@@ -307,7 +307,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 @page { size: A4 landscape; margin: 9mm; }
 @media print {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-base, .expander { display: none !important; }
+  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-bases, #view-base, .expander { display: none !important; }
   .app { display: block; }
   .main-col { max-width: none; }
   .grp-title { display: none; }
@@ -356,3 +356,48 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 .avancado > summary { cursor: pointer; list-style-position: inside; padding: 2px 0; }
 .avancado[open] > summary { margin-bottom: 4px; }
 .avancado .card { box-shadow: none; }
+
+/* ---------- Bases de campo ---------- */
+.pasta { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); min-width: 0; }
+.pasta > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 16px; font-weight: 700; border-radius: var(--radius); }
+.pasta > summary::-webkit-details-marker { display: none; }
+.pasta > summary:hover { background: #f3f5f9; }
+.pasta > summary .ico { color: var(--muted); }
+.pasta > summary .ico:first-child { transition: transform 0.12s; }
+.pasta[open] > summary .ico:first-child { transform: rotate(90deg); }
+.pasta-nome { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.pasta-cont { font-size: 12.5px; font-weight: 600; color: var(--muted); background: #eef1f5; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.pasta-corpo { display: grid; gap: 12px; padding: 4px 14px 14px; min-width: 0; }
+.pasta-dia { box-shadow: none; background: #fbfcfe; }
+.pasta-dia > summary { font-size: 14px; padding: 10px 14px; }
+.basecard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; min-width: 0; box-shadow: var(--shadow); }
+.basehead { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-start; justify-content: space-between; }
+.basetitle { min-width: 0; flex: 1 1 260px; }
+.basetitle h3 { font-size: 15px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.basetitle .hint { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.basetools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.datefield { display: grid; gap: 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.datefield input { min-height: 32px; padding: 3px 8px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fff; }
+.progresso { display: flex; align-items: center; gap: 12px; }
+.progresso-bar { flex: 1 1 auto; height: 10px; border-radius: 999px; background: #e9edf3; overflow: hidden; }
+.progresso-bar > span { display: block; height: 100%; background: var(--exec); border-radius: 999px; }
+.progresso-txt { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.minis { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mini { background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mini-label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.mini-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.mini-sub { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+@media (min-width: 720px) {
+  .minis-base { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .minis-res { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) {
+  .minis-res { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .mini-value { font-size: 20px; }
+}
+@media (max-width: 420px) {
+  .basetools .btn { flex: 1 1 auto; }
+}
+@media (max-width: 560px) {
+  .tabs button { white-space: normal; text-align: center; flex: 1 1 auto; line-height: 1.2; padding: 7px 6px; font-size: 13px; }
+}

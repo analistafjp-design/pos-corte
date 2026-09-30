@@ -43,3 +43,7 @@ O painel é só código (sem dados), então pode ficar em uma URL fixa. O `node 
 3. Os arquivos continuam sendo lidos **no computador de quem abre a página**: nada da pasta do OneDrive é enviado ao GitHub.
 
 Observações: a página publicada é pública (quem tiver a URL a vê, mas só vê o painel vazio). Em repositório privado, o GitHub Pages exige plano pago (Pro/Team). Os dados gravados no navegador ficam ligados ao endereço da página; abrir por outra URL (ou pelo arquivo local) começa sem eles.
+
+## Bases de campo
+
+A aba **Bases de campo** recebe as bases geradas pela estratégia que saem para campo (o nome do arquivo deve ter a data, ex.: `Base_Campo_28_09_2026.xlsx`). Ao subir a base, o painel cruza cada linha (Cód. Protocolo Origem, ou Matrícula quando não há protocolo) com as atividades Exec/Exoc já carregadas, realizadas a partir da data da base, e mostra: total da base, data que subiu, percorrido, quanto falta, Exec, Exoc, termos, assertividade, negociações, efetividade, sem desdobro e total de equipes. O botão **Baixar o que falta (Excel)** exporta as linhas ainda não percorridas. As bases ficam gravadas no navegador, organizadas por mês e pela data em que subiram.

@@ -315,7 +315,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 @page { size: A4 landscape; margin: 9mm; }
 @media print {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-base, .expander { display: none !important; }
+  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-bases, #view-base, .expander { display: none !important; }
   .app { display: block; }
   .main-col { max-width: none; }
   .grp-title { display: none; }
@@ -365,6 +365,51 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 .avancado[open] > summary { margin-bottom: 4px; }
 .avancado .card { box-shadow: none; }
 
+/* ---------- Bases de campo ---------- */
+.pasta { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); min-width: 0; }
+.pasta > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 16px; font-weight: 700; border-radius: var(--radius); }
+.pasta > summary::-webkit-details-marker { display: none; }
+.pasta > summary:hover { background: #f3f5f9; }
+.pasta > summary .ico { color: var(--muted); }
+.pasta > summary .ico:first-child { transition: transform 0.12s; }
+.pasta[open] > summary .ico:first-child { transform: rotate(90deg); }
+.pasta-nome { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.pasta-cont { font-size: 12.5px; font-weight: 600; color: var(--muted); background: #eef1f5; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.pasta-corpo { display: grid; gap: 12px; padding: 4px 14px 14px; min-width: 0; }
+.pasta-dia { box-shadow: none; background: #fbfcfe; }
+.pasta-dia > summary { font-size: 14px; padding: 10px 14px; }
+.basecard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; min-width: 0; box-shadow: var(--shadow); }
+.basehead { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-start; justify-content: space-between; }
+.basetitle { min-width: 0; flex: 1 1 260px; }
+.basetitle h3 { font-size: 15px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.basetitle .hint { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.basetools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.datefield { display: grid; gap: 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.datefield input { min-height: 32px; padding: 3px 8px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fff; }
+.progresso { display: flex; align-items: center; gap: 12px; }
+.progresso-bar { flex: 1 1 auto; height: 10px; border-radius: 999px; background: #e9edf3; overflow: hidden; }
+.progresso-bar > span { display: block; height: 100%; background: var(--exec); border-radius: 999px; }
+.progresso-txt { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.minis { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mini { background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mini-label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.mini-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.mini-sub { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+@media (min-width: 720px) {
+  .minis-base { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .minis-res { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) {
+  .minis-res { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .mini-value { font-size: 20px; }
+}
+@media (max-width: 420px) {
+  .basetools .btn { flex: 1 1 auto; }
+}
+@media (max-width: 560px) {
+  .tabs button { white-space: normal; text-align: center; flex: 1 1 auto; line-height: 1.2; padding: 7px 6px; font-size: 13px; }
+}
+
 </style>
 </head>
 <body>
@@ -409,6 +454,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
     <main id="main" tabindex="-1">
       <section id="view-geral" aria-label="Visão geral"></section>
       <section id="view-analitico" aria-label="Analítico" hidden></section>
+      <section id="view-bases" aria-label="Bases de campo" hidden></section>
       <section id="view-base" aria-label="Arquivos e regras" hidden></section>
     </main>
   </div>
@@ -2267,6 +2313,166 @@ window.FRENTES_PADRAO = [
 
   /* ------------------------------------------------------------------ */
 
+
+  /* ------------------------------------------------------------------ */
+  /* Bases enviadas a campo: leitura, chave de cruzamento e avaliação     */
+  /* ------------------------------------------------------------------ */
+
+  const BASE_PROTOCOLO = new Set(['cod protocolo origem', 'codigo protocolo origem', 'protocolo origem', 'cod protocolo', 'codigo protocolo', 'protocolo', 'numero protocolo', 'n protocolo']);
+  const BASE_MATRICULA = new Set(['matricula', 'matricula cliente', 'matricula do cliente', 'cod matricula', 'codigo matricula', 'matr']);
+  const MAX_LINHAS_BASE = 300000;
+
+  /** Data (AAAA-MM-DD) contida no nome do arquivo, ou '' quando não há uma data reconhecível. */
+  function dataDoNome(nome) {
+    const n = String(nome || '').replace(/\.[A-Za-z0-9]+$/, '');
+    const tenta = (re, ordem) => {
+      const m = re.exec(n);
+      if (!m) return '';
+      let y, mo, d;
+      if (ordem === 'ymd') { y = +m[1]; mo = +m[2]; d = +m[3]; }
+      else { d = +m[1]; mo = +m[2]; y = +m[3]; if (y < 100) y += 2000; }
+      return validYMD(y, mo, d) ? y + '-' + pad2(mo) + '-' + pad2(d) : '';
+    };
+    return (
+      tenta(/(?:^|[^0-9])(20\d{2})[-_.\s](\d{1,2})[-_.\s](\d{1,2})(?![0-9])/, 'ymd') ||
+      tenta(/(?:^|[^0-9])(\d{1,2})[-_.\s](\d{1,2})[-_.\s](20\d{2})(?![0-9])/, 'dmy') ||
+      tenta(/(?:^|[^0-9])(\d{1,2})[-_.\s](\d{1,2})[-_.\s](\d{2})(?![0-9])/, 'dmy') ||
+      tenta(/(?:^|[^0-9])(20\d{2})(\d{2})(\d{2})(?![0-9])/, 'ymd') ||
+      tenta(/(?:^|[^0-9])(\d{2})(\d{2})(20\d{2})(?![0-9])/, 'dmy') ||
+      ''
+    );
+  }
+
+  /** Normaliza protocolo/matrícula para comparar (sem espaços, ".0" de número, zeros à esquerda e caixa). */
+  function chaveNorm(v) {
+    let t = String(v == null ? '' : v).trim().replace(/\.0+$/, '').replace(/\s+/g, '').toUpperCase();
+    if (/^\d+$/.test(t)) t = t.replace(/^0+(?=\d)/, '');
+    return t;
+  }
+
+  /**
+   * Lê uma base enviada a campo: todas as colunas da primeira aba (preferindo uma chamada "base").
+   * Devolve { aba, colunas, linhas, colProtocolo, colMatricula, dataNome }.
+   */
+  async function readBaseCampo(file, opts) {
+    opts = opts || {};
+    const wb = await openWorkbook(file);
+    const ctx = await wb.loadContext();
+    const visiveis = wb.sheets.filter((x) => x.state === 'visible');
+    const lista = visiveis.length ? visiveis : wb.sheets;
+    const sheet = lista.find((x) => /base/.test(norm(x.name))) || lista[0];
+    let cabecalho = null;
+    let colProtocolo = -1;
+    let colMatricula = -1;
+    let scanned = 0;
+    let truncado = false;
+    let candidato = null;
+    const linhas = [];
+    const fmt = (v, k) => {
+      if (k === 2) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}:\d{2}):\d{2})?$/.exec(v);
+        if (m) return m[3] + '/' + m[2] + '/' + m[1] + (m[4] && m[4] !== '00:00' ? ' ' + m[4] : '');
+      }
+      return v;
+    };
+    await scanSheet(wb, sheet, ctx, (n, cols, vals, kinds) => {
+      if (!cabecalho) {
+        scanned++;
+        const nomes = [];
+        let preenchidas = 0;
+        let achou = false;
+        for (let j = 0; j < n; j++) {
+          const t = trimStr(vals[j]);
+          if (!t) continue;
+          preenchidas++;
+          nomes[cols[j]] = t;
+          const h = normHeader(t);
+          if (BASE_PROTOCOLO.has(h) || BASE_MATRICULA.has(h)) achou = true;
+        }
+        if (!candidato && preenchidas >= 2) candidato = nomes.filter(Boolean);
+        if (achou) {
+          const usados = [];
+          for (let c = 0; c < nomes.length; c++) if (nomes[c] !== undefined) usados.push(c);
+          cabecalho = { cols: usados, nomes: usados.map((c) => nomes[c]) };
+          cabecalho.nomes.forEach((nm, i) => {
+            const h = normHeader(nm);
+            if (colProtocolo < 0 && BASE_PROTOCOLO.has(h)) colProtocolo = i;
+            if (colMatricula < 0 && BASE_MATRICULA.has(h)) colMatricula = i;
+          });
+        } else if (scanned >= MAX_HEADER_SCAN_ROWS) return true;
+        return;
+      }
+      if (linhas.length >= MAX_LINHAS_BASE) { truncado = true; return true; }
+      const porCol = new Map();
+      for (let j = 0; j < n; j++) porCol.set(cols[j], fmt(vals[j], kinds[j]));
+      const row = cabecalho.cols.map((c) => (porCol.has(c) ? porCol.get(c) : ''));
+      if (row.some((x) => trimStr(x) !== '')) linhas.push(row);
+    }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo a base', fraction: f }); });
+    if (!cabecalho && candidato) {
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
+    }
+    if (!cabecalho) {
+      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula".');
+    }
+    if (colProtocolo < 0 && colMatricula < 0) {
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
+    }
+    if (!linhas.length) throw new PcError('SEM_LINHAS', 'A aba "' + sheet.name + '" não tem linhas de dados abaixo do cabeçalho.');
+    return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name), truncado };
+  }
+
+  /**
+   * Cruza a base com as atividades realizadas (Exec/Exoc). Um item da base está percorrido quando existe atividade
+   * com o mesmo Cód. Protocolo Origem (ou, se a linha não tem protocolo, a mesma Matrícula), realizada a partir da data da base.
+   * Vale a atividade mais recente de cada item.
+   */
+  function avaliarBase(base, records, dataBase) {
+    const pos = (r) => !dataBase || (r.data && r.data >= dataBase);
+    const porProt = new Map();
+    const porMat = new Map();
+    const guarda = (mapa, k, r) => {
+      if (!k) return;
+      const a = mapa.get(k);
+      if (!a || (r.data || '') > (a.data || '')) mapa.set(k, r);
+    };
+    for (const r of records) {
+      if (!pos(r)) continue;
+      guarda(porProt, chaveNorm(r.protocolo), r);
+      guarda(porMat, chaveNorm(r.matricula), r);
+    }
+    const vistos = new Set();
+    const casadas = [];
+    const pendentes = [];
+    let duplicadas = 0;
+    let semChave = 0;
+    const cp = base.colProtocolo;
+    const cm = base.colMatricula;
+    base.linhas.forEach((row, i) => {
+      const p = cp >= 0 ? chaveNorm(row[cp]) : '';
+      const m = cm >= 0 ? chaveNorm(row[cm]) : '';
+      const item = p ? 'p:' + p : m ? 'm:' + m : '';
+      if (item) {
+        if (vistos.has(item)) { duplicadas++; return; }
+        vistos.add(item);
+      } else semChave++;
+      const r = p ? porProt.get(p) : m ? porMat.get(m) : null;
+      if (r) casadas.push(r); else pendentes.push(i);
+    });
+    const total = vistos.size + semChave;
+    const resumo = summarize(casadas);
+    return {
+      total,
+      percorridos: casadas.length,
+      faltam: pendentes.length,
+      pct: total ? casadas.length / total : null,
+      resumo,
+      pendentes,
+      duplicadas,
+      semChave,
+      chave: cp >= 0 ? 'Cód. Protocolo Origem' + (cm >= 0 ? ' (ou Matrícula quando o protocolo está vazio)' : '') : 'Matrícula',
+    };
+  }
+
   return {
     PcError, PARSER_VERSION, CODIGOS_SERVICO, codigoServico, FIELDS, INDICADORES, INDICADOR_BY_KEY, NAO_MAPEADA, SEM_DATA, CSV_COLUMNS,
     norm, normHeader, isBlank, decodeEntities, decodeText,
@@ -2276,6 +2482,7 @@ window.FRENTES_PADRAO = [
     buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate, ordenarArquivos,
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell, agrupar,
+    dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
   };
 });
 
@@ -2566,7 +2773,50 @@ window.FRENTES_PADRAO = [
     return [resumo, mensal, cidades, equipes, frentes, registros];
   }
 
-  return { toXlsx, montarExport, criarZip, crc32, isoParaSerial };
+
+  /**
+   * Excel de uma base enviada a campo: resumo dos indicadores e as linhas que ainda faltam percorrer.
+   * `meta`: { nome, enviadoEm: 'texto', dataBase: 'texto', geradoEm: Date }.
+   */
+  function montarExportBase(base, av, meta) {
+    meta = meta || {};
+    const r = av.resumo;
+    const dt = meta.geradoEm instanceof Date ? meta.geradoEm : new Date();
+    const dtTxt = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+    const resumo = {
+      nome: 'Resumo da base',
+      colunas: [34, 22, 70],
+      linhas: [
+        [{ v: 'Pós-Corte Interior — Base enviada a campo', f: 'titulo' }],
+        [{ v: 'Base', f: 'negrito' }, meta.nome || '—'],
+        [{ v: 'Enviada (subida) em', f: 'negrito' }, meta.enviadoEm || '—'],
+        [{ v: 'Data da base', f: 'negrito' }, meta.dataBase || 'não informada'],
+        [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
+        [],
+        [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
+        ['Total da base', intCel(av.total), 'Itens distintos da base (' + av.chave + ')'],
+        ['Percorrido da base', intCel(av.percorridos), 'Itens da base com atividade Exec ou Exoc' + (meta.dataBase ? ' realizada a partir de ' + meta.dataBase : '')],
+        ['Faltam percorrer', intCel(av.faltam), 'Total da base − percorrido (linhas na aba "Faltam percorrer")'],
+        ['% percorrido', pctCel(av.pct), 'Percorrido ÷ total da base'],
+        ['Total de Exec', intCel(r.exec), 'Status da Atividade = Finalizada'],
+        ['Total de Exoc', intCel(r.exoc), 'Status da Atividade = Encerrada com Ocorrência'],
+        ['Termos aplicados', intCel(r.termos), 'Serviço adicionais resposta contém o código 110013 (Serviços) ou 310013 (VCG)'],
+        ['Assertividade', pctCel(r.assertividade), 'Termos ÷ Exec'],
+        ['Negociações', intCel(r.neg), 'Negociou O Débito? = Sim'],
+        ['Efetividade', pctCel(r.efetividade), 'Negociações ÷ Exec'],
+        ['Negociações Sem Desdobro', intCel(r.semDesdobro), 'Negociação com Serviço adicionais resposta vazio'],
+        ['Equipes que trabalharam', intCel(r.equipes), 'Recursos distintos nas atividades desta base'],
+      ],
+    };
+    const faltam = {
+      nome: 'Faltam percorrer',
+      colunas: base.colunas.map((c) => (c.length > 24 ? 30 : Math.max(14, c.length + 3))),
+      cabecalho: 1,
+      linhas: [base.colunas.map(cab)].concat(av.pendentes.map((i) => base.linhas[i])),
+    };
+    return [resumo, faltam];
+  }
+  return { toXlsx, montarExport, montarExportBase, criarZip, crc32, isoParaSerial };
 });
 
 </script>
@@ -2629,6 +2879,9 @@ window.FRENTES_PADRAO = [
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const ICONS = {
+    trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    chevron: '<path d="m9 18 6-6-6-6"/>',
+    layers: '<path d="m12 2 10 5-10 5L2 7l10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
     arrow: '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>',
     folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
     refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
@@ -2697,6 +2950,10 @@ window.FRENTES_PADRAO = [
     exportando: false,
     leitura: { lidos: 0, salvos: 0, memoria: 0 },
     complementares: new Set(),
+    bases: [],
+    basesUI: { abertos: new Set(), inicial: true, lendo: false },
+    baseEval: new Map(),
+    baseEvalRecords: null,
   };
   let vm = null; // modelo de visualização calculado a partir dos filtros
   let anRows = []; // linhas do analítico (filtros + indicador + busca)
@@ -2799,11 +3056,12 @@ window.FRENTES_PADRAO = [
   const idb = {
     open() {
       return new Promise((res, rej) => {
-        const r = indexedDB.open('poscorte', 2);
+        const r = indexedDB.open('poscorte', 3);
         r.onupgradeneeded = () => {
           const db = r.result;
           if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
           if (!db.objectStoreNames.contains('arquivos')) db.createObjectStore('arquivos');
+          if (!db.objectStoreNames.contains('bases')) db.createObjectStore('bases');
         };
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
@@ -2826,6 +3084,10 @@ window.FRENTES_PADRAO = [
     get(k) { return this.op('kv', 'readonly', (st) => st.get(k)); },
     set(k, v) { return this.op('kv', 'readwrite', (st) => { st.put(v, k); }); },
     // resultado já lido de cada arquivo (só os campos usados); a chave inclui caminho, tamanho e data
+    // bases enviadas a campo (páginas "Bases de campo"): não são apagadas por "Limpar dados gravados"
+    baseLista() { return this.op('bases', 'readonly', (st) => st.getAll()); },
+    basePut(k, v) { return this.op('bases', 'readwrite', (st) => { st.put(v, k); }); },
+    baseDel(k) { return this.op('bases', 'readwrite', (st) => { st.delete(k); }); },
     arquivoTem(k) { return this.op('arquivos', 'readonly', (st) => st.count(k)).then((n) => n > 0); },
     arquivoGet(k) { return this.op('arquivos', 'readonly', (st) => st.get(k)); },
     arquivoPut(k, v) { return this.op('arquivos', 'readwrite', (st) => { st.put(v, k); }); },
@@ -3315,6 +3577,7 @@ window.FRENTES_PADRAO = [
   const VIEWS = [
     { k: 'geral', t: 'Visão geral', i: 'dash' },
     { k: 'analitico', t: 'Analítico', i: 'table' },
+    { k: 'bases', t: 'Bases de campo', i: 'layers' },
     { k: 'base', t: 'Arquivos e regras', i: 'book' },
   ];
   function montarNav() {
@@ -4036,6 +4299,219 @@ window.FRENTES_PADRAO = [
     ));
   }
 
+
+  /* ------------------------------------------------------------------ */
+  /* Bases de campo: bases geradas pela estratégia e enviadas às equipes  */
+  /* ------------------------------------------------------------------ */
+
+  const MESES_LONGOS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const ymdLocal = (ms) => { const d = new Date(ms); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
+  const dataBR = (iso) => (iso ? PC.isoToBR(iso) : '');
+
+  async function carregarBases() {
+    if (!window.indexedDB) return;
+    try {
+      const lista = await idb.baseLista();
+      const ids = new Set(state.bases.map((b) => b.id));
+      for (const b of lista || []) if (b && b.id && !ids.has(b.id)) state.bases.push(b);
+    } catch (_) { /* sem armazenamento: as bases valem só nesta sessão */ }
+    if (state.view === 'bases') renderTudo();
+  }
+
+  function avaliacaoDaBase(b) {
+    if (state.baseEvalRecords !== state.records) { state.baseEval.clear(); state.baseEvalRecords = state.records; }
+    const k = b.id + '|' + (b.dataBase || '');
+    let av = state.baseEval.get(k);
+    if (!av) { av = PC.avaliarBase(b, state.records, b.dataBase || ''); state.baseEval.set(k, av); }
+    return av;
+  }
+
+  async function subirBases(files) {
+    const lista = [...files].filter((f) => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
+    const rejeitados = [...files].filter((f) => !lista.includes(f)).map((f) => f.name);
+    if (!lista.length) {
+      setStatus({ kind: 'warning', title: 'Nenhum arquivo .xlsx selecionado', detail: 'A base precisa estar em .xlsx.' + (rejeitados.length ? ' Ignorado(s): ' + rejeitados.join(', ') + '.' : '') });
+      return;
+    }
+    state.basesUI.lendo = true;
+    const ok = [];
+    const erros = rejeitados.map((n) => n + ' — formato não suportado (use .xlsx)');
+    for (let i = 0; i < lista.length; i++) {
+      const f = lista[i];
+      try {
+        setStatus({ kind: 'info', title: 'Lendo a base…', detail: 'Arquivo ' + (i + 1) + ' de ' + lista.length + ': ' + f.name, progress: i / lista.length });
+        const r = await PC.readBaseCampo(f, { onProgress: (p) => setStatus({ kind: 'info', title: 'Lendo a base…', detail: 'Arquivo ' + (i + 1) + ' de ' + lista.length + ': ' + f.name + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / lista.length }) });
+        const agora = Date.now();
+        const b = {
+          id: agora.toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+          nome: f.name,
+          tamanho: f.size,
+          enviadoEm: agora,
+          dataBase: r.dataNome || '',
+          dataNome: r.dataNome || '',
+          aba: r.aba,
+          colunas: r.colunas,
+          linhas: r.linhas,
+          colProtocolo: r.colProtocolo,
+          colMatricula: r.colMatricula,
+          truncado: !!r.truncado,
+        };
+        state.bases.push(b);
+        try { await idb.basePut(b.id, b); } catch (_) { b.semGravar = true; }
+        ok.push(b);
+      } catch (err) {
+        erros.push(f.name + ' — ' + friendly(err));
+      }
+    }
+    state.basesUI.lendo = false;
+    if (ok.length) {
+      const ultima = ok[ok.length - 1];
+      state.basesUI.abertos.add('m:' + ymdLocal(ultima.enviadoEm).slice(0, 7));
+      state.basesUI.abertos.add('d:' + ymdLocal(ultima.enviadoEm));
+    }
+    const semData = ok.filter((b) => !b.dataBase).length;
+    const semGravar = ok.filter((b) => b.semGravar).length;
+    const avisos = [];
+    if (semData) avisos.push(semData + ' ' + plural(semData, 'base sem data reconhecida no nome', 'bases sem data reconhecida no nome') + ': o cruzamento considera todas as atividades carregadas. Informe a "Data da base" no cartão para contar só o que foi feito depois dela.');
+    if (semGravar) avisos.push('Não foi possível gravar ' + semGravar + ' no navegador: ficam só nesta sessão.');
+    if (ok.some((b) => b.truncado)) avisos.push('Base com muitas linhas: só as primeiras 300.000 foram lidas.');
+    setStatus({
+      kind: erros.length || avisos.length ? 'warning' : 'success',
+      title: ok.length ? (ok.length === 1 ? 'Base enviada: ' + ok[0].nome : ok.length + ' bases enviadas') : 'Nenhuma base foi enviada',
+      detail: ok.length ? ok.map((b) => b.nome + ' — ' + fmtInt(b.linhas.length) + ' linhas').join('; ') : 'Verifique os arquivos abaixo.',
+      items: erros.map((e) => 'Não enviado: ' + e).concat(avisos),
+    });
+    renderTudo();
+  }
+
+  async function excluirBase(b) {
+    if (!window.confirm('Excluir a base "' + b.nome + '"? Ela some desta lista (o arquivo original não é apagado).')) return;
+    state.bases = state.bases.filter((x) => x.id !== b.id);
+    state.baseEval.clear();
+    try { await idb.baseDel(b.id); } catch (_) { /* ignora */ }
+    renderTudo();
+  }
+
+  async function mudarDataBase(b, iso) {
+    b.dataBase = iso || '';
+    state.baseEval.clear();
+    try { await idb.basePut(b.id, b); } catch (_) { /* ignora */ }
+    renderTudo();
+  }
+
+  async function baixarFaltantes(b) {
+    const av = avaliacaoDaBase(b);
+    try {
+      const sheets = window.PosCorteExport.montarExportBase(b, av, { nome: b.nome, enviadoEm: fmtDataHora(b.enviadoEm), dataBase: dataBR(b.dataBase), geradoEm: new Date() });
+      const bytes = await window.PosCorteExport.toXlsx(sheets);
+      const nome = 'faltam-percorrer_' + b.nome.replace(/\.xlsx$/i, '').replace(/[^\w.-]+/g, '_') + '_' + ymdLocal(Date.now()).replace(/-/g, '') + '.xlsx';
+      baixarBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nome);
+    } catch (err) {
+      setStatus({ kind: 'error', title: 'Não foi possível gerar o Excel', detail: (err && err.message) || String(err) });
+    }
+  }
+
+  function miniKpi(chave, rotulo, valor, sub, cor) {
+    return h('div', { class: 'mini', dataset: { bk: chave }, style: { '--kc': cor || COR.atividades } },
+      h('span', { class: 'mini-label' }, h('i', { class: 'kdot' }), rotulo),
+      h('span', { class: 'mini-value num', text: valor }),
+      sub ? h('span', { class: 'mini-sub', text: sub }) : null);
+  }
+
+  function cartaoBase(b) {
+    const av = avaliacaoDaBase(b);
+    const r = av.resumo;
+    const pctTxt = av.pct == null ? '—' : (av.pct * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    const notas = [];
+    if (av.duplicadas) notas.push(fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'linha repetida', 'linhas repetidas') + ' na base (contadas uma vez).');
+    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' protocolo e matrícula (contam como faltantes).');
+    if (!state.records.length) notas.push('As atividades realizadas ainda não foram carregadas: conecte a pasta para calcular o percorrido.');
+    const campoData = h('input', { type: 'date', value: b.dataBase || '', 'aria-label': 'Data da base ' + b.nome, onchange: (e) => mudarDataBase(b, e.target.value) });
+    return h('article', { class: 'basecard', dataset: { baseId: b.id }, 'aria-label': 'Base ' + b.nome },
+      h('div', { class: 'basehead' },
+        h('div', { class: 'basetitle' },
+          h('h3', { text: b.nome }),
+          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento por ' + av.chave })),
+        h('div', { class: 'basetools' },
+          h('label', { class: 'datefield' }, h('span', { text: 'Data da base' }), campoData),
+          h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar' }, disabled: av.faltam === 0, onclick: () => baixarFaltantes(b) }, icon('download', 16), h('span', { text: 'Baixar o que falta (Excel)' })),
+          h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Excluir a base ' + b.nome, title: 'Excluir esta base da lista', onclick: () => excluirBase(b) }, icon('trash', 16)))),
+      h('div', { class: 'progresso' },
+        h('div', { class: 'progresso-bar', role: 'img', 'aria-label': pctTxt + ' da base percorrido' }, h('span', { style: { width: Math.min(100, (av.pct || 0) * 100) + '%' } })),
+        h('span', { class: 'progresso-txt num', text: pctTxt + ' percorrido' })),
+      h('div', { class: 'minis minis-base' },
+        miniKpi('total', 'Total da base', fmtInt(av.total), 'itens distintos', COR.atividades),
+        miniKpi('percorrido', 'Percorrido', fmtInt(av.percorridos), 'Exec + Exoc desta base', COR.exec),
+        miniKpi('faltam', 'Faltam percorrer', fmtInt(av.faltam), 'sobra da base', COR.exoc),
+        miniKpi('subiu', 'Data que subiu', dataBR(ymdLocal(b.enviadoEm)), b.dataBase ? 'data da base: ' + dataBR(b.dataBase) : 'sem data da base', COR.atividades)),
+      h('div', { class: 'minis minis-res' },
+        miniKpi('exec', 'Total de Exec', fmtInt(r.exec), null, COR.exec),
+        miniKpi('exoc', 'Total de Exoc', fmtInt(r.exoc), null, COR.exoc),
+        miniKpi('termos', 'Termos aplicados', fmtInt(r.termos), null, COR.termos),
+        miniKpi('assertividade', 'Assertividade', fmtPctVal(r.assertividade), 'Termos ÷ Exec', COR.termos),
+        miniKpi('neg', 'Negociações', fmtInt(r.neg), null, COR.neg),
+        miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), 'Negociações ÷ Exec', COR.neg),
+        miniKpi('semDesdobro', 'Sem Desdobro', fmtInt(r.semDesdobro), null, COR.semDesdobro),
+        miniKpi('equipes', 'Total de equipes', fmtInt(r.equipes), null, COR.atividades)),
+      notas.length ? h('p', { class: 'note', text: notas.join(' ') }) : null);
+  }
+
+  function pastaDetalhes(chave, titulo, contagem, filhos, nivel) {
+    const aberta = state.basesUI.abertos.has(chave);
+    const d = h('details', { class: 'pasta pasta-' + nivel, dataset: { pasta: chave } },
+      h('summary', null, icon('chevron', 16), icon('folder', 18), h('span', { class: 'pasta-nome', text: titulo }), h('span', { class: 'pasta-cont', text: contagem })),
+      h('div', { class: 'pasta-corpo' }, filhos));
+    if (aberta) d.open = true;
+    d.addEventListener('toggle', () => { if (d.open) state.basesUI.abertos.add(chave); else state.basesUI.abertos.delete(chave); });
+    return d;
+  }
+
+  function renderBases() {
+    const root = $('#view-bases');
+    if (!root.dataset.pronto) {
+      root.dataset.pronto = '1';
+      const inp = h('input', { type: 'file', id: 'inp-bases', accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', multiple: true, hidden: true });
+      inp.addEventListener('change', () => { const fs = [...inp.files]; inp.value = ''; if (fs.length) subirBases(fs); });
+      document.body.append(inp);
+    }
+    const subir = h('button', { class: 'btn primary', type: 'button', id: 'btn-subir-base', disabled: state.basesUI.lendo, onclick: () => $('#inp-bases').click() }, icon('upload'), h('span', { text: 'Subir base' }));
+    const topo = h('section', { class: 'card' },
+      h('div', { class: 'card-head' },
+        h('div', null,
+          h('h2', { text: 'Bases de campo' }),
+          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (o nome do arquivo deve ter a data). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
+        subir),
+      h('p', { class: 'note', text: 'Cruzamento: um item da base está percorrido quando há atividade Exec ou Exoc com o mesmo Cód. Protocolo Origem (ou a mesma Matrícula, se a linha não tiver protocolo) realizada a partir da data da base; vale a atividade mais recente. Total da base = itens distintos.' }));
+    if (!state.bases.length) {
+      root.replaceChildren(h('div', { class: 'stack' }, topo, h('section', { class: 'card empty' },
+        h('h2', { text: 'Nenhuma base enviada ainda' }),
+        h('p', { text: 'Clique em "Subir base" e escolha o arquivo .xlsx que foi para campo. Os indicadores aparecem automaticamente.' }))));
+      return;
+    }
+    const meses = new Map();
+    for (const b of [...state.bases].sort((a, c) => c.enviadoEm - a.enviadoEm)) {
+      const dia = ymdLocal(b.enviadoEm);
+      const mes = dia.slice(0, 7);
+      if (!meses.has(mes)) meses.set(mes, new Map());
+      const dias = meses.get(mes);
+      if (!dias.has(dia)) dias.set(dia, []);
+      dias.get(dia).push(b);
+    }
+    if (state.basesUI.inicial) {
+      state.basesUI.inicial = false;
+      const m0 = [...meses.keys()][0];
+      state.basesUI.abertos.add('m:' + m0);
+      state.basesUI.abertos.add('d:' + [...meses.get(m0).keys()][0]);
+    }
+    const pastas = [...meses.entries()].map(([mes, dias]) => {
+      const total = [...dias.values()].reduce((a, l) => a + l.length, 0);
+      const nomeMes = MESES_LONGOS[+mes.slice(5, 7) - 1] + ' de ' + mes.slice(0, 4);
+      return pastaDetalhes('m:' + mes, nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1), total + ' ' + plural(total, 'base', 'bases'),
+        [...dias.entries()].map(([dia, lista]) => pastaDetalhes('d:' + dia, 'Subiu em ' + dataBR(dia), lista.length + ' ' + plural(lista.length, 'base', 'bases'), lista.map(cartaoBase), 'dia')), 'mes');
+    });
+    root.replaceChildren(h('div', { class: 'stack' }, topo, pastas));
+  }
+
   /* ------------------------------------------------------------------ */
   /* Renderização geral                                                  */
   /* ------------------------------------------------------------------ */
@@ -4043,11 +4519,13 @@ window.FRENTES_PADRAO = [
   function renderTudo() {
     const ativo = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : '';
     const tem = state.records.length > 0;
-    $('#filters').hidden = !tem;
+    $('#filters').hidden = !tem || state.view === 'bases';
+    $('#chips').hidden = state.view === 'bases';
     calcular();
     renderChips();
     if (state.view === 'geral') renderGeral();
     else if (state.view === 'analitico') renderAnalitico();
+    else if (state.view === 'bases') renderBases();
     else renderBase();
     renderSideFoot();
     if (ativo) {
@@ -4081,6 +4559,7 @@ window.FRENTES_PADRAO = [
       setStatus({ kind: 'info', title: 'Seleção manual de pasta', detail: 'Este navegador não permite acesso contínuo à pasta. Use "Conectar pasta" para escolhê-la e selecione-a de novo quando quiser atualizar. Para leitura automática a cada 60 s, abra o painel no Chrome ou no Edge.' });
     }
     restaurarPasta();
+    carregarBases();
   }
   window.__poscorte = { state, PC, carregar, get vm() { return vm; }, get anRows() { return anRows; } }; // gancho para testes e diagnóstico
   init();

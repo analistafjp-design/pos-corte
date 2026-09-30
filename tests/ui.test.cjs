@@ -436,7 +436,7 @@ test('lê só arquivo novo ou modificado: Atualizar, arquivo novo, arquivo alter
 
   // recarregar a página: tudo vem do que ficou gravado, nada é lido dos arquivos
   await page.waitForFunction(() => new Promise((res) => {
-    const r = indexedDB.open('poscorte', 2);
+    const r = indexedDB.open('poscorte', 3);
     r.onsuccess = () => {
       const c = r.result.transaction('arquivos').objectStore('arquivos').getAllKeys();
       c.onsuccess = () => { r.result.close(); const gravadas = new Set(c.result); res([...window.__poscorte.state.cache.keys()].every((k) => gravadas.has(k)) && gravadas.size === 3); };
@@ -719,7 +719,7 @@ test('nome do painel e abas: Pós-Corte Interior; Visão geral, Analítico e Arq
   assert.equal(await page.title(), 'Pós-Corte Interior');
   assert.equal(await page.textContent('h1'), 'Pós-Corte Interior');
   assert.match(await page.textContent('.title h1'), /Pós-Corte Interior/);
-  assert.deepEqual(await page.$$eval('#nav-tabs button', (bs) => bs.map((b) => b.textContent.trim())), ['Visão geral', 'Analítico', 'Arquivos e regras']);
+  assert.deepEqual(await page.$$eval('#nav-tabs button', (bs) => bs.map((b) => b.textContent.trim())), ['Visão geral', 'Analítico', 'Bases de campo', 'Arquivos e regras']);
   await page.context().close();
 });
 
@@ -757,5 +757,82 @@ test('Base e regras: fonte, conferências, colunas, frentes e regras em portugu�
   ]) assert.ok(t.includes(trecho), trecho);
   assert.match(t, /1 atividades em "Não mapeada"|1 atividade em "Não mapeada"|Recursos sem Nomenclatura correspondente: QQ-01 \(1\)/);
   semErros(page);
+  await page.context().close();
+});
+
+/* ---------- Bases de campo ---------- */
+const BASE_CAMPO = fx('Base_Campo_28_09_2026.xlsx');
+const BASE_SEM_CHAVE = fx('Base_Sem_Chave.xlsx');
+const miniTxt = (page, k) => page.textContent(`.basecard [data-bk="${k}"] .mini-value`);
+
+test('bases de campo: subir base, indicadores, pastas por mês/data, Excel do que falta e persistência', { timeout: 120000 }, async () => {
+  const page = await abrir();
+  await importar(page, PEQUENO);
+  await page.click('#nav-tabs button[data-view=bases]');
+  assert.ok(await page.locator('#filters').isHidden(), 'filtros não valem para as bases');
+  assert.match(await page.textContent('#view-bases'), /Nenhuma base enviada ainda/);
+  // base sem coluna de chave é recusada com mensagem clara
+  await page.setInputFiles('#inp-bases', BASE_SEM_CHAVE);
+  await page.waitForFunction(() => /Nenhuma base foi enviada/.test(document.querySelector('#status').textContent));
+  assert.match(await statusTexto(page), /Cód\. Protocolo Origem.*Matrícula/);
+  assert.equal(await page.locator('.basecard').count(), 0);
+  // base válida: data 28/09/2026 (do nome) => só conta o realizado a partir dela (ID 17, protocolo OS1)
+  await page.setInputFiles('#inp-bases', BASE_CAMPO);
+  await page.waitForSelector('.basecard');
+  assert.equal(await page.textContent('.basecard h3'), 'Base_Campo_28_09_2026.xlsx');
+  assert.equal(await miniTxt(page, 'total'), '4', 'OS1, OS2, OS3 e a linha sem chave (OS2 repetida conta uma vez)');
+  assert.equal(await miniTxt(page, 'percorrido'), '1');
+  assert.equal(await miniTxt(page, 'faltam'), '3');
+  assert.equal(await miniTxt(page, 'exec'), '1');
+  assert.equal(await miniTxt(page, 'exoc'), '0');
+  assert.equal(await miniTxt(page, 'termos'), '0');
+  assert.equal(await miniTxt(page, 'neg'), '0');
+  assert.equal(await miniTxt(page, 'equipes'), '1');
+  assert.equal(await miniTxt(page, 'assertividade'), '0,0%');
+  assert.match(await page.textContent('.basecard'), /25,0% percorrido/);
+  const hoje = await page.evaluate(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear(); });
+  assert.equal(await miniTxt(page, 'subiu'), hoje);
+  // pastas: mês > data em que subiu
+  assert.equal(await page.locator('details.pasta-mes').count(), 1);
+  assert.equal(await page.locator('details.pasta-mes details.pasta-dia').count(), 1);
+  assert.match(await page.textContent('details.pasta-dia > summary'), new RegExp('Subiu em ' + hoje.replace(/\//g, '\\/')));
+  // trocar a data da base recalcula: a partir de 29/09 nada foi percorrido
+  await page.fill('.basecard input[type=date]', '2026-09-29');
+  await page.waitForFunction(() => document.querySelector('.basecard [data-bk="percorrido"] .mini-value').textContent === '0');
+  assert.equal(await miniTxt(page, 'faltam'), '4');
+  await page.fill('.basecard input[type=date]', '2026-09-28');
+  await page.waitForFunction(() => document.querySelector('.basecard [data-bk="percorrido"] .mini-value').textContent === '1');
+  // Excel do que falta: aba com as 3 linhas pendentes e o cabeçalho da base
+  const [download] = await Promise.all([page.waitForEvent('download'), page.click('.basecard [data-act=baixar]')]);
+  assert.match(download.suggestedFilename(), /^faltam-percorrer_Base_Campo_28_09_2026_\d{8}\.xlsx$/);
+  const arq = require('node:path').join(require('node:os').tmpdir(), 'faltam-' + process.pid + '.xlsx');
+  await download.saveAs(arq);
+  assert.equal(fs.readFileSync(arq).subarray(0, 2).toString(), 'PK');
+  const py = require('node:child_process').spawnSync('python3', ['-c', 'import openpyxl'], { encoding: 'utf8' });
+  if (py.status === 0) {
+    const o = require('node:child_process').spawnSync('python3', ['-c', `
+import openpyxl, sys, json
+wb = openpyxl.load_workbook(sys.argv[1]); f = wb['Faltam percorrer']; r = wb['Resumo da base']
+print(json.dumps({'abas': wb.sheetnames, 'linhas': [[c.value for c in row] for row in f.iter_rows()], 'total': r['B8'].value, 'faltam': r['B10'].value}, default=str))`, arq], { encoding: 'utf8' });
+    const x = JSON.parse(o.stdout);
+    assert.deepEqual(x.abas, ['Resumo da base', 'Faltam percorrer']);
+    assert.deepEqual(x.linhas.map((l) => l[0]), ['Cód. Protocolo Origem', 'OS2', 'OS3', null]);
+    assert.equal(x.linhas[0].length, 5, 'todas as colunas da base');
+    assert.equal(x.total, 4);
+    assert.equal(x.faltam, 3);
+  }
+  fs.unlinkSync(arq);
+  // persistência: recarregar a página mantém a base (e "Limpar dados gravados" não a apaga)
+  await page.reload();
+  await page.click('#nav-tabs button[data-view=bases]');
+  await page.waitForSelector('.basecard');
+  assert.equal(await page.textContent('.basecard h3'), 'Base_Campo_28_09_2026.xlsx');
+  assert.equal(await miniTxt(page, 'total'), '4');
+  assert.equal(await miniTxt(page, 'percorrido'), '0', 'sem o realizado carregado nada foi percorrido');
+  assert.match(await page.textContent('.basecard'), /conecte a pasta/);
+  // excluir
+  page.once('dialog', (d) => d.accept());
+  await page.click('.basecard button[aria-label^="Excluir"]');
+  await page.waitForSelector('#view-bases .empty');
   await page.context().close();
 });
