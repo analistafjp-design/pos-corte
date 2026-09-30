@@ -1,0 +1,18 @@
+{
+  "name": "acompanhamento-pos-corte",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Painel de Acompanhamento de Pós Corte (AnalistaFJP): HTML único que lê arquivos Excel de uma pasta do OneDrive.",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "fixtures": "python3 tools/make_fixtures.py tests/fixtures",
+    "test:core": "node --test tests/core.test.mjs",
+    "test:ui": "node build.mjs && node --test tests/ui.test.cjs",
+    "test": "npm run fixtures && npm run test:core && npm run test:ui"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}

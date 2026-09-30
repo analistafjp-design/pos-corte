@@ -1,0 +1,3455 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acompanhamento de Pós Corte · AnalistaFJP</title>
+<meta name="description" content="Painel de acompanhamento de Pós Corte: Exec, Exoc, negociações, termos aplicados e frentes de serviço, atualizado por arquivos Excel de uma pasta do OneDrive.">
+<style>
+/* Acompanhamento de Pós Corte — AnalistaFJP */
+:root {
+  color-scheme: light;
+  --bg: #f4f5f3;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --line: #e1e0d9;
+  --line-strong: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.1);
+  --brand: #0d366b;
+  --brand-2: #1c5cab;
+  --brand-tint: #e8f0fb;
+  --focus: #1c5cab;
+
+  /* Cores por entidade (paleta categórica validada; a mesma cor em todos os gráficos) */
+  --atv: #5b6675;
+  --exec: #2a78d6;
+  --exoc: #eb6834;
+  --neg: #1baf7a;
+  --termo: #4a3aa7;
+  --sem: #e87ba4;
+  --outros: #a8a69e;
+
+  --ok-bg: #e8f5e8;
+  --ok-ink: #0a5a0a;
+  --info-bg: #e8f0fb;
+  --info-ink: #0d366b;
+  --warn-bg: #fff4d6;
+  --warn-ink: #6b4400;
+  --err-bg: #fdeceb;
+  --err-ink: #9c1f1f;
+
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.05), 0 8px 24px rgba(11, 11, 11, 0.04);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 var(--font);
+  min-height: 100vh;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p { margin: 0; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip { position: absolute; left: 8px; top: -48px; background: var(--brand); color: #fff; padding: 8px 12px; border-radius: 8px; z-index: 100; }
+.skip:focus { top: 8px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Estrutura ---------- */
+.app { display: grid; grid-template-columns: 1fr; min-height: 100vh; }
+.side {
+  display: none;
+  background: var(--brand);
+  color: #fff;
+  padding: 20px 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  flex-direction: column;
+  gap: 22px;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+.brand-mark {
+  width: 36px; height: 36px; border-radius: 10px; background: #fff; color: var(--brand);
+  display: grid; place-items: center; font-weight: 800; font-size: 13px; letter-spacing: -0.02em; flex: none;
+}
+.brand-name { font-weight: 700; font-size: 16px; line-height: 1.1; }
+.brand-sub { font-size: 12px; opacity: 0.75; }
+.nav { display: flex; flex-direction: column; gap: 4px; }
+.nav button {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: transparent; border: 0; color: rgba(255, 255, 255, 0.82);
+  padding: 10px 12px; border-radius: 10px; font-weight: 600;
+}
+.nav button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.nav button[aria-current="page"] { background: #fff; color: var(--brand); }
+.side-foot { margin-top: auto; font-size: 12px; color: rgba(255, 255, 255, 0.78); padding: 0 6px; display: grid; gap: 4px; }
+.side-foot strong { color: #fff; font-weight: 600; }
+
+.main-col { min-width: 0; padding: 16px 16px 96px; display: flex; flex-direction: column; gap: 14px; }
+.top { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; justify-content: space-between; }
+.top-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.top-title .brand-mark { background: var(--brand); color: #fff; }
+.top h1 { font-size: 20px; line-height: 1.2; letter-spacing: -0.01em; }
+.top .sub { color: var(--ink-2); font-size: 13px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 40px; padding: 8px 14px; border-radius: 10px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-weight: 600;
+}
+.btn:hover { background: #f0efec; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn.primary { background: var(--brand-2); border-color: var(--brand-2); color: #fff; }
+.btn.primary:hover { background: #184f95; }
+.btn.small { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.btn.ghost { border-color: transparent; background: transparent; }
+.btn.ghost:hover { background: #ebeae5; }
+.ico { flex: none; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* ---------- Mensagens ---------- */
+.status {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start;
+  padding: 12px 14px; border-radius: 12px; border: 1px solid transparent;
+}
+.status .st-title { font-weight: 700; }
+.status .st-detail { font-size: 14px; margin-top: 2px; overflow-wrap: anywhere; }
+.status ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+.status li { overflow-wrap: anywhere; }
+.status.info { background: var(--info-bg); color: var(--info-ink); border-color: #c8dbf5; }
+.status.success { background: var(--ok-bg); color: var(--ok-ink); border-color: #c6e3c6; }
+.status.warning { background: var(--warn-bg); color: var(--warn-ink); border-color: #f0dc9c; }
+.status.error { background: var(--err-bg); color: var(--err-ink); border-color: #f3c6c4; }
+.progress { height: 6px; border-radius: 4px; background: rgba(13, 54, 107, 0.15); overflow: hidden; margin-top: 8px; }
+.progress > span { display: block; height: 100%; background: var(--brand-2); border-radius: 4px; transition: width 0.15s; }
+.status-actions { display: flex; gap: 6px; }
+
+/* ---------- Filtros ---------- */
+.filters {
+  background: var(--surface); border: 1px solid var(--ring); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 12px 14px; display: grid; gap: 10px 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end;
+}
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.field input, .field select {
+  min-height: 40px; padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: #fff; width: 100%; min-width: 0;
+}
+.field.wide { grid-column: 1 / -1; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; background: var(--brand-tint); color: var(--brand);
+  border: 1px solid #c8dbf5; border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 600;
+}
+.chip button { border: 0; background: transparent; padding: 2px; display: grid; place-items: center; border-radius: 50%; color: inherit; }
+.chip button:hover { background: rgba(13, 54, 107, 0.15); }
+.count-note { font-size: 13px; color: var(--ink-2); }
+
+/* ---------- Cartões ---------- */
+.card {
+  background: var(--surface); border: 1px solid var(--ring); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px;
+  min-width: 0;
+}
+.card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 12px; margin-bottom: 12px; }
+.card h2 { font-size: 16px; letter-spacing: -0.005em; }
+.card .hint { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kpi {
+  text-align: left; background: var(--surface); border: 1px solid var(--ring); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden; min-width: 0;
+}
+.kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--kc, var(--atv)); }
+.kpi:hover { border-color: var(--line-strong); background: #fff; }
+.kpi-label { font-size: 13px; font-weight: 600; color: var(--ink-2); padding-left: 6px; min-height: 2.7em; }
+.kpi-value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; padding-left: 6px; }
+.kpi-sub { font-size: 12.5px; color: var(--ink-2); padding-left: 6px; overflow-wrap: anywhere; }
+.kpi-go { font-size: 12px; color: var(--brand-2); font-weight: 600; padding-left: 6px; margin-top: auto; padding-top: 6px; }
+
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.grid-rank { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.stack { display: grid; gap: 14px; }
+
+/* ---------- Gráficos de barras ---------- */
+.legend { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; background: var(--c); flex: none; display: inline-block; }
+
+.brow, .mgroup {
+  display: grid; grid-template-columns: 74px minmax(0, 1fr); align-items: center; gap: 10px;
+  width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 5px 6px; color: inherit;
+}
+.brow:hover, .mgroup:hover { background: #f0efec; }
+.brow.is-active, .mgroup.is-active { background: var(--brand-tint); border-color: #c8dbf5; }
+.brow[disabled] { cursor: default; }
+.brow-label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.track { border-left: 1px solid var(--line-strong); min-height: 22px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* barras mensais: a largura é a fração --r do espaço livre; o valor fica na ponta da barra */
+.brow .track .bar, .mgroup .track .bar { width: calc((100% - 62px) * var(--r, 0)); flex: none; }
+.bar { display: flex; height: 18px; min-width: 0; }
+.bar > i { display: block; height: 100%; flex: 1 1 0; min-width: 2px; background: var(--c); margin-left: 2px; }
+.bar > i:first-child { margin-left: 0; }
+.bar > i:last-child { border-radius: 0 4px 4px 0; }
+.bar.solid { background: var(--c); border-radius: 0 4px 4px 0; }
+.bval { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.mgroup .bval { font-size: 13px; }
+.mgroup .bval .sw { width: 9px; height: 9px; border-radius: 50%; }
+.mgroup .tracks { display: grid; gap: 4px; }
+.mgroup .track { min-height: 14px; }
+.mgroup .bar { height: 12px; }
+
+.rrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l v" "b b"; gap: 4px 10px; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 7px 8px; color: inherit; }
+button.rrow:hover { background: #f0efec; }
+.rrow.is-active { background: var(--brand-tint); border-color: #c8dbf5; }
+.rrow .rl { grid-area: l; font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.rrow .rv { grid-area: v; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap; }
+.rrow .rv small { font-weight: 500; color: var(--ink-2); font-size: 12px; margin-left: 4px; }
+.rrow .track { grid-area: b; }
+.rank-list { display: grid; gap: 2px; }
+.more { margin-top: 8px; }
+.note { font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+.note.warn { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 8px 10px; }
+
+/* ---------- Tabelas ---------- */
+.table-wrap { overflow: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { position: sticky; top: 0; background: #f0efec; font-size: 12px; text-transform: none; color: var(--ink-2); white-space: nowrap; z-index: 1; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover td { background: #fafaf8; }
+tfoot td { font-weight: 700; background: #f7f7f4; }
+.tag { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 600; background: #eeede8; color: var(--ink-2); white-space: nowrap; }
+.tag.exec { background: #dfeafa; color: #12437f; }
+.tag.exoc { background: #fde7dd; color: #8a3410; }
+.tag.neg { background: #d9f3e9; color: #0b5a3d; }
+.tag.termo { background: #e6e2f7; color: #372a86; }
+.tag.sem { background: #fbe3ec; color: #8c2450; }
+.detail-row td { background: #f7f7f4; padding: 0; }
+.detail-inner { position: sticky; left: 0; padding: 12px 14px; box-sizing: border-box; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 18px; }
+.detail-grid dt { font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+.detail-grid dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.expander { border: 0; background: transparent; padding: 2px 6px; border-radius: 6px; font-weight: 700; color: var(--brand-2); }
+.expander:hover { background: var(--brand-tint); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: end; }
+.toolbar .field { flex: 1 1 200px; }
+.toolbar .field.grow { flex: 2 1 260px; }
+.pager { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+.pager .btns { display: flex; gap: 6px; }
+
+/* ---------- Base e regras ---------- */
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checks li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 8px 10px; border-radius: 10px; background: #f7f7f4; }
+.checks .ok { color: var(--ok-ink); }
+.checks .bad { color: var(--err-ink); }
+.rules h3 { font-size: 14px; margin: 14px 0 4px; }
+.rules p, .rules li { font-size: 14px; color: var(--ink); }
+.rules ul { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 3px; }
+.rules code, code { background: #eeede8; padding: 1px 5px; border-radius: 5px; font-size: 13px; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+.kv dt { color: var(--ink-2); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+
+/* ---------- Vazio ---------- */
+.empty { text-align: center; padding: 36px 18px; display: grid; gap: 10px; justify-items: center; }
+.empty h2 { font-size: 20px; }
+.empty p { color: var(--ink-2); max-width: 62ch; }
+.empty ol { text-align: left; color: var(--ink-2); max-width: 62ch; padding-left: 20px; margin: 4px 0; }
+
+/* ---------- Dica flutuante ---------- */
+#tip {
+  position: fixed; z-index: 50; pointer-events: none; background: #1b1b1a; color: #fff; padding: 8px 10px; border-radius: 8px;
+  font-size: 12.5px; line-height: 1.4; max-width: min(320px, calc(100vw - 16px)); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+#tip strong { display: block; font-size: 13px; }
+
+/* ---------- Navegação inferior (telas pequenas) ---------- */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(3, 1fr);
+  background: var(--surface); border-top: 1px solid var(--line-strong); padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+.tabbar button {
+  display: grid; justify-items: center; gap: 2px; background: transparent; border: 0; padding: 6px 4px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; color: var(--ink-2);
+}
+.tabbar button[aria-current="page"] { color: var(--brand-2); background: var(--brand-tint); }
+
+/* ---------- Responsivo ---------- */
+@media (min-width: 720px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .main-col { padding: 20px 22px 96px; }
+}
+@media (min-width: 960px) {
+  .app { grid-template-columns: 232px minmax(0, 1fr); }
+  .side { display: flex; }
+  .tabbar { display: none; }
+  .main-col { padding: 22px 28px 40px; }
+  .top-title .brand-mark { display: none; }
+  .filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .filters .field.wide { grid-column: auto; }
+  .grid-2 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+}
+@media (min-width: 1280px) {
+  .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .grid-rank { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi-value { font-size: 28px; }
+}
+@media (min-width: 760px) and (max-width: 1279px) {
+  .grid-rank { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .brow, .mgroup { grid-template-columns: 62px minmax(0, 1fr); gap: 6px; }
+  .kpi-value { font-size: 26px; }
+  .actions .btn { flex: 1 1 calc(50% - 8px); padding: 8px 8px; white-space: nowrap; }
+}
+@media (forced-colors: active) {
+  .bar > i, .bar.solid, .sw { forced-color-adjust: none; border: 1px solid CanvasText; }
+}
+@media print {
+  .side, .tabbar, .actions, .filters { display: none !important; }
+  body { background: #fff; }
+}
+
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Ir para o conteúdo</a>
+<div class="app">
+  <aside class="side" aria-label="Menu lateral">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">FJP</div>
+      <div><div class="brand-name">AnalistaFJP</div><div class="brand-sub">Pós Corte</div></div>
+    </div>
+    <nav class="nav" id="nav-side" aria-label="Seções"></nav>
+    <div class="side-foot" id="side-foot"></div>
+  </aside>
+
+  <div class="main-col">
+    <header class="top">
+      <div class="top-title">
+        <div class="brand-mark" aria-hidden="true">FJP</div>
+        <div>
+          <h1>Acompanhamento de Pós Corte</h1>
+          <div class="sub" id="top-sub">Exec, Exoc, negociações, termos aplicados e frentes de serviço</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="btn-pasta" type="button"></button>
+        <button class="btn" id="btn-atualizar" type="button"></button>
+        <button class="btn" id="btn-importar" type="button"></button>
+      </div>
+    </header>
+
+    <div id="status" aria-live="polite"></div>
+
+    <section class="filters" id="filters" aria-label="Filtros" hidden>
+      <div class="field"><label for="f-from">Data inicial</label><input type="date" id="f-from"></div>
+      <div class="field"><label for="f-to">Data final</label><input type="date" id="f-to"></div>
+      <div class="field"><label for="f-cidade">Cidade</label><select id="f-cidade"></select></div>
+      <div class="field"><label for="f-frente">Frente de serviço</label><select id="f-frente"></select></div>
+      <div class="field"><label for="f-equipe">Equipe (recurso)</label><select id="f-equipe"></select></div>
+      <div class="field" id="f-ind-wrap"><label for="f-ind">Indicador dos gráficos</label><select id="f-ind"></select></div>
+    </section>
+    <div class="chips" id="chips" aria-label="Filtros aplicados"></div>
+
+    <main id="main" tabindex="-1">
+      <section id="view-geral" aria-label="Visão geral"></section>
+      <section id="view-analitico" aria-label="Analítico" hidden></section>
+      <section id="view-base" aria-label="Base e regras" hidden></section>
+    </main>
+  </div>
+</div>
+<nav class="tabbar" id="nav-bottom" aria-label="Seções"></nav>
+
+<input type="file" id="inp-files" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
+<input type="file" id="inp-folder" webkitdirectory multiple hidden>
+
+<script>
+/* Mapeamento padrão Nomenclatura -> Frente (aba "Frente de Serviço" da planilha de amostra de 29/09/2026).
+   Sem dados pessoais. Qualquer aba "Frente de Serviço" importada substitui a mesma nomenclatura. */
+window.FRENTES_PADRAO = [
+ {
+  "nomenclatura": "RIOCOBIN",
+  "frente": "COBRANÇA"
+ },
+ {
+  "nomenclatura": "RIOCERIN",
+  "frente": "CORTE - RELIGA"
+ },
+ {
+  "nomenclatura": "RIOCERLG",
+  "frente": "CORTE - RELIGA"
+ },
+ {
+  "nomenclatura": "RIOCERB1",
+  "frente": "CORTE - RELIGA B1"
+ },
+ {
+  "nomenclatura": "RIOEGCIN",
+  "frente": "ESGOTO"
+ },
+ {
+  "nomenclatura": "RIOEGCTIN",
+  "frente": "ESGOTO"
+ },
+ {
+  "nomenclatura": "RIOEGCTL",
+  "frente": "ESGOTO"
+ },
+ {
+  "nomenclatura": "RIOEGCTLG",
+  "frente": "ESGOTO"
+ },
+ {
+  "nomenclatura": "RIOCSSIN",
+  "frente": "FISCALIZAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOFSCIN",
+  "frente": "FISCALIZAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOFSCLG",
+  "frente": "FISCALIZAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOFSCB1",
+  "frente": "FISCALIZAÇÃO B1"
+ },
+ {
+  "nomenclatura": "RIOLTRIN",
+  "frente": "LEITURA"
+ },
+ {
+  "nomenclatura": "RIOLTRLG",
+  "frente": "LEITURA"
+ },
+ {
+  "nomenclatura": "RIOLTRLIN",
+  "frente": "LEITURA"
+ },
+ {
+  "nomenclatura": "RIOLTRLL",
+  "frente": "LEITURA"
+ },
+ {
+  "nomenclatura": "RIOLTRLLG",
+  "frente": "LEITURA"
+ },
+ {
+  "nomenclatura": "RIOLTRLLIN",
+  "frente": "LEITURA"
+ },
+ {
+  "nomenclatura": "RIOMLTIN",
+  "frente": "MANUTENÇÃO"
+ },
+ {
+  "nomenclatura": "RIOMLTLG",
+  "frente": "MANUTENÇÃO"
+ },
+ {
+  "nomenclatura": "RIOMLTTIN",
+  "frente": "MANUTENÇÃO"
+ },
+ {
+  "nomenclatura": "RIOMLTTL",
+  "frente": "MANUTENÇÃO"
+ },
+ {
+  "nomenclatura": "RIOMLTTLG",
+  "frente": "MANUTENÇÃO"
+ },
+ {
+  "nomenclatura": "RIOMNTIN",
+  "frente": "MANUTENÇÃO"
+ },
+ {
+  "nomenclatura": "RIOMNTLG",
+  "frente": "MANUTENÇÃO"
+ },
+ {
+  "nomenclatura": "RIOCPATL",
+  "frente": "OPERAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOOPEIN",
+  "frente": "OPERAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOOPELG",
+  "frente": "OPERAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOOVAIN",
+  "frente": "OPERAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOPAVIN",
+  "frente": "PAVIMENTAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOPAVLG",
+  "frente": "PAVIMENTAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOPAVTIN",
+  "frente": "PAVIMENTAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOPAVTL",
+  "frente": "PAVIMENTAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOPAVTLG",
+  "frente": "PAVIMENTAÇÃO"
+ },
+ {
+  "nomenclatura": "RIOPCRIN",
+  "frente": "PÓS CORTE"
+ },
+ {
+  "nomenclatura": "RIOPCRTIN",
+  "frente": "PÓS CORTE"
+ },
+ {
+  "nomenclatura": "RIORECIN",
+  "frente": "RECADASTRO"
+ },
+ {
+  "nomenclatura": "RIORECLG",
+  "frente": "RECADASTRO"
+ },
+ {
+  "nomenclatura": "RIOPCRNT",
+  "frente": "RECUPERAÇÃO DE CORTADOS"
+ },
+ {
+  "nomenclatura": "RIOCOMIN",
+  "frente": "SERVIÇOS - COMERCIAIS"
+ },
+ {
+  "nomenclatura": "RIOCPAIN",
+  "frente": "SERVIÇOS"
+ },
+ {
+  "nomenclatura": "RIOCPATIN",
+  "frente": "SERVIÇOS"
+ },
+ {
+  "nomenclatura": "RIOPROIN",
+  "frente": "SERVIÇOS"
+ },
+ {
+  "nomenclatura": "RIOCSSLG",
+  "frente": "SETORIZADA"
+ },
+ {
+  "nomenclatura": "RIOSETIN",
+  "frente": "SETORIZADA"
+ },
+ {
+  "nomenclatura": "RIOSETLG",
+  "frente": "SETORIZADA"
+ },
+ {
+  "nomenclatura": "RIOSETLT",
+  "frente": "SETORIZADA"
+ },
+ {
+  "nomenclatura": "RIOSETNT",
+  "frente": "SETORIZADA"
+ },
+ {
+  "nomenclatura": "RIOSETB2",
+  "frente": "SETORIZADA B2"
+ },
+ {
+  "nomenclatura": "RIOVCGEXTIN",
+  "frente": "VCG RIO BONITO"
+ },
+ {
+  "nomenclatura": "RIOVCGVARTIN",
+  "frente": "VCG RIO BONITO"
+ },
+ {
+  "nomenclatura": "RIOVENIN",
+  "frente": "VENDA"
+ }
+];
+
+</script>
+<script>
+/*!
+ * Acompanhamento de Pós Corte — núcleo de dados (AnalistaFJP)
+ *
+ * Contém: leitor de .xlsx por streaming (ZIP + XML incremental, sem árvore DOM),
+ * regras dos indicadores, deduplicação, frentes de serviço, agregações e CSV.
+ * Roda no navegador (Chrome/Edge) e no Node (testes) sem dependências externas.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.PosCorte = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------ */
+  /* Erros e utilitários de texto                                        */
+  /* ------------------------------------------------------------------ */
+
+  class PcError extends Error {
+    constructor(code, message) {
+      super(message);
+      this.name = 'PcError';
+      this.code = code;
+    }
+  }
+
+  const stripAccents = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const norm = (v) => stripAccents(String(v == null ? '' : v)).toLowerCase().replace(/\s+/g, ' ').trim();
+  const normHeader = (v) => norm(v).replace(/[^a-z0-9]+/g, ' ').trim();
+  const isBlank = (v) => v == null || String(v).trim() === '';
+
+  const NAO_MAPEADA = 'Não mapeada';
+  const SEM_DATA = 'Sem data';
+
+  /* ------------------------------------------------------------------ */
+  /* Campos mantidos no modelo de atividades                             */
+  /* ------------------------------------------------------------------ */
+
+  // `critical`: sem esta coluna o indicador seria calculado errado; o arquivo é recusado.
+  const FIELDS = [
+    { key: 'recurso', header: 'Recurso', critical: true },
+    { key: 'protocolo', header: 'Cód. Protocolo Origem', aliases: ['Código Protocolo Origem'] },
+    { key: 'id', header: 'ID da Atividade' },
+    { key: 'matricula', header: 'Matrícula' },
+    { key: 'codigo', header: 'Código/Descrição' },
+    { key: 'data', header: 'Data', critical: true },
+    { key: 'status', header: 'Status da Atividade', critical: true },
+    { key: 'solicitante', header: 'Nome do Solicitante' },
+    { key: 'cidade', header: 'Cidade' },
+    { key: 'slaInicio', header: 'Início do SLA' },
+    { key: 'slaFim', header: 'Fim do SLA' },
+    { key: 'tipoCorte', header: 'Tipo do Corte Realizado' },
+    { key: 'situacaoPergunta', header: 'Qual a situação do imóvel?' },
+    { key: 'irregularidade', header: 'Irregularidade Encontrada?' },
+    { key: 'valor', header: 'Valor Total dos Débitos' },
+    { key: 'negociou', header: 'Negociou O Débito?', critical: true },
+    { key: 'categoria', header: 'Categoria' },
+    { key: 'situacaoImovel', header: 'Situação Do Imóvel' },
+    { key: 'servAdic', header: 'Serviço adicionais resposta', aliases: ['Serviços adicionais resposta'], critical: true },
+  ];
+  const FIELD_INDEX = {};
+  FIELDS.forEach((f, i) => (FIELD_INDEX[f.key] = i));
+
+  const HEADER_MATCHER = new Map();
+  FIELDS.forEach((f, i) => {
+    for (const a of [f.header].concat(f.aliases || [])) HEADER_MATCHER.set(normHeader(a), i);
+  });
+
+  const MIN_HEADER_MATCHES = 4; // colunas esperadas que precisam aparecer para reconhecer a linha de cabeçalho
+  const MAX_HEADER_SCAN_ROWS = 30;
+
+  /* ------------------------------------------------------------------ */
+  /* Datas e valores                                                     */
+  /* ------------------------------------------------------------------ */
+
+  const pad2 = (n) => (n < 10 ? '0' + n : '' + n);
+
+  function validYMD(y, m, d) {
+    if (m < 1 || m > 12 || d < 1 || y < 1900 || y > 2200) return false;
+    const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+    const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
+    return d <= dim;
+  }
+
+  /** Data serial do Excel -> {y,m,d,H,M,S,time}. */
+  function serialToParts(serial, date1904) {
+    if (!isFinite(serial) || serial < 1 || serial > 2958465) return null;
+    let days = Math.floor(serial);
+    let secs = Math.round((serial - days) * 86400);
+    if (secs >= 86400) {
+      secs -= 86400;
+      days += 1;
+    }
+    const base = date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
+    const d = new Date(base + days * 86400000);
+    const p = {
+      y: d.getUTCFullYear(),
+      m: d.getUTCMonth() + 1,
+      d: d.getUTCDate(),
+      H: Math.floor(secs / 3600),
+      M: Math.floor((secs % 3600) / 60),
+      S: secs % 60,
+    };
+    p.time = secs > 0;
+    return p;
+  }
+
+  const RE_DATE_BR = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})(?:[ T,]+(\d{1,2}):(\d{2})(?::(\d{2})(?:[.,]\d+)?)?)?\s*$/;
+  const RE_DATE_ISO = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ]+(\d{1,2}):(\d{2})(?::(\d{2})(?:[.,]\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?\s*$/;
+
+  /** Texto de data (dd/mm/aaaa, aaaa-mm-dd, com ou sem hora) -> partes, ou null. */
+  function parseDateText(s) {
+    s = String(s).trim();
+    if (!s) return null;
+    let m = RE_DATE_ISO.exec(s);
+    let y, mo, d, H, M, S, time;
+    if (m) {
+      y = +m[1]; mo = +m[2]; d = +m[3];
+      H = m[4] ? +m[4] : 0; M = m[5] ? +m[5] : 0; S = m[6] ? +m[6] : 0;
+      time = m[4] !== undefined;
+    } else if ((m = RE_DATE_BR.exec(s))) {
+      d = +m[1]; mo = +m[2]; y = +m[3];
+      if (m[3].length === 2) y += 2000;
+      H = m[4] ? +m[4] : 0; M = m[5] ? +m[5] : 0; S = m[6] ? +m[6] : 0;
+      time = m[4] !== undefined;
+    } else {
+      return null;
+    }
+    if (!validYMD(y, mo, d) || H > 23 || M > 59 || S > 59) return null;
+    return { y, m: mo, d, H, M, S, time };
+  }
+
+  /**
+   * Interpreta um valor de célula de data. `kind`: 0 texto, 1 número cru,
+   * 2 número de célula com formato de data já convertido pelo leitor (texto ISO).
+   */
+  function parseDateValue(val, kind, date1904) {
+    if (val == null || val === '') return null;
+    if (kind === 1) {
+      const n = Number(val);
+      return n >= 20000 && n < 80000 ? serialToParts(n, date1904) : null;
+    }
+    const p = parseDateText(val);
+    if (p) return p;
+    if (kind === 0 && /^\d{5}(\.\d+)?$/.test(String(val).trim())) {
+      const n = Number(val);
+      return n >= 20000 && n < 80000 ? serialToParts(n, date1904) : null;
+    }
+    return null;
+  }
+
+  const isoDate = (p) => p.y + '-' + pad2(p.m) + '-' + pad2(p.d);
+  function fmtBR(p) {
+    let s = pad2(p.d) + '/' + pad2(p.m) + '/' + p.y;
+    if (p.time) s += ' ' + pad2(p.H) + ':' + pad2(p.M) + ':' + pad2(p.S);
+    return s;
+  }
+  function isoToBR(iso) {
+    if (!iso) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    return m ? m[3] + '/' + m[2] + '/' + m[1] : iso;
+  }
+
+  /** Valor monetário no padrão brasileiro (R$ 1.234,56). Retorna número, null (vazio) ou NaN. */
+  function parseValor(val, kind) {
+    if (val == null) return null;
+    if (kind === 1) {
+      const n = Number(val);
+      return isFinite(n) ? n : NaN;
+    }
+    let s = String(val).trim();
+    if (!s) return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(s)) {
+      neg = true;
+      s = s.slice(1, -1);
+    }
+    s = s.replace(/R\s*\$/gi, '').replace(/\s+/g, '');
+    if (s === '') return null; // "R$ " sozinho = sem valor informado
+    if (/^[-\u2212]/.test(s)) {
+      neg = !neg;
+      s = s.slice(1);
+    }
+    if (!/^[.,]?\d[\d.,]*$/.test(s)) return NaN; // aceita ",03"
+    const dots = (s.match(/\./g) || []).length;
+    const commas = (s.match(/,/g) || []).length;
+    if (dots && commas) {
+      if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.');
+      else s = s.replace(/,/g, '');
+    } else if (commas) {
+      s = commas === 1 ? s.replace(',', '.') : s.replace(/,/g, '');
+    } else if (dots) {
+      if (dots > 1) s = s.replace(/\./g, '');
+      else if (/^[1-9]\d{0,2}\.\d{3}$/.test(s)) s = s.replace('.', '');
+    }
+    const n = Number(s);
+    if (!isFinite(n)) return NaN;
+    return neg ? -n : n;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Regras dos indicadores                                              */
+  /* ------------------------------------------------------------------ */
+
+  // Código completo, com limites numéricos: 1100130 e 9310013 não contam.
+  const RE_TERMO_SERVICOS = /(?:^|[^0-9])110013(?![0-9])/;
+  const RE_TERMO_VCG = /(?:^|[^0-9])310013(?![0-9])/;
+
+  /** Aplica as regras de negócio a campos já normalizados. */
+  function classify(status, negociou, servAdic, hasServ) {
+    const st = norm(status);
+    const sa = servAdic == null ? '' : String(servAdic);
+    const neg = norm(negociou) === 'sim';
+    const t11 = RE_TERMO_SERVICOS.test(sa);
+    const t31 = RE_TERMO_VCG.test(sa);
+    return {
+      exec: st === 'finalizada',
+      exoc: st === 'encerrada com ocorrencia',
+      neg,
+      // Sem a coluna "Serviço adicionais resposta" não dá para afirmar que ela está vazia.
+      semDesdobro: neg && hasServ !== false && sa.trim() === '',
+      t11,
+      t31,
+      termo: t11 || t31,
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* ZIP (leitura por Blob.slice + DecompressionStream)                  */
+  /* ------------------------------------------------------------------ */
+
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+  function tick() {
+    if (typeof MessageChannel !== 'undefined') {
+      return new Promise((resolve) => {
+        const ch = new MessageChannel();
+        ch.port1.onmessage = () => {
+          ch.port1.close();
+          resolve();
+        };
+        ch.port2.postMessage(0);
+      });
+    }
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  async function readBytes(file, start, end) {
+    return new Uint8Array(await file.slice(start, end).arrayBuffer());
+  }
+
+  async function openZip(file) {
+    const size = file.size;
+    if (!size) throw new PcError('EMPTY', 'O arquivo está vazio (0 bytes). Pode ainda estar sendo sincronizado pelo OneDrive.');
+    if (size < 22) throw new PcError('NOT_XLSX', 'O arquivo é pequeno demais para ser um .xlsx válido.');
+
+    const head = await readBytes(file, 0, Math.min(8, size));
+    if (head[0] === 0xd0 && head[1] === 0xcf && head[2] === 0x11 && head[3] === 0xe0) {
+      throw new PcError(
+        'OLE2',
+        'Formato incompatível: é um .xls antigo ou um Excel protegido por senha. Abra no Excel e salve uma cópia como .xlsx sem senha.'
+      );
+    }
+
+    const tailStart = Math.max(0, size - 65557);
+    const tail = await readBytes(file, tailStart, size);
+    let e = -1;
+    for (let i = tail.length - 22; i >= 0; i--) {
+      if (tail[i] === 0x50 && tail[i + 1] === 0x4b && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) {
+        e = i;
+        break;
+      }
+    }
+    if (e < 0) {
+      if (head[0] === 0x50 && head[1] === 0x4b) {
+        throw new PcError('TRUNCATED', 'Arquivo incompleto ou corrompido (fim do .xlsx não encontrado). Se estiver no OneDrive, aguarde a sincronização terminar.');
+      }
+      throw new PcError('NOT_XLSX', 'O arquivo não é um .xlsx válido (não é um pacote ZIP/OOXML).');
+    }
+    const dv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+    let total = dv.getUint16(e + 10, true);
+    const cdSize = dv.getUint32(e + 12, true);
+    const cdOffset = dv.getUint32(e + 16, true);
+    const zip64Locator = e >= 20 && dv.getUint32(e - 20, true) === 0x07064b50;
+    if (zip64Locator || total === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) {
+      throw new PcError('ZIP64', 'Arquivo com ZIP64, não suportado por este leitor. Salve uma cópia .xlsx compatível pelo Excel.');
+    }
+    if (cdOffset + cdSize > size) {
+      throw new PcError('TRUNCATED', 'Arquivo incompleto ou corrompido (diretório interno fora do arquivo).');
+    }
+
+    const cd = await readBytes(file, cdOffset, cdOffset + cdSize);
+    const cdv = new DataView(cd.buffer, cd.byteOffset, cd.byteLength);
+    const entries = new Map();
+    const dec = new TextDecoder('utf-8');
+    let p = 0;
+    for (let i = 0; i < total; i++) {
+      if (p + 46 > cd.length || cdv.getUint32(p, true) !== 0x02014b50) {
+        throw new PcError('CORRUPT', 'Arquivo corrompido (diretório interno inválido).');
+      }
+      const flags = cdv.getUint16(p + 8, true);
+      const method = cdv.getUint16(p + 10, true);
+      const csize = cdv.getUint32(p + 20, true);
+      const usize = cdv.getUint32(p + 24, true);
+      const nlen = cdv.getUint16(p + 28, true);
+      const xlen = cdv.getUint16(p + 30, true);
+      const clen = cdv.getUint16(p + 32, true);
+      const loff = cdv.getUint32(p + 42, true);
+      const name = dec.decode(cd.subarray(p + 46, p + 46 + nlen)).replace(/\\/g, '/');
+      p += 46 + nlen + xlen + clen;
+      if (csize === 0xffffffff || usize === 0xffffffff || loff === 0xffffffff) {
+        throw new PcError('ZIP64', 'Arquivo com ZIP64, não suportado por este leitor. Salve uma cópia .xlsx compatível pelo Excel.');
+      }
+      if (name.endsWith('/')) continue;
+      entries.set(name, { name, flags, method, csize, usize, loff });
+    }
+    return { file, entries };
+  }
+
+  function findEntry(zip, path) {
+    if (zip.entries.has(path)) return zip.entries.get(path);
+    const lower = path.toLowerCase();
+    for (const [k, v] of zip.entries) if (k.toLowerCase() === lower) return v;
+    return null;
+  }
+
+  async function entryStream(zip, entry) {
+    if (entry.flags & 1) {
+      throw new PcError('ENCRYPTED', `A parte "${entry.name}" está criptografada. Remova a senha do arquivo.`);
+    }
+    if (entry.method !== 0 && entry.method !== 8) {
+      throw new PcError('METHOD', `Compressão não suportada na parte "${entry.name}" (método ${entry.method}).`);
+    }
+    const lh = await readBytes(zip.file, entry.loff, entry.loff + 30);
+    const lv = new DataView(lh.buffer, lh.byteOffset, lh.byteLength);
+    if (lh.length < 30 || lv.getUint32(0, true) !== 0x04034b50) {
+      throw new PcError('CORRUPT', `Arquivo corrompido (cabeçalho local inválido em "${entry.name}").`);
+    }
+    const start = entry.loff + 30 + lv.getUint16(26, true) + lv.getUint16(28, true);
+    const blob = zip.file.slice(start, start + entry.csize);
+    let stream = blob.stream();
+    if (entry.method === 8) stream = stream.pipeThrough(new DecompressionStream('deflate-raw'));
+    return stream;
+  }
+
+  /** Lê uma parte do pacote como texto UTF-8 em pedaços, chamando onText(str); onText pode devolver true para parar. */
+  async function streamEntryText(zip, entry, onText, onBytes) {
+    const stream = await entryStream(zip, entry);
+    const reader = stream.getReader();
+    const dec = new TextDecoder('utf-8');
+    let last = now();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (onBytes) onBytes(value.byteLength);
+        if (onText(dec.decode(value, { stream: true })) === true) {
+          await reader.cancel().catch(() => {});
+          return;
+        }
+        if (now() - last > 40) {
+          await tick();
+          last = now();
+        }
+      }
+      const rest = dec.decode();
+      if (rest) onText(rest);
+    } catch (err) {
+      if (err instanceof PcError) throw err;
+      throw new PcError('CORRUPT', `Arquivo corrompido ou incompleto (falha ao descompactar "${entry.name}").`);
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* XML incremental (estilo SAX)                                        */
+  /* ------------------------------------------------------------------ */
+
+  function decodeEntities(s) {
+    if (s.indexOf('&') < 0) return s;
+    return s.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|lt|gt|amp|quot|apos);/g, (m, e) => {
+      switch (e) {
+        case 'lt': return '<';
+        case 'gt': return '>';
+        case 'amp': return '&';
+        case 'quot': return '"';
+        case 'apos': return "'";
+      }
+      const cp = e[1] === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      try {
+        return String.fromCodePoint(cp);
+      } catch (_) {
+        return m;
+      }
+    });
+  }
+
+  /** Texto de nó: entidades XML e escapes _xHHHH_ do OOXML. */
+  function decodeText(s) {
+    if (s.indexOf('&') >= 0) s = decodeEntities(s);
+    if (s.indexOf('_x') >= 0) s = s.replace(/_x([0-9A-Fa-f]{4})_/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+    return s;
+  }
+
+  const IRREGULAR_ATTRS = /[\t\r\n]|\s=|=\s/;
+  function getAttr(inner, name) {
+    let p = inner.indexOf(' ' + name + '=');
+    if (p < 0) {
+      if (!IRREGULAR_ATTRS.test(inner)) return undefined;
+      const m = new RegExp('(?:^|\\s)' + name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')').exec(inner);
+      return m ? (m[1] !== undefined ? m[1] : m[2]) : undefined;
+    }
+    p += name.length + 2;
+    const q = inner.charCodeAt(p);
+    if (q !== 34 && q !== 39) return undefined;
+    const e = inner.indexOf(q === 34 ? '"' : "'", p + 1);
+    return e < 0 ? undefined : inner.substring(p + 1, e);
+  }
+
+  /**
+   * Tokenizador incremental: recebe pedaços de texto via write(), emite
+   * open(name, inner, selfClosing) / close(name) / text(str, raw).
+   * Nomes vêm sem prefixo de namespace. Nunca monta árvore DOM.
+   */
+  class XmlStream {
+    constructor(handlers) {
+      this.h = handlers;
+      this.tail = '';
+    }
+
+    write(chunk) {
+      const h = this.h;
+      const s = this.tail ? this.tail + chunk : chunk;
+      let i = 0;
+      for (;;) {
+        const lt = s.indexOf('<', i);
+        if (lt < 0) break;
+        const c1 = s.charCodeAt(lt + 1);
+        if (c1 !== c1) break; // fim do pedaço logo após '<'
+        let end; // índice do último caractere da marcação
+        if (c1 === 33) {
+          // <!
+          if (s.startsWith('<!--', lt)) {
+            end = s.indexOf('-->', lt + 4);
+            if (end < 0) break;
+            end += 2;
+            if (lt > i) h.text(s.substring(i, lt), false);
+          } else if (s.startsWith('<![CDATA[', lt)) {
+            end = s.indexOf(']]>', lt + 9);
+            if (end < 0) break;
+            if (lt > i) h.text(s.substring(i, lt), false);
+            const cd = s.substring(lt + 9, end);
+            if (cd) h.text(cd, true);
+            end += 2;
+          } else {
+            end = s.indexOf('>', lt + 2);
+            if (end < 0) break;
+            if (lt > i) h.text(s.substring(i, lt), false);
+          }
+        } else if (c1 === 63) {
+          // <?
+          end = s.indexOf('?>', lt + 2);
+          if (end < 0) break;
+          end += 1;
+          if (lt > i) h.text(s.substring(i, lt), false);
+        } else if (c1 === 47) {
+          // </
+          end = s.indexOf('>', lt + 2);
+          if (end < 0) break;
+          if (lt > i) h.text(s.substring(i, lt), false);
+          let name = s.substring(lt + 2, end).trim();
+          const cp = name.indexOf(':');
+          if (cp >= 0) name = name.substring(cp + 1);
+          h.close(name);
+        } else {
+          end = s.indexOf('>', lt + 1);
+          if (end < 0) break;
+          if (lt > i) h.text(s.substring(i, lt), false);
+          const inner = s.substring(lt + 1, end);
+          const selfClosing = inner.charCodeAt(inner.length - 1) === 47;
+          let ne = 0;
+          const L = inner.length;
+          while (ne < L) {
+            const c = inner.charCodeAt(ne);
+            if (c === 32 || c === 47 || c === 9 || c === 10 || c === 13) break;
+            ne++;
+          }
+          let name = inner.substring(0, ne);
+          const cp = name.indexOf(':');
+          if (cp >= 0) name = name.substring(cp + 1);
+          h.open(name, inner, selfClosing);
+          if (selfClosing) h.close(name);
+        }
+        i = end + 1;
+      }
+      this.tail = i < s.length ? s.substring(i) : '';
+    }
+
+    end() {
+      if (this.tail.trim() !== '') {
+        throw new PcError('XML_TRUNCATED', 'Conteúdo XML incompleto (arquivo cortado ou corrompido).');
+      }
+    }
+  }
+
+  const NOOP_HANDLERS = { open() {}, close() {}, text() {} };
+
+  async function parseSmallPart(zip, path, handlers, { required = true } = {}) {
+    const entry = findEntry(zip, path);
+    if (!entry) {
+      if (required) throw new PcError('MISSING_PART', `Estrutura do .xlsx incompleta: parte "${path}" não encontrada.`);
+      return false;
+    }
+    const xs = new XmlStream(Object.assign({}, NOOP_HANDLERS, handlers));
+    await streamEntryText(zip, entry, (t) => xs.write(t));
+    xs.end();
+    return true;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Pacote OOXML: workbook, relacionamentos, strings, estilos           */
+  /* ------------------------------------------------------------------ */
+
+  const dirname = (p) => (p.lastIndexOf('/') >= 0 ? p.substring(0, p.lastIndexOf('/')) : '');
+  const basename = (p) => p.substring(p.lastIndexOf('/') + 1);
+
+  function resolveTarget(baseDir, target) {
+    if (target.startsWith('/')) return target.substring(1);
+    const parts = (baseDir ? baseDir.split('/') : []).concat(target.split('/'));
+    const out = [];
+    for (const seg of parts) {
+      if (seg === '' || seg === '.') continue;
+      if (seg === '..') out.pop();
+      else out.push(seg);
+    }
+    return out.join('/');
+  }
+
+  async function readRels(zip, path) {
+    const rels = [];
+    const ok = await parseSmallPart(
+      zip,
+      path,
+      {
+        open(name, inner) {
+          if (name === 'Relationship') {
+            rels.push({
+              id: decodeEntities(getAttr(inner, 'Id') || ''),
+              type: decodeEntities(getAttr(inner, 'Type') || ''),
+              target: decodeEntities(getAttr(inner, 'Target') || ''),
+              mode: getAttr(inner, 'TargetMode') || '',
+            });
+          }
+        },
+      },
+      { required: false }
+    );
+    return ok ? rels : null;
+  }
+
+  const BUILTIN_DATE_FMT = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 45, 46, 47, 50, 51, 52, 53, 54, 55, 56, 57, 58]);
+
+  function isDateFormatCode(code) {
+    const t = code.trim().toLowerCase();
+    if (t === 'general' || t === 'standard') return false;
+    if (/\[(h+|m+|s+)\]/i.test(code)) return true;
+    const clean = code.replace(/"[^"]*"/g, '').replace(/\[[^\]]*\]/g, '').replace(/\\./g, '').replace(/[_*]./g, '');
+    return /[dmyhs]/i.test(clean);
+  }
+
+  async function openWorkbook(file) {
+    const zip = await openZip(file);
+
+    let wbPath = null;
+    const rootRels = await readRels(zip, '_rels/.rels');
+    if (rootRels) {
+      const r = rootRels.find((x) => /\/officeDocument$/.test(x.type));
+      if (r) wbPath = resolveTarget('', r.target);
+    }
+    if (!wbPath && findEntry(zip, 'xl/workbook.xml')) wbPath = 'xl/workbook.xml';
+    if (!wbPath || !findEntry(zip, wbPath)) {
+      if (findEntry(zip, 'xl/workbook.bin')) {
+        throw new PcError('XLSB', 'Formato .xlsb não suportado. Abra no Excel e salve uma cópia como .xlsx.');
+      }
+      throw new PcError('NOT_XLSX', 'O arquivo é um ZIP, mas não tem a estrutura de uma planilha Excel (.xlsx): workbook não encontrado.');
+    }
+    const wbDir = dirname(wbPath);
+    const relsList = (await readRels(zip, (wbDir ? wbDir + '/' : '') + '_rels/' + basename(wbPath) + '.rels')) || [];
+    const rels = new Map(relsList.map((r) => [r.id, r]));
+
+    const sheetsRaw = [];
+    let date1904 = false;
+    await parseSmallPart(zip, wbPath, {
+      open(name, inner) {
+        if (name === 'workbookPr') {
+          const d = getAttr(inner, 'date1904');
+          date1904 = d === '1' || d === 'true';
+        } else if (name === 'sheet') {
+          const m = /\s[\w.-]+:id\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(inner);
+          sheetsRaw.push({
+            name: decodeEntities(getAttr(inner, 'name') || ''),
+            rid: m ? (m[1] !== undefined ? m[1] : m[2]) : '',
+            state: getAttr(inner, 'state') || 'visible',
+          });
+        }
+      },
+    });
+    if (!sheetsRaw.length) throw new PcError('NO_SHEETS', 'A planilha não contém abas.');
+
+    const sheets = sheetsRaw.map((s, i) => {
+      const rel = rels.get(s.rid);
+      let path = rel ? resolveTarget(wbDir, rel.target) : '';
+      if (!rel || rel.mode === 'External' || !findEntry(zip, path)) {
+        throw new PcError('MISSING_PART', `A aba "${s.name}" aponta para uma parte inexistente no arquivo (arquivo corrompido ou incompleto).`);
+      }
+      return { name: s.name, path, state: s.state, index: i };
+    });
+
+    const relByType = (suffix) => {
+      const r = relsList.find((x) => x.type.endsWith('/' + suffix) && x.mode !== 'External');
+      return r ? resolveTarget(wbDir, r.target) : null;
+    };
+
+    const wb = {
+      zip,
+      sheets,
+      date1904,
+      sstPath: relByType('sharedStrings'),
+      stylesPath: relByType('styles'),
+      _ctx: null,
+    };
+    wb.loadContext = async function () {
+      if (wb._ctx) return wb._ctx;
+      const sst = [];
+      if (wb.sstPath && findEntry(zip, wb.sstPath)) {
+        let inSi = false, inT = false, inRPh = false, acc = '';
+        await parseSmallPart(zip, wb.sstPath, {
+          open(name) {
+            if (name === 'si') { inSi = true; acc = ''; }
+            else if (name === 't' && inSi && !inRPh) inT = true;
+            else if (name === 'rPh') inRPh = true;
+          },
+          close(name) {
+            if (name === 't') inT = false;
+            else if (name === 'rPh') inRPh = false;
+            else if (name === 'si') { sst.push(acc); inSi = false; }
+          },
+          text(t, raw) {
+            if (inT) acc += raw ? t : decodeText(t);
+          },
+        });
+      }
+      const dateStyle = [];
+      if (wb.stylesPath && findEntry(zip, wb.stylesPath)) {
+        const custom = new Set();
+        let inXfs = false;
+        await parseSmallPart(zip, wb.stylesPath, {
+          open(name, inner) {
+            if (name === 'numFmt') {
+              const id = +getAttr(inner, 'numFmtId');
+              if (isDateFormatCode(decodeEntities(getAttr(inner, 'formatCode') || ''))) custom.add(id);
+            } else if (name === 'cellXfs') inXfs = true;
+            else if (name === 'xf' && inXfs) {
+              const id = +(getAttr(inner, 'numFmtId') || 0);
+              dateStyle.push(BUILTIN_DATE_FMT.has(id) || custom.has(id));
+            }
+          },
+          close(name) {
+            if (name === 'cellXfs') inXfs = false;
+          },
+        });
+      }
+      wb._ctx = { sst, dateStyle, date1904 };
+      return wb._ctx;
+    };
+    return wb;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Varredura de uma aba (linhas -> células)                            */
+  /* ------------------------------------------------------------------ */
+
+  function colFromRef(ref) {
+    let n = 0;
+    for (let i = 0; i < ref.length; i++) {
+      const c = ref.charCodeAt(i);
+      if (c >= 65 && c <= 90) n = n * 26 + (c - 64);
+      else if (c >= 97 && c <= 122) n = n * 26 + (c - 96);
+      else break;
+    }
+    return n - 1;
+  }
+
+  /**
+   * Percorre a aba emitindo onRow(n, cols, vals, kinds) por linha (arrays reutilizados).
+   * kinds: 0 texto, 1 número cru (texto original de <v>), 2 número com formato de data (já ISO).
+   */
+  async function scanSheet(wb, sheet, ctx, onRow, onProgress) {
+    const entry = findEntry(wb.zip, sheet.path);
+    const { sst, dateStyle, date1904 } = ctx;
+    const cols = [], vals = [], kinds = [];
+    let n = 0, nextCol = 0;
+    let cCol = 0, cType = 'n', cStyle = 0;
+    let inV = false, inT = false, inIs = false, inRPh = false;
+    let vAcc = '', tAcc = '';
+    let badSst = 0;
+    let stopped = false;
+
+    function finishCell() {
+      let v, k = 0;
+      switch (cType) {
+        case 's': {
+          if (vAcc === '') return;
+          v = sst[+vAcc];
+          if (v === undefined) { badSst++; return; }
+          break;
+        }
+        case 'inlineStr': v = tAcc; break;
+        case 'str': v = decodeText(vAcc); break;
+        case 'b': v = vAcc === '1' ? 'VERDADEIRO' : 'FALSO'; break;
+        case 'e': return;
+        case 'd': v = vAcc; break;
+        default: {
+          if (vAcc === '') return;
+          if (dateStyle[cStyle] === true) {
+            const p = serialToParts(+vAcc, date1904);
+            if (p) {
+              v = isoDate(p) + (p.time ? ' ' + pad2(p.H) + ':' + pad2(p.M) + ':' + pad2(p.S) : '');
+              k = 2;
+            } else { v = vAcc; k = 1; }
+          } else { v = vAcc; k = 1; }
+        }
+      }
+      cols[n] = cCol; vals[n] = v; kinds[n] = k; n++;
+    }
+
+    const xs = new XmlStream({
+      open(name, inner) {
+        switch (name) {
+          case 'c': {
+            const r = getAttr(inner, 'r');
+            cCol = r !== undefined ? colFromRef(r) : nextCol;
+            nextCol = cCol + 1;
+            cType = getAttr(inner, 't') || 'n';
+            const s = getAttr(inner, 's');
+            cStyle = s === undefined ? 0 : +s;
+            vAcc = ''; tAcc = '';
+            break;
+          }
+          case 'v': inV = true; vAcc = ''; break;
+          case 'is': inIs = true; tAcc = ''; break;
+          case 't': if (inIs && !inRPh) inT = true; break;
+          case 'rPh': inRPh = true; break;
+          case 'row': n = 0; nextCol = 0; break;
+        }
+      },
+      close(name) {
+        switch (name) {
+          case 'v': inV = false; break;
+          case 't': inT = false; break;
+          case 'rPh': inRPh = false; break;
+          case 'is': inIs = false; break;
+          case 'c': finishCell(); break;
+          case 'row':
+            if (n > 0 && !stopped && onRow(n, cols, vals, kinds) === true) stopped = true;
+            n = 0;
+            break;
+        }
+      },
+      text(t, raw) {
+        if (inV) vAcc += t;
+        else if (inT) tAcc += raw ? t : decodeText(t);
+      },
+    });
+
+    let bytes = 0;
+    const total = entry.usize || 1;
+    await streamEntryText(
+      wb.zip,
+      entry,
+      (t) => {
+        xs.write(t);
+        return stopped; // onRow pode encerrar a leitura antecipadamente (ex.: só o cabeçalho)
+      },
+      (b) => {
+        bytes += b;
+        if (onProgress) onProgress(Math.min(1, bytes / total));
+      }
+    );
+    if (!stopped) xs.end();
+    return { badSst };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Leitura das abas: registros de atividades e frentes                 */
+  /* ------------------------------------------------------------------ */
+
+  const trimStr = (v) => (v == null ? '' : String(v).trim());
+
+  /** Tabela cabeçalho normalizado -> campo, com os nomes alternativos cadastrados pelo usuário. */
+  function makeMatcher(aliases) {
+    const m = new Map(HEADER_MATCHER);
+    if (aliases) {
+      for (const [key, list] of Object.entries(aliases)) {
+        const fi = FIELD_INDEX[key];
+        if (fi === undefined) continue;
+        for (const a of list || []) {
+          const k = normHeader(a);
+          if (k) m.set(k, fi);
+        }
+      }
+    }
+    return m;
+  }
+
+  /** Lê a aba de atividades (Base ou recortes) e devolve registros com indicadores calculados. */
+  async function readRecordsSheet(wb, sheet, ctx, opts) {
+    opts = opts || {};
+    const matcher = opts.matcher || HEADER_MATCHER;
+    const fieldOfCol = new Int16Array(16384).fill(-1);
+    let header = null;
+    let headers = [];
+    let filled = null;
+    let scanned = 0;
+    let dataRows = 0;
+    let ignoredRows = 0;
+    let bestMatch = 0;
+    let firstNames = null;
+    let hasServ = true;
+    const records = [];
+    const stats = { semData: 0, dataInvalida: 0, valorInvalido: 0 };
+    const fv = new Array(FIELDS.length);
+    const fk = new Array(FIELDS.length);
+    const D1904 = ctx.date1904;
+
+    function tryHeader(n, cols, vals) {
+      const found = new Map();
+      const dups = new Map();
+      const names = [];
+      for (let j = 0; j < n; j++) {
+        const name = trimStr(vals[j]);
+        names[cols[j]] = name;
+        const fi = matcher.get(normHeader(name));
+        if (fi === undefined) continue;
+        if (found.has(fi)) dups.set(fi, (dups.get(fi) || 1) + 1);
+        else found.set(fi, cols[j]);
+      }
+      if (!firstNames) firstNames = names.filter(Boolean);
+      bestMatch = Math.max(bestMatch, found.size);
+      if (found.size < MIN_HEADER_MATCHES) return false;
+      header = { found, dups };
+      headers = names;
+      hasServ = found.has(FIELD_INDEX.servAdic);
+      for (const [fi, c] of found) fieldOfCol[c] = fi;
+      filled = new Int32Array(names.length + 1);
+      return true;
+    }
+
+    function buildRecord() {
+      const get = (i) => trimStr(fv[i]);
+      const status = get(FIELD_INDEX.status);
+      const negociou = get(FIELD_INDEX.negociou);
+      const servAdic = get(FIELD_INDEX.servAdic);
+
+      let dataISO = '';
+      let dataTxt = '';
+      const dRaw = fv[FIELD_INDEX.data];
+      if (dRaw !== undefined && trimStr(dRaw) !== '') {
+        const dp = parseDateValue(dRaw, fk[FIELD_INDEX.data], D1904);
+        if (dp) { dataISO = isoDate(dp); dataTxt = fmtBR(dp); }
+        else { dataTxt = trimStr(dRaw); stats.dataInvalida++; }
+      }
+      if (!dataISO) stats.semData++;
+
+      const dtField = (i) => {
+        const raw = fv[i];
+        if (raw === undefined || trimStr(raw) === '') return '';
+        const p = parseDateValue(raw, fk[i], D1904);
+        return p ? fmtBR(p) : trimStr(raw);
+      };
+
+      let valor = null;
+      const vRaw = fv[FIELD_INDEX.valor];
+      if (vRaw !== undefined && trimStr(vRaw) !== '') {
+        const v = parseValor(vRaw, fk[FIELD_INDEX.valor]);
+        if (Number.isNaN(v)) stats.valorInvalido++;
+        else valor = v;
+      }
+
+      const c = classify(status, negociou, servAdic, hasServ);
+      return {
+        recurso: get(FIELD_INDEX.recurso),
+        protocolo: get(FIELD_INDEX.protocolo),
+        id: get(FIELD_INDEX.id),
+        matricula: get(FIELD_INDEX.matricula),
+        codigo: get(FIELD_INDEX.codigo),
+        data: dataISO,
+        dataTxt,
+        mes: dataISO ? dataISO.substring(0, 7) : '',
+        status,
+        solicitante: get(FIELD_INDEX.solicitante),
+        cidade: get(FIELD_INDEX.cidade),
+        slaInicio: dtField(FIELD_INDEX.slaInicio),
+        slaFim: dtField(FIELD_INDEX.slaFim),
+        tipoCorte: get(FIELD_INDEX.tipoCorte),
+        situacaoPergunta: get(FIELD_INDEX.situacaoPergunta),
+        irregularidade: get(FIELD_INDEX.irregularidade),
+        valor,
+        negociou,
+        categoria: get(FIELD_INDEX.categoria),
+        situacaoImovel: get(FIELD_INDEX.situacaoImovel),
+        servAdic,
+        exec: c.exec,
+        exoc: c.exoc,
+        neg: c.neg,
+        semDesdobro: c.semDesdobro,
+        t11: c.t11,
+        t31: c.t31,
+        termo: c.termo,
+        frente: '',
+        arquivo: opts.arquivo || '',
+        linha: dataRows,
+      };
+    }
+
+    const res = await scanSheet(
+      wb,
+      sheet,
+      ctx,
+      (n, cols, vals, kinds) => {
+        if (!header) {
+          if (++scanned > MAX_HEADER_SCAN_ROWS) return true;
+          tryHeader(n, cols, vals);
+          return;
+        }
+        dataRows++;
+        fv.fill(undefined);
+        fk.fill(0);
+        let any = false;
+        for (let j = 0; j < n; j++) {
+          const c = cols[j];
+          const v = vals[j];
+          const blank = kinds[j] === 0 && (v.length === 0 || v.trim().length === 0);
+          if (!blank && opts.audit && c < filled.length) filled[c]++;
+          const fi = fieldOfCol[c];
+          if (fi >= 0) {
+            fv[fi] = v;
+            fk[fi] = kinds[j];
+            if (!blank) any = true;
+          }
+        }
+        if (!any) { ignoredRows++; dataRows--; return; }
+        records.push(buildRecord());
+      },
+      opts.onProgress
+    );
+
+    if (!header) {
+      const vistas = (firstNames || []).slice(0, 12).join(', ');
+      throw new PcError(
+        'NO_HEADER',
+        `Cabeçalho não encontrado na aba "${sheet.name}": no máximo ${bestMatch} das ${FIELDS.length} colunas esperadas foram reconhecidas nas primeiras ${MAX_HEADER_SCAN_ROWS} linhas (mínimo ${MIN_HEADER_MATCHES}).` +
+          (vistas ? ` Primeiras colunas da aba: ${vistas}.` : '') +
+          ' Se as colunas têm outros nomes, cadastre o nome alternativo em "Base e regras".'
+      );
+    }
+
+    const has = (k) => header.found.has(FIELD_INDEX[k]);
+    if (!has('status') && !has('negociou') && !has('servAdic')) {
+      throw new PcError(
+        'MISSING_COLUMNS',
+        `Nenhum indicador pode ser calculado na aba "${sheet.name}": faltam "Status da Atividade", "Negociou O Débito?" e "Serviço adicionais resposta".`
+      );
+    }
+
+    const warnings = [];
+    const indisponiveis = [];
+    const tratadas = new Set();
+    const aviso = (campo, texto) => { tratadas.add(campo); warnings.push(texto); };
+    if (!has('status')) {
+      indisponiveis.push('exec', 'exoc');
+      aviso('status', 'Coluna "Status da Atividade" não encontrada: Exec e Exoc não puderam ser calculados neste arquivo (contam 0).');
+    }
+    if (!has('negociou')) {
+      indisponiveis.push('neg', 'semDesdobro');
+      aviso('negociou', 'Coluna "Negociou O Débito?" não encontrada: Negociações e Sem Desdobro não puderam ser calculadas neste arquivo (contam 0).');
+    } else if (!has('servAdic')) {
+      indisponiveis.push('semDesdobro');
+    }
+    if (!has('servAdic')) {
+      indisponiveis.push('termos');
+      aviso('servAdic', 'Coluna "Serviço adicionais resposta" não encontrada: Termos aplicados e Sem Desdobro não puderam ser calculados neste arquivo (contam 0).');
+    }
+    if (!has('data')) aviso('data', 'Coluna "Data" não encontrada: os registros ficam "Sem data" e saem de qualquer filtro de período.');
+    if (!has('recurso')) aviso('recurso', 'Coluna "Recurso" não encontrada: a equipe fica vazia e a frente aparece como "Não mapeada".');
+    const missing = FIELDS.filter((f, i) => !header.found.has(i));
+    const outras = missing.filter((f) => !tratadas.has(f.key));
+    if (outras.length) {
+      warnings.push(`Colunas não encontradas em "${sheet.name}" (esses campos ficam vazios): ${outras.map((f) => f.header).join(', ')}.`);
+    }
+    if (header.dups.size) {
+      warnings.push(
+        `Colunas repetidas em "${sheet.name}" (usada a primeira ocorrência): ${[...header.dups]
+          .map(([fi, k]) => `${FIELDS[fi].header} (${k}x)`)
+          .join(', ')}.`
+      );
+    }
+    if (!has('id')) {
+      warnings.push('Coluna "ID da Atividade" não encontrada: a deduplicação usa a chave Protocolo + Matrícula + Código/Descrição + Data + Recurso, e linhas com algum desses campos vazio não são unidas a outras.');
+    }
+    if (res.badSst) warnings.push(`${res.badSst} células referenciam textos inexistentes na tabela de strings do arquivo.`);
+    if (stats.dataInvalida) warnings.push(`${stats.dataInvalida} registros com "Data" que não pôde ser interpretada.`);
+    if (stats.valorInvalido) warnings.push(`${stats.valorInvalido} registros com "Valor Total dos Débitos" que não pôde ser interpretado.`);
+
+    const found = {};
+    const reconhecidas = [];
+    for (const [fi, c] of header.found) {
+      found[FIELDS[fi].key] = c;
+      reconhecidas.push({ campo: FIELDS[fi].key, esperado: FIELDS[fi].header, planilha: headers[c] });
+    }
+    return {
+      records,
+      headers,
+      filled,
+      dataRows,
+      ignoredRows,
+      stats,
+      warnings,
+      missing: missing.map((f) => f.header),
+      columns: found,
+      cobertura: {
+        reconhecidas,
+        ausentes: missing.map((f) => ({ campo: f.key, esperado: f.header })),
+        indisponiveis,
+        semData: !has('data'),
+        semRecurso: !has('recurso'),
+        semChaveId: !has('id'),
+      },
+    };
+  }
+
+  /** Só procura o cabeçalho (para decidir qual aba é a base); interrompe a leitura ao achá-lo. */
+  async function probeHeader(wb, sheet, ctx, matcher) {
+    let scanned = 0;
+    let best = 0;
+    let ok = false;
+    await scanSheet(wb, sheet, ctx, (n, cols, vals) => {
+      if (++scanned > MAX_HEADER_SCAN_ROWS) return true;
+      const found = new Set();
+      for (let j = 0; j < n; j++) {
+        const fi = matcher.get(normHeader(trimStr(vals[j])));
+        if (fi !== undefined) found.add(fi);
+      }
+      best = Math.max(best, found.size);
+      if (found.size >= MIN_HEADER_MATCHES) { ok = true; return true; }
+      return false;
+    });
+    return { ok, best };
+  }
+
+  /** Lê a aba de mapeamento Frente/Nomenclatura. */
+  async function readFrenteSheet(wb, sheet, ctx) {
+    let map = null;
+    let scanned = 0;
+    const out = [];
+    let empty = 0;
+    await scanSheet(wb, sheet, ctx, (n, cols, vals) => {
+      if (!map) {
+        if (++scanned > MAX_HEADER_SCAN_ROWS) return true;
+        let cf = -1, cn = -1;
+        for (let j = 0; j < n; j++) {
+          const h = normHeader(vals[j]);
+          if (h === 'frente' && cf < 0) cf = cols[j];
+          else if (h === 'nomenclatura' && cn < 0) cn = cols[j];
+        }
+        if (cf >= 0 && cn >= 0) map = { cf, cn };
+        return;
+      }
+      let f = '', nm = '';
+      for (let j = 0; j < n; j++) {
+        if (cols[j] === map.cf) f = trimStr(vals[j]);
+        else if (cols[j] === map.cn) nm = trimStr(vals[j]);
+      }
+      if (!f && !nm) return;
+      if (!f || !nm) { empty++; return; }
+      out.push({ nomenclatura: nm, frente: f });
+    });
+    if (!map) throw new PcError('NO_HEADER', `A aba "${sheet.name}" não tem as colunas Frente e Nomenclatura.`);
+    return { frentes: out, incompletas: empty };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Chave de deduplicação e conciliação dos recortes                    */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * ID da Atividade; sem ID, Protocolo + Matrícula + Código/Descrição + Data + Recurso.
+   * Retorna null quando a chave alternativa está incompleta (nada é unido a partir de chave fraca).
+   */
+  function recordKey(r) {
+    if (r.id) return 'id:' + norm(r.id);
+    const parts = [r.protocolo, r.matricula, r.codigo, r.data || r.dataTxt, r.recurso].map(norm);
+    if (parts.some((p) => !p)) return null;
+    return 'alt:' + parts.join('|');
+  }
+
+  const RECORTE_DEFS = [
+    { key: 'termos', test: (n) => n.includes('termo'), label: 'Termos', rule: (r) => r.termo, indicador: 'termos' },
+    { key: 'negociacoes', test: (n) => n.includes('negocia'), label: 'Negociações', rule: (r) => r.neg, indicador: 'neg' },
+  ];
+
+  const isFrenteName = (n) => n === 'frente de servico' || n.startsWith('frente');
+  const recorteDe = (n) => RECORTE_DEFS.find((d) => d.test(n));
+
+  /** Escolhe a aba principal: "Base"; se não existir, a única aba com as colunas esperadas. */
+  async function pickSheets(wb, ctx, matcher, warnings) {
+    const info = wb.sheets.map((s) => ({ s, n: norm(s.name) }));
+    let base = info.find((x) => x.n === 'base');
+    const frente = info.find((x) => x.n === 'frente de servico') || info.find((x) => x !== base && isFrenteName(x.n));
+    if (!base) {
+      const cands = [];
+      const melhores = [];
+      for (const x of info) {
+        if (x === frente) continue;
+        const probe = await probeHeader(wb, x.s, ctx, matcher);
+        melhores.push(`${x.s.name}: ${probe.best}`);
+        if (probe.ok) cands.push(x);
+      }
+      const principais = cands.filter((x) => !recorteDe(x.n));
+      const lista = (arr) => arr.map((x) => `"${x.s.name}"`).join(', ');
+      if (principais.length === 1) base = principais[0];
+      else if (principais.length > 1) {
+        throw new PcError('AMBIGUOUS_SHEET', `Várias abas parecem conter atividades (${lista(principais)}). Renomeie a aba principal para "Base".`);
+      } else if (cands.length === 1) base = cands[0];
+      else if (cands.length > 1) {
+        throw new PcError('AMBIGUOUS_SHEET', `Não há aba "Base" e mais de uma aba tem as colunas esperadas (${lista(cands)}). Renomeie a aba principal para "Base".`);
+      } else {
+        throw new PcError(
+          'NO_BASE_SHEET',
+          `Aba "Base" não encontrada e nenhuma aba tem as colunas esperadas (reconhecidas por aba: ${melhores.join('; ') || 'nenhuma'}; mínimo ${MIN_HEADER_MATCHES}). Abas do arquivo: ${wb.sheets.map((s) => s.name).join(', ')}.`
+        );
+      }
+      warnings.push(`Aba "Base" não encontrada: foi usada a aba "${base.s.name}", a única com as colunas esperadas.`);
+    }
+    return { base, frente };
+  }
+
+  /**
+   * Lê um arquivo .xlsx completo: aba principal (obrigatória), Frente de Serviço (opcional)
+   * e as abas de recorte (Termos/Negociações) somente para conferência.
+   * opts: { path, onProgress, aliases }
+   */
+  async function readSpreadsheetFile(file, opts) {
+    opts = opts || {};
+    const progress = opts.onProgress || (() => {});
+    const matcher = makeMatcher(opts.aliases);
+    const wb = await openWorkbook(file);
+    const sheetNames = wb.sheets.map((s) => s.name);
+    const ctx = await wb.loadContext();
+    const warnings = [];
+    const { base, frente } = await pickSheets(wb, ctx, matcher, warnings);
+    const baseRes = await readRecordsSheet(wb, base.s, ctx, {
+      audit: true,
+      arquivo: opts.path || file.name,
+      matcher,
+      onProgress: (f) => progress({ phase: `Lendo aba ${base.s.name}`, fraction: f }),
+    });
+    warnings.push(...baseRes.warnings);
+
+    let frentes = null;
+    if (frente) {
+      try {
+        progress({ phase: 'Lendo aba Frente de Serviço', fraction: 0 });
+        const fr = await readFrenteSheet(wb, frente.s, ctx);
+        frentes = fr.frentes;
+        if (fr.incompletas) warnings.push(`${fr.incompletas} linhas da aba "${frente.s.name}" com Frente ou Nomenclatura vazia foram ignoradas.`);
+      } catch (e) {
+        if (!(e instanceof PcError)) throw e;
+        warnings.push(`${e.message} O mapeamento de frentes anterior foi mantido.`);
+      }
+    }
+
+    const baseKeys = new Set();
+    let baseSemChave = 0;
+    for (const r of baseRes.records) {
+      const k = recordKey(r);
+      if (k) baseKeys.add(k);
+      else baseSemChave++;
+    }
+    const indisp = new Set(baseRes.cobertura.indisponiveis);
+    const conferencia = [];
+    for (const def of RECORTE_DEFS) {
+      const sh = abaRecorte(wb, base, frente, def);
+      if (!sh) continue;
+      if (indisp.has(def.indicador)) {
+        conferencia.push({ tipo: def.key, rotulo: def.label, aba: sh.name, erro: `Sem conferência: a Base deste arquivo não tem as colunas necessárias para calcular ${def.label}.` });
+        continue;
+      }
+      try {
+        progress({ phase: `Conferindo aba ${sh.name}`, fraction: 0 });
+        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher });
+        let naBase = 0;
+        let regraOk = 0;
+        let semChave = 0;
+        for (const r of rr.records) {
+          const k = recordKey(r);
+          if (!k) semChave++;
+          else if (baseKeys.has(k)) naBase++;
+          if (def.rule(r)) regraOk++;
+        }
+        const calculado = baseRes.records.filter(def.rule).length;
+        conferencia.push({
+          tipo: def.key,
+          rotulo: def.label,
+          aba: sh.name,
+          linhas: rr.records.length,
+          naBase,
+          semChave,
+          seguemRegra: regraOk,
+          calculadoNaBase: calculado,
+          conciliado: rr.records.length === calculado && naBase === rr.records.length && regraOk === rr.records.length,
+        });
+      } catch (e) {
+        if (!(e instanceof PcError)) throw e;
+        conferencia.push({ tipo: def.key, rotulo: def.label, aba: sh.name, erro: e.message });
+      }
+    }
+
+    // auditoria de preenchimento das colunas
+    const columns = [];
+    const keptByCol = new Map();
+    for (const [key, c] of Object.entries(baseRes.columns)) keptByCol.set(c, key);
+    for (let c = 0; c < baseRes.headers.length; c++) {
+      const h = baseRes.headers[c];
+      if (h === undefined || h === '') continue;
+      const key = keptByCol.get(c);
+      columns.push({ coluna: c, nome: h, preenchidas: baseRes.filled[c], mantida: !!key, campo: key || '' });
+    }
+
+    return {
+      sheetNames,
+      abaBase: base.s.name,
+      records: baseRes.records,
+      frentes,
+      warnings,
+      conferencia,
+      cobertura: baseRes.cobertura,
+      semChave: baseSemChave,
+      audit: { linhas: baseRes.dataRows, colunas: columns, totalColunas: columns.length, linhasIgnoradas: baseRes.ignoredRows },
+      stats: baseRes.stats,
+      colunasNaoEncontradas: baseRes.missing,
+    };
+  }
+
+  /** Aba de recorte (Termos/Negociações) que não seja a base nem a de frentes. */
+  function abaRecorte(wb, base, frente, def) {
+    const x = wb.sheets.find((s) => s !== base.s && (!frente || s !== frente.s) && def.test(norm(s.name)));
+    return x || null;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Frentes, dimensões e consolidação                                   */
+  /* ------------------------------------------------------------------ */
+
+  function buildFrenteIndex(map) {
+    const list = [];
+    for (const v of map.values()) list.push({ prefix: v.nomenclatura.trim().toUpperCase(), frente: v.frente, nomenclatura: v.nomenclatura });
+    list.sort((a, b) => b.prefix.length - a.prefix.length || (a.prefix < b.prefix ? -1 : 1));
+    return list.filter((e) => e.prefix);
+  }
+
+  function frenteFor(recurso, index) {
+    const r = String(recurso || '').trim().toUpperCase();
+    if (r) for (const e of index) if (r.startsWith(e.prefix)) return e.frente;
+    return NAO_MAPEADA;
+  }
+
+  function applyFrentes(records, map) {
+    const index = buildFrenteIndex(map);
+    const cache = new Map();
+    for (const r of records) {
+      let f = cache.get(r.recurso);
+      if (f === undefined) { f = frenteFor(r.recurso, index); cache.set(r.recurso, f); }
+      r.frente = f;
+    }
+  }
+
+  /**
+   * Junta mapeamentos: entradas existentes são preservadas; para a mesma nomenclatura o mais recente substitui.
+   * `fontes`: [{ nome, frentes }] em ordem cronológica (do mais antigo ao mais recente).
+   */
+  function mergeFrentes(map, fontes) {
+    const out = new Map(map);
+    for (const fonte of fontes) {
+      if (!fonte || !fonte.frentes) continue;
+      for (const f of fonte.frentes) {
+        out.set(f.nomenclatura.trim().toUpperCase(), { nomenclatura: f.nomenclatura.trim(), frente: f.frente, origem: fonte.nome || '' });
+      }
+    }
+    return out;
+  }
+
+  /** Uniformiza variações de caixa/acentos/espaços de um campo, usando a grafia mais frequente. */
+  function canonicalize(records, field) {
+    const groups = new Map();
+    for (const r of records) {
+      const v = r[field];
+      if (!v) continue;
+      const k = norm(v);
+      let g = groups.get(k);
+      if (!g) groups.set(k, (g = new Map()));
+      g.set(v, (g.get(v) || 0) + 1);
+    }
+    const canon = new Map();
+    for (const [k, g] of groups) {
+      let best = null, bc = -1;
+      for (const [v, c] of g) if (c > bc || (c === bc && v < best)) { best = v; bc = c; }
+      canon.set(k, best);
+    }
+    for (const r of records) if (r[field]) r[field] = canon.get(norm(r[field]));
+  }
+
+  /**
+   * Consolida resultados de arquivos válidos: ordena por data de modificação,
+   * remove duplicatas (o arquivo modificado mais recentemente prevalece).
+   */
+  function consolidate(files) {
+    const ordered = files.slice().sort((a, b) => a.lastModified - b.lastModified || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    const byKey = new Map();
+    let lidos = 0;
+    let semChave = 0;
+    for (const f of ordered) {
+      for (const r of f.records) {
+        lidos++;
+        let k = recordKey(r);
+        if (k === null) {
+          // chave alternativa incompleta: a linha nunca é unida a outra
+          semChave++;
+          k = 'linha:' + f.path + '#' + r.linha;
+        }
+        byKey.set(k, r); // Map mantém a posição da primeira inserção; o valor é o mais recente
+      }
+    }
+    const records = [...byKey.values()];
+    const duplicatas = lidos - records.length;
+    for (const r of records) r.busca = norm([r.matricula, r.protocolo, r.solicitante, r.id].join(' '));
+    canonicalize(records, 'cidade');
+    canonicalize(records, 'recurso');
+    return { records, lidos, duplicatas, semChave, ordemArquivos: ordered.map((f) => f.path) };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Filtros e agregações                                                */
+  /* ------------------------------------------------------------------ */
+
+  const INDICADORES = [
+    { key: 'atividades', rotulo: 'Atividades', curto: 'Atividades', test: () => true },
+    { key: 'exec', rotulo: 'Finalizadas (Exec)', curto: 'Exec', test: (r) => r.exec },
+    { key: 'exoc', rotulo: 'Encerradas com Ocorrência (Exoc)', curto: 'Exoc', test: (r) => r.exoc },
+    { key: 'neg', rotulo: 'Negociações', curto: 'Negociações', test: (r) => r.neg },
+    { key: 'termos', rotulo: 'Irregularidade identificada (Termos aplicados)', curto: 'Termos', test: (r) => r.termo },
+    { key: 'semDesdobro', rotulo: 'Negociações Sem Desdobro', curto: 'Sem Desdobro', test: (r) => r.semDesdobro },
+  ];
+  const INDICADOR_BY_KEY = Object.fromEntries(INDICADORES.map((i) => [i.key, i]));
+
+  function filterRecords(records, f) {
+    f = f || {};
+    const from = f.from || '';
+    const to = f.to || '';
+    const cidade = f.cidade || '';
+    const frente = f.frente || '';
+    const equipe = f.equipe || '';
+    const ind = f.indicador && f.indicador !== 'atividades' ? INDICADOR_BY_KEY[f.indicador].test : null;
+    const q = f.busca ? norm(f.busca) : '';
+    const dated = !!(from || to);
+    return records.filter((r) => {
+      if (dated) {
+        if (!r.data) return false;
+        if (from && r.data < from) return false;
+        if (to && r.data > to) return false;
+      }
+      if (cidade && r.cidade !== cidade) return false;
+      if (frente && r.frente !== frente) return false;
+      if (equipe && r.recurso !== equipe) return false;
+      if (ind && !ind(r)) return false;
+      if (q && !r.busca.includes(q)) return false;
+      return true;
+    });
+  }
+
+  function summarize(records) {
+    const s = { atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0 };
+    for (const r of records) {
+      s.atividades++;
+      if (r.exec) s.exec++;
+      else if (r.exoc) s.exoc++;
+      else s.outros++;
+      if (r.neg) {
+        s.neg++;
+        if (r.valor == null) s.debitoNaoInformado++;
+        else s.debito += r.valor;
+        if (r.semDesdobro) s.semDesdobro++;
+      }
+      if (r.termo) {
+        s.termos++;
+        if (r.t11) s.t11++;
+        if (r.t31) s.t31++;
+        if (r.neg) s.negETermo++;
+      }
+    }
+    return s;
+  }
+
+  function addMonth(ym, k) {
+    let y = +ym.substring(0, 4);
+    let m = +ym.substring(5, 7) - 1 + k;
+    y += Math.floor(m / 12);
+    m = ((m % 12) + 12) % 12;
+    return y + '-' + pad2(m + 1);
+  }
+
+  const MAX_MESES_CONTINUOS = 60;
+  /** Série mensal contínua (meses sem registros aparecem zerados) + linha "Sem data". */
+  function monthlySeries(records) {
+    const by = new Map();
+    let semData = null;
+    for (const r of records) {
+      let b;
+      if (!r.mes) {
+        b = semData || (semData = { mes: '', rotulo: SEM_DATA, records: [] });
+      } else {
+        b = by.get(r.mes);
+        if (!b) by.set(r.mes, (b = { mes: r.mes, rotulo: monthLabel(r.mes), records: [] }));
+      }
+      b.records.push(r);
+    }
+    const keys = [...by.keys()].sort();
+    const out = [];
+    if (keys.length) {
+      const span = (+keys[keys.length - 1].substring(0, 4) - +keys[0].substring(0, 4)) * 12 + (+keys[keys.length - 1].substring(5, 7) - +keys[0].substring(5, 7)) + 1;
+      if (span <= MAX_MESES_CONTINUOS) {
+        for (let m = keys[0]; m <= keys[keys.length - 1]; m = addMonth(m, 1)) {
+          out.push(by.get(m) || { mes: m, rotulo: monthLabel(m), records: [] });
+        }
+      } else {
+        // período absurdamente longo (ex.: data digitada com ano errado): mostra só os meses com registros
+        for (const k of keys) out.push(by.get(k));
+      }
+    }
+    if (semData) out.push(semData);
+    for (const b of out) b.sum = summarize(b.records);
+    return out;
+  }
+
+  const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const monthLabel = (ym) => MESES[+ym.substring(5, 7) - 1] + '/' + ym.substring(0, 4);
+  function monthRange(ym) {
+    const y = +ym.substring(0, 4);
+    const m = +ym.substring(5, 7);
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return { from: ym + '-01', to: ym + '-' + pad2(last) };
+  }
+
+  /** Ranking por dimensão ('frente' | 'cidade' | 'recurso') para um indicador. */
+  function ranking(records, dim, indicador) {
+    const test = INDICADOR_BY_KEY[indicador].test;
+    const m = new Map();
+    let total = 0;
+    for (const r of records) {
+      if (!test(r)) continue;
+      total++;
+      const k = r[dim] || (dim === 'recurso' ? '(sem recurso)' : dim === 'cidade' ? '(sem cidade)' : NAO_MAPEADA);
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    const items = [...m].map(([key, value]) => ({ key, value }));
+    items.sort((a, b) => b.value - a.value || a.key.localeCompare(b.key, 'pt-BR'));
+    return { items, total };
+  }
+
+  function distinct(records, field) {
+    const s = new Set();
+    for (const r of records) s.add(r[field] || '');
+    return [...s].filter((v) => v).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }
+
+  function statusBreakdown(records) {
+    const m = new Map();
+    for (const r of records) {
+      const k = r.status || '(vazio)';
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return [...m].map(([status, value]) => ({ status, value })).sort((a, b) => b.value - a.value);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* CSV                                                                 */
+  /* ------------------------------------------------------------------ */
+
+  const sn = (b) => (b ? 'Sim' : 'Não');
+  const CSV_COLUMNS = [
+    { header: 'Recurso', get: (r) => r.recurso },
+    { header: 'Cód. Protocolo Origem', get: (r) => r.protocolo },
+    { header: 'ID da Atividade', get: (r) => r.id },
+    { header: 'Matrícula', get: (r) => r.matricula },
+    { header: 'Código/Descrição', get: (r) => r.codigo },
+    { header: 'Data', get: (r) => r.dataTxt },
+    { header: 'Status da Atividade', get: (r) => r.status },
+    { header: 'Nome do Solicitante', get: (r) => r.solicitante },
+    { header: 'Cidade', get: (r) => r.cidade },
+    { header: 'Início do SLA', get: (r) => r.slaInicio },
+    { header: 'Fim do SLA', get: (r) => r.slaFim },
+    { header: 'Tipo do Corte Realizado', get: (r) => r.tipoCorte },
+    { header: 'Qual a situação do imóvel?', get: (r) => r.situacaoPergunta },
+    { header: 'Irregularidade Encontrada?', get: (r) => r.irregularidade },
+    { header: 'Valor Total dos Débitos', get: (r) => r.valor, numeric: true },
+    { header: 'Negociou O Débito?', get: (r) => r.negociou },
+    { header: 'Categoria', get: (r) => r.categoria },
+    { header: 'Situação Do Imóvel', get: (r) => r.situacaoImovel },
+    { header: 'Serviço adicionais resposta', get: (r) => r.servAdic },
+    { header: 'Frente', get: (r) => r.frente },
+    { header: 'Exec', get: (r) => sn(r.exec) },
+    { header: 'Exoc', get: (r) => sn(r.exoc) },
+    { header: 'Negociação', get: (r) => sn(r.neg) },
+    { header: 'Sem Desdobro', get: (r) => sn(r.semDesdobro) },
+    { header: 'Termo 110013 (Serviços)', get: (r) => sn(r.t11) },
+    { header: 'Termo 310013 (VCG)', get: (r) => sn(r.t31) },
+    { header: 'Termo aplicado', get: (r) => sn(r.termo) },
+    { header: 'Arquivo de origem', get: (r) => r.arquivo },
+  ];
+
+  function csvCell(v, numeric) {
+    if (v == null || v === '') return '';
+    if (numeric && typeof v === 'number') return v.toFixed(2).replace('.', ',');
+    let s = String(v);
+    // Protege contra execução de fórmulas ao abrir no Excel.
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    if (/[;"\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function toCsv(records, columns) {
+    columns = columns || CSV_COLUMNS;
+    const lines = [columns.map((c) => csvCell(c.header)).join(';')];
+    for (const r of records) lines.push(columns.map((c) => csvCell(c.get(r), c.numeric)).join(';'));
+    return '\uFEFF' + lines.join('\r\n') + '\r\n';
+  }
+
+  /* ------------------------------------------------------------------ */
+
+  return {
+    PcError, FIELDS, INDICADORES, INDICADOR_BY_KEY, NAO_MAPEADA, SEM_DATA, CSV_COLUMNS,
+    norm, normHeader, isBlank, decodeEntities, decodeText,
+    parseDateText, parseDateValue, serialToParts, parseValor, fmtBR, isoToBR, isDateFormatCode,
+    classify, recordKey,
+    XmlStream, openZip, openWorkbook, readSpreadsheetFile, readRecordsSheet, makeMatcher,
+    buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate,
+    filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
+    toCsv, csvCell,
+  };
+});
+
+</script>
+<script>
+/*!
+ * Acompanhamento de Pós Corte — interface (AnalistaFJP)
+ * Depende de window.PosCorte (core.js) e window.FRENTES_PADRAO (frentes-padrao.js).
+ */
+(function () {
+  'use strict';
+  const PC = window.PosCorte;
+  const INDS = PC.INDICADORES;
+  const IND = PC.INDICADOR_BY_KEY;
+  const $ = (s, r) => (r || document).querySelector(s);
+
+  /* ------------------------------------------------------------------ */
+  /* Utilitários                                                         */
+  /* ------------------------------------------------------------------ */
+
+  const nf = new Intl.NumberFormat('pt-BR');
+  const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  const fmtInt = (n) => nf.format(n);
+  const fmtPct = (a, b) => (b ? ((a / b) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%' : '—');
+  const plural = (n, um, varios) => (n === 1 ? um : varios);
+  const pad2 = (n) => (n < 10 ? '0' + n : '' + n);
+  const hhmmss = (d) => pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  const fmtDataHora = (ms) => {
+    const d = new Date(ms);
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  };
+  const fmtBytes = (b) => (b >= 1048576 ? (b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
+
+  /** Cria elementos sem innerHTML: todo texto de dados entra como textContent. */
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    if (props) {
+      for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v == null || v === false) continue;
+        if (k === 'class') el.className = v;
+        else if (k === 'text') el.textContent = v;
+        else if (k === 'style') {
+          for (const sk of Object.keys(v)) {
+            if (sk.startsWith('--')) el.style.setProperty(sk, v[sk]);
+            else el.style[sk] = v[sk];
+          }
+        } else if (k === 'dataset') Object.assign(el.dataset, v);
+        else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+        else if (k === 'value') el.value = v;
+        else if (k === 'disabled' || k === 'hidden' || k === 'checked' || k === 'selected') el[k] = !!v;
+        else el.setAttribute(k, v === true ? '' : v);
+      }
+    }
+    for (const c of kids.flat(Infinity)) {
+      if (c == null || c === false) continue;
+      el.append(c.nodeType ? c : document.createTextNode(String(c)));
+    }
+    return el;
+  }
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const ICONS = {
+    folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+    refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+    upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+    info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+    dash: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+    table: '<path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/>',
+    book: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/>',
+  };
+  function icon(name, size) {
+    const s = document.createElementNS(SVG_NS, 'svg');
+    s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('width', size || 18);
+    s.setAttribute('height', size || 18);
+    s.setAttribute('fill', 'none');
+    s.setAttribute('stroke', 'currentColor');
+    s.setAttribute('stroke-width', '2');
+    s.setAttribute('stroke-linecap', 'round');
+    s.setAttribute('stroke-linejoin', 'round');
+    s.setAttribute('aria-hidden', 'true');
+    s.setAttribute('class', 'ico');
+    s.innerHTML = ICONS[name]; // ícones estáticos, nunca dados
+    return s;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Estado                                                              */
+  /* ------------------------------------------------------------------ */
+
+  const COR = {
+    atividades: 'var(--atv)',
+    exec: 'var(--exec)',
+    exoc: 'var(--exoc)',
+    neg: 'var(--neg)',
+    termos: 'var(--termo)',
+    semDesdobro: 'var(--sem)',
+    outros: 'var(--outros)',
+  };
+
+  const state = {
+    records: [],
+    files: [], // resultados da última leitura (válidos e com erro)
+    consolidado: null,
+    cobertura: {},
+    frenteMap: new Map(),
+    source: null, // { kind: 'folder'|'files', mode: 'handle'|'input', name, handle?, entries? }
+    cache: new Map(),
+    lastSig: '',
+    lastRead: null,
+    lastCheck: null,
+    filters: { from: '', to: '', cidade: '', frente: '', equipe: '' },
+    chartInd: 'atividades',
+    view: 'geral',
+    an: { ind: 'atividades', busca: '', page: 1, expanded: new Set() },
+    showAll: { frente: false, cidade: false, recurso: false },
+    loading: false,
+    status: null,
+    aliases: {},
+    ignoradosFormato: [],
+    auditoriaAberta: false,
+  };
+  let vm = null; // modelo de visualização calculado a partir dos filtros
+  let anRows = []; // linhas do analítico (filtros + indicador + busca)
+
+  for (const f of window.FRENTES_PADRAO || []) {
+    state.frenteMap.set(f.nomenclatura.trim().toUpperCase(), { nomenclatura: f.nomenclatura, frente: f.frente, origem: 'padrão incorporado' });
+  }
+  try {
+    state.aliases = JSON.parse(localStorage.getItem('poscorte.aliases') || '{}') || {};
+  } catch (_) {
+    state.aliases = {};
+  }
+  function salvarAliases() {
+    try { localStorage.setItem('poscorte.aliases', JSON.stringify(state.aliases)); } catch (_) { /* sem armazenamento: vale só nesta sessão */ }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Dica flutuante (hover e foco)                                       */
+  /* ------------------------------------------------------------------ */
+
+  const tip = h('div', { id: 'tip', role: 'tooltip', hidden: true });
+  document.body.append(tip);
+  let tipTimer = null;
+  function posTip(x, y) {
+    const w = tip.offsetWidth, hh = tip.offsetHeight;
+    let left = x + 14, top = y + 16;
+    if (left + w > window.innerWidth - 8) left = Math.max(8, x - w - 14);
+    if (top + hh > window.innerHeight - 8) top = Math.max(8, y - hh - 12);
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+  function showTip(el, x, y) {
+    const t = el.getAttribute('data-tip');
+    if (!t) return;
+    const [first, ...rest] = t.split('\n');
+    tip.replaceChildren(h('strong', { text: first }), ...rest.map((l) => h('div', { text: l })));
+    tip.hidden = false;
+    posTip(x, y);
+  }
+  const hideTip = () => { tip.hidden = true; clearTimeout(tipTimer); };
+  document.addEventListener('pointerover', (e) => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if (!el) return;
+    showTip(el, e.clientX, e.clientY);
+    if (e.pointerType === 'touch') { clearTimeout(tipTimer); tipTimer = setTimeout(hideTip, 2200); }
+  });
+  document.addEventListener('pointermove', (e) => { if (!tip.hidden && e.pointerType !== 'touch') posTip(e.clientX, e.clientY); });
+  document.addEventListener('pointerout', (e) => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) hideTip();
+  });
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if (el && e.target.matches(':focus-visible')) { const r = el.getBoundingClientRect(); showTip(el, r.left + 12, r.bottom - 6); }
+  });
+  document.addEventListener('focusout', hideTip);
+  window.addEventListener('scroll', hideTip, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
+
+  /* ------------------------------------------------------------------ */
+  /* Mensagens de status                                                 */
+  /* ------------------------------------------------------------------ */
+
+  function setStatus(s) {
+    state.status = s;
+    renderStatus();
+  }
+  function renderStatus() {
+    const box = $('#status');
+    const s = state.status;
+    if (!s) { box.replaceChildren(); return; }
+    const ic = s.kind === 'success' ? 'check' : s.kind === 'warning' || s.kind === 'error' ? 'alert' : 'info';
+    const body = h('div', null,
+      h('div', { class: 'st-title', text: s.title }),
+      s.detail ? h('div', { class: 'st-detail', text: s.detail }) : null,
+      s.items && s.items.length ? h('ul', null, s.items.map((t) => h('li', { text: t }))) : null,
+      s.progress != null ? h('div', { class: 'progress', role: 'progressbar', 'aria-label': 'Progresso da leitura', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(s.progress * 100) }, h('span', { style: { width: Math.round(s.progress * 100) + '%' } })) : null
+    );
+    const acts = h('div', { class: 'status-actions' },
+      (s.actions || []).map((a) => h('button', { class: 'btn small', type: 'button', text: a.label, onclick: a.run })),
+      s.progress == null ? h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Fechar mensagem', onclick: () => setStatus(null) }, icon('x', 16)) : null
+    );
+    box.replaceChildren(h('div', { class: 'status ' + s.kind, role: s.kind === 'error' ? 'alert' : 'status' }, icon(ic, 20), body, acts));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Fontes: pasta (acesso contínuo ou seleção manual) e arquivos        */
+  /* ------------------------------------------------------------------ */
+
+  const temPicker = () => typeof window.showDirectoryPicker === 'function';
+
+  const idb = {
+    open() {
+      return new Promise((res, rej) => {
+        const r = indexedDB.open('poscorte', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    },
+    async get(k) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const q = db.transaction('kv').objectStore('kv').get(k);
+        q.onsuccess = () => res(q.result);
+        q.onerror = () => rej(q.error);
+      });
+    },
+    async set(k, v) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put(v, k);
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+      });
+    },
+  };
+
+  async function listarPasta(dir, prefixo, prof) {
+    const out = [];
+    for await (const [name, handle] of dir.entries()) {
+      const path = prefixo + name;
+      if (handle.kind === 'file') {
+        out.push({ name, path, getFile: () => handle.getFile() });
+      } else if (handle.kind === 'directory' && prof < 10) {
+        out.push(...(await listarPasta(handle, path + '/', prof + 1)));
+      }
+    }
+    return out;
+  }
+
+  function entradasDeArquivos(fileList) {
+    return [...fileList].map((f) => ({ name: f.name, path: f.webkitRelativePath || f.name, getFile: async () => f }));
+  }
+
+  function friendly(err) {
+    if (err instanceof PC.PcError) return err.message;
+    const n = err && err.name;
+    if (n === 'NotFoundError') return 'Arquivo não encontrado (foi movido ou apagado durante a leitura).';
+    if (n === 'NotReadableError' || n === 'SecurityError') {
+      return 'Não foi possível ler o arquivo. Se ele está no OneDrive, confirme que está baixado neste computador ("Sempre manter neste dispositivo") e que não está bloqueado por outro programa.';
+    }
+    if (err instanceof RangeError) return 'Memória insuficiente ao processar o arquivo.';
+    return 'Falha inesperada ao ler o arquivo (' + (n || 'erro') + ': ' + (err && err.message) + ').';
+  }
+
+  const isXlsx = (n) => /\.xlsx$/i.test(n);
+  const isFormatoAntigo = (n) => /\.(xls|xlsb|xlsm)$/i.test(n);
+
+  /**
+   * Lê os arquivos, consolida e atualiza o painel.
+   * Mantém a base anterior quando nenhuma base válida é carregada.
+   */
+  async function carregar(entries, opts) {
+    opts = opts || {};
+    if (state.loading) return;
+    state.loading = true;
+    renderActions();
+    const rotulo = state.source ? state.source.name : '';
+    try {
+      const xlsx = [];
+      const ignoradosFormato = [];
+      for (const e of entries) {
+        if (e.name.startsWith('~$')) continue; // temporários do Excel
+        if (isXlsx(e.name)) xlsx.push(e);
+        else if (isFormatoAntigo(e.name)) ignoradosFormato.push(e.path);
+      }
+      if (!xlsx.length) {
+        setStatus({
+          kind: 'warning',
+          title: 'Nenhum arquivo .xlsx encontrado',
+          detail: (rotulo ? 'Fonte: ' + rotulo + '. ' : '') + 'Coloque arquivos .xlsx na pasta (subpastas são lidas; arquivos ~$ temporários são ignorados).' + (state.records.length ? ' A base anterior foi mantida.' : ''),
+          items: ignoradosFormato.map((p) => 'Formato não suportado (salve como .xlsx): ' + p),
+        });
+        return;
+      }
+
+      const ok = [];
+      const falhas = [];
+      const chaves = [];
+      const novos = [];
+      let ultimoProgresso = 0;
+      for (let i = 0; i < xlsx.length; i++) {
+        const e = xlsx[i];
+        const prefixo = 'Arquivo ' + (i + 1) + ' de ' + xlsx.length + ': ' + e.name;
+        let file;
+        try {
+          file = await e.getFile();
+        } catch (err) {
+          falhas.push({ path: e.path, motivo: friendly(err) });
+          chaves.push('ERR:' + e.path);
+          continue;
+        }
+        const chave = e.path + '|' + file.size + '|' + file.lastModified;
+        chaves.push(chave);
+        let res = state.cache.get(chave);
+        if (!res) {
+          if (!opts.auto) setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo, progress: 0 });
+          try {
+            res = await PC.readSpreadsheetFile(file, {
+              path: e.path,
+              aliases: state.aliases,
+              onProgress: (p) => {
+                if (opts.auto || (p.fraction < 1 && Date.now() - ultimoProgresso < 120)) return;
+                ultimoProgresso = Date.now();
+                setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo + ' — ' + p.phase + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / xlsx.length });
+              },
+            });
+            res.path = e.path;
+            res.name = e.name;
+            res.size = file.size;
+            res.lastModified = file.lastModified;
+            state.cache.set(chave, res);
+            novos.push(e.path);
+          } catch (err) {
+            falhas.push({ path: e.path, motivo: friendly(err) });
+            continue;
+          }
+        }
+        ok.push(res);
+      }
+      for (const k of [...state.cache.keys()]) if (!chaves.includes(k)) state.cache.delete(k);
+      state.lastCheck = new Date();
+
+      const sig = chaves.slice().sort().join('\n') + '\n' + JSON.stringify(state.aliases);
+      if (opts.auto && sig === state.lastSig && ok.length) {
+        renderSideFoot();
+        return; // nada mudou desde a última leitura
+      }
+
+      if (!ok.length) {
+        setStatus({
+          kind: 'error',
+          title: 'Nenhuma base válida foi carregada',
+          detail: state.records.length ? 'A base anterior foi mantida na tela.' : 'Verifique os arquivos abaixo.',
+          items: falhas.map((f) => f.path + ' — ' + f.motivo),
+        });
+        renderSideFoot();
+        return;
+      }
+
+      state.lastSig = sig;
+      const cons = PC.consolidate(ok);
+      const ordemMod = ok.slice().sort((a, b) => a.lastModified - b.lastModified || (a.path < b.path ? -1 : 1));
+      state.frenteMap = PC.mergeFrentes(state.frenteMap, ordemMod.map((r) => ({ nome: r.name, frentes: r.frentes })));
+      PC.applyFrentes(cons.records, state.frenteMap);
+      state.records = cons.records;
+      state.consolidado = cons;
+      state.files = ok.map((r) => ({ ok: true, res: r })).concat(falhas.map((f) => ({ ok: false, path: f.path, motivo: f.motivo })));
+      state.ignoradosFormato = ignoradosFormato;
+      state.lastRead = new Date();
+      calcularCobertura(ok);
+      sanitizarFiltros();
+      resetarAnalitico();
+      montarFiltros();
+      renderTudo();
+
+      const itens = [];
+      falhas.forEach((f) => itens.push('Não importado: ' + f.path + ' — ' + f.motivo));
+      ignoradosFormato.forEach((p) => itens.push('Ignorado (formato não suportado, salve como .xlsx): ' + p));
+      const indisp = Object.entries(state.cobertura.indisponiveis || {});
+      indisp.forEach(([k, nomes]) => itens.push(IND[k].curto + ' não pôde ser calculado em: ' + nomes.join(', ')));
+      if (cons.semChave) itens.push(fmtInt(cons.semChave) + ' ' + plural(cons.semChave, 'linha', 'linhas') + ' sem chave de deduplicação completa (ID da Atividade ausente e Protocolo/Matrícula/Código/Data/Recurso incompleto): não são unidas a linhas de outros arquivos; se houver arquivos acumulados sobrepostos, as contagens podem duplicar.');
+      const nAvisos = ok.reduce((a, r) => a + r.warnings.length, 0);
+      const parcial = falhas.length > 0;
+      const alerta = parcial || indisp.length > 0 || cons.semChave > 0;
+      setStatus({
+        kind: alerta ? 'warning' : 'success',
+        title: parcial
+          ? 'Importação parcial: ' + ok.length + ' de ' + (ok.length + falhas.length) + ' arquivos'
+          : (opts.auto && novos.length ? 'Pasta atualizada: ' : 'Base carregada: ') + fmtInt(cons.records.length) + ' ' + plural(cons.records.length, 'atividade', 'atividades') + ' de ' + ok.length + ' ' + plural(ok.length, 'arquivo', 'arquivos'),
+        detail:
+          (parcial ? fmtInt(cons.records.length) + ' atividades foram carregadas dos arquivos válidos. ' : '') +
+          (cons.duplicatas ? fmtInt(cons.duplicatas) + ' ' + plural(cons.duplicatas, 'duplicata removida', 'duplicatas removidas') + '. ' : '') +
+          (nAvisos ? nAvisos + ' ' + plural(nAvisos, 'aviso de leitura', 'avisos de leitura') + ' em "Base e regras". ' : ''),
+        items: itens,
+      });
+    } catch (err) {
+      setStatus({ kind: 'error', title: 'Erro ao atualizar', detail: friendly(err) + (state.records.length ? ' A base anterior foi mantida.' : '') });
+    } finally {
+      state.loading = false;
+      renderActions();
+      renderSideFoot();
+    }
+  }
+
+  function calcularCobertura(ok) {
+    const indisponiveis = {};
+    for (const r of ok) {
+      for (const k of r.cobertura.indisponiveis) (indisponiveis[k] = indisponiveis[k] || []).push(r.name);
+    }
+    state.cobertura = { indisponiveis };
+  }
+
+  async function lerPastaHandle(auto) {
+    const s = state.source;
+    if (!s || s.mode !== 'handle') return;
+    try {
+      let perm = await s.handle.queryPermission({ mode: 'read' });
+      if (perm !== 'granted') {
+        if (auto) {
+          setStatus({ kind: 'warning', title: 'Permissão de acesso à pasta expirou', detail: 'Clique em "Atualizar" para autorizar novamente. A base atual continua na tela.' });
+          return;
+        }
+        perm = await s.handle.requestPermission({ mode: 'read' });
+        if (perm !== 'granted') {
+          setStatus({ kind: 'error', title: 'Acesso à pasta não autorizado', detail: 'Sem permissão de leitura não é possível atualizar. A base atual foi mantida.' });
+          return;
+        }
+      }
+      const entries = await listarPasta(s.handle, '', 0);
+      await carregar(entries, { auto });
+    } catch (err) {
+      setStatus({ kind: 'error', title: 'Não foi possível ler a pasta', detail: friendly(err) + (state.records.length ? ' A base anterior foi mantida.' : '') });
+    }
+  }
+
+  async function conectarPasta() {
+    if (temPicker()) {
+      let handle;
+      try {
+        handle = await window.showDirectoryPicker({ id: 'pos-corte-onedrive', mode: 'read' });
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        setStatus({ kind: 'error', title: 'Não foi possível abrir o seletor de pasta', detail: err && err.message });
+        return;
+      }
+      state.source = { kind: 'folder', mode: 'handle', name: handle.name, handle };
+      state.lastSig = '';
+      idb.set('pasta', handle).catch(() => {});
+      await lerPastaHandle(false);
+    } else {
+      $('#inp-folder').click();
+    }
+  }
+
+  function atualizar() {
+    const s = state.source;
+    if (!s) return conectarPasta();
+    if (s.mode === 'handle') return lerPastaHandle(false);
+    if (s.kind === 'folder') {
+      setStatus({ kind: 'info', title: 'Selecione a pasta novamente', detail: 'Este navegador não mantém acesso contínuo à pasta. Escolha-a de novo para reler os arquivos.' });
+      $('#inp-folder').click();
+    } else {
+      setStatus({ kind: 'info', title: 'Selecione os arquivos novamente', detail: 'A importação manual não monitora os arquivos. Selecione-os de novo para reler.' });
+      $('#inp-files').click();
+    }
+  }
+
+  /** Reaplica as regras (ex.: novo nome alternativo de coluna) aos arquivos já selecionados. */
+  async function reprocessar() {
+    state.cache.clear();
+    state.lastSig = '';
+    const s = state.source;
+    if (!s) return;
+    if (s.mode === 'handle') await lerPastaHandle(false);
+    else if (s.entries) await carregar(s.entries, {});
+  }
+
+  $('#inp-folder').addEventListener('change', (e) => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    const primeiro = files[0].webkitRelativePath || '';
+    state.source = { kind: 'folder', mode: 'input', name: primeiro.split('/')[0] || 'pasta selecionada', entries: entradasDeArquivos(files) };
+    state.lastSig = '';
+    carregar(state.source.entries, {});
+    e.target.value = '';
+  });
+  $('#inp-files').addEventListener('change', (e) => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    state.source = { kind: 'files', mode: 'input', name: files.length + ' ' + plural(files.length, 'arquivo selecionado', 'arquivos selecionados'), entries: entradasDeArquivos(files) };
+    state.lastSig = '';
+    carregar(state.source.entries, {});
+    e.target.value = '';
+  });
+
+  // Leitura periódica (60 s) apenas com a página visível e acesso contínuo autorizado.
+  const INTERVALO_MS = 60000;
+  function verificarPasta() {
+    const s = state.source;
+    if (document.visibilityState !== 'visible' || state.loading || !s || s.mode !== 'handle') return;
+    lerPastaHandle(true);
+  }
+  setInterval(verificarPasta, INTERVALO_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.lastCheck && Date.now() - state.lastCheck.getTime() >= INTERVALO_MS) verificarPasta();
+  });
+
+  async function restaurarPasta() {
+    if (!temPicker() || !window.indexedDB) return;
+    let handle;
+    try { handle = await idb.get('pasta'); } catch (_) { return; }
+    if (!handle || state.source) return;
+    state.source = { kind: 'folder', mode: 'handle', name: handle.name, handle, restaurada: true };
+    let perm = 'prompt';
+    try { perm = await handle.queryPermission({ mode: 'read' }); } catch (_) { /* ignora */ }
+    if (perm === 'granted') {
+      await lerPastaHandle(false);
+    } else {
+      setStatus({
+        kind: 'info',
+        title: 'Última pasta usada: "' + handle.name + '"',
+        detail: 'Autorize a leitura para carregar os arquivos novamente.',
+        actions: [{ label: 'Reconectar pasta', run: () => lerPastaHandle(false) }],
+      });
+    }
+    renderActions();
+    renderSideFoot();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Filtros e cálculo                                                   */
+  /* ------------------------------------------------------------------ */
+
+  function calcular() {
+    const filtered = PC.filterRecords(state.records, state.filters);
+    let min = '', max = '';
+    for (const r of filtered) {
+      if (!r.data) continue;
+      if (!min || r.data < min) min = r.data;
+      if (!max || r.data > max) max = r.data;
+    }
+    vm = {
+      filtered,
+      sum: PC.summarize(filtered),
+      months: PC.monthlySeries(filtered),
+      status: PC.statusBreakdown(filtered),
+      min,
+      max,
+      rank: {
+        frente: PC.ranking(filtered, 'frente', state.chartInd),
+        cidade: PC.ranking(filtered, 'cidade', state.chartInd),
+        recurso: PC.ranking(filtered, 'recurso', state.chartInd),
+      },
+    };
+    anRows = PC.filterRecords(state.records, Object.assign({}, state.filters, { indicador: state.an.ind, busca: state.an.busca }));
+    anRows.sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0) || a.recurso.localeCompare(b.recurso, 'pt-BR') || a.protocolo.localeCompare(b.protocolo, 'pt-BR'));
+  }
+
+  function sanitizarFiltros() {
+    const f = state.filters;
+    if (f.cidade && !state.records.some((r) => r.cidade === f.cidade)) f.cidade = '';
+    if (f.frente && !state.records.some((r) => r.frente === f.frente)) f.frente = '';
+    if (f.equipe && !state.records.some((r) => r.recurso === f.equipe)) f.equipe = '';
+  }
+  function resetarAnalitico() {
+    state.an.page = 1;
+    state.an.expanded = new Set();
+  }
+
+  function setFiltro(chave, valor) {
+    const atual = state.filters[chave];
+    state.filters[chave] = atual === valor ? '' : valor; // clicar de novo no mesmo item limpa o filtro
+    aplicarFiltros();
+  }
+  function aplicarFiltros() {
+    resetarAnalitico();
+    sincronizarFiltros();
+    renderTudo();
+  }
+  function limparFiltros() {
+    state.filters = { from: '', to: '', cidade: '', frente: '', equipe: '' };
+    aplicarFiltros();
+  }
+
+  function preencherSelect(sel, valores, rotuloTodos, atual) {
+    const opts = [h('option', { value: '', text: rotuloTodos })];
+    for (const v of valores) opts.push(h('option', { value: v, text: v }));
+    sel.replaceChildren(...opts);
+    sel.value = valores.includes(atual) ? atual : '';
+  }
+  function montarFiltros() {
+    const fr = PC.distinct(state.records, 'frente').filter((v) => v !== PC.NAO_MAPEADA);
+    if (state.records.some((r) => r.frente === PC.NAO_MAPEADA)) fr.push(PC.NAO_MAPEADA);
+    preencherSelect($('#f-cidade'), PC.distinct(state.records, 'cidade'), 'Todas', state.filters.cidade);
+    preencherSelect($('#f-frente'), fr, 'Todas', state.filters.frente);
+    preencherSelect($('#f-equipe'), PC.distinct(state.records, 'recurso'), 'Todas', state.filters.equipe);
+    sincronizarFiltros();
+  }
+  function sincronizarFiltros() {
+    const f = state.filters;
+    $('#f-from').value = f.from;
+    $('#f-to').value = f.to;
+    $('#f-cidade').value = f.cidade;
+    $('#f-frente').value = f.frente;
+    $('#f-equipe').value = f.equipe;
+    $('#f-ind').value = state.chartInd;
+  }
+
+  function chipsAtivos() {
+    const f = state.filters;
+    const out = [];
+    const br = PC.isoToBR;
+    if (f.from || f.to) out.push({ k: 'periodo', t: 'Período: ' + (f.from ? br(f.from) : 'início') + ' a ' + (f.to ? br(f.to) : 'hoje') });
+    if (f.cidade) out.push({ k: 'cidade', t: 'Cidade: ' + f.cidade });
+    if (f.frente) out.push({ k: 'frente', t: 'Frente: ' + f.frente });
+    if (f.equipe) out.push({ k: 'equipe', t: 'Equipe: ' + f.equipe });
+    return out;
+  }
+  function renderChips() {
+    const box = $('#chips');
+    const chips = chipsAtivos();
+    if (!chips.length || !state.records.length) { box.replaceChildren(); return; }
+    box.replaceChildren(
+      ...chips.map((c) => h('span', { class: 'chip' }, c.t, h('button', {
+        type: 'button', 'aria-label': 'Remover filtro ' + c.t,
+        onclick: () => {
+          if (c.k === 'periodo') { state.filters.from = ''; state.filters.to = ''; }
+          else state.filters[c.k] = '';
+          aplicarFiltros();
+        },
+      }, icon('x', 14)))),
+      h('button', { class: 'btn small ghost', type: 'button', text: 'Limpar filtros', onclick: limparFiltros }),
+      vm ? h('span', { class: 'count-note', text: fmtInt(vm.filtered.length) + ' de ' + fmtInt(state.records.length) + ' atividades' }) : null
+    );
+    if (f_periodoInvertido()) box.append(h('span', { class: 'count-note', text: '⚠ A data inicial é posterior à data final: nenhum registro atende ao período.' }));
+  }
+  const f_periodoInvertido = () => state.filters.from && state.filters.to && state.filters.from > state.filters.to;
+
+  /* ------------------------------------------------------------------ */
+  /* Navegação e ações                                                   */
+  /* ------------------------------------------------------------------ */
+
+  const VIEWS = [
+    { k: 'geral', t: 'Visão geral', i: 'dash' },
+    { k: 'analitico', t: 'Analítico', i: 'table' },
+    { k: 'base', t: 'Base e regras', i: 'book' },
+  ];
+  function montarNav() {
+    for (const [sel, cls] of [['#nav-side', ''], ['#nav-bottom', '']]) {
+      $(sel).replaceChildren(...VIEWS.map((v) => h('button', {
+        type: 'button', dataset: { view: v.k }, onclick: () => irPara(v.k), 'aria-current': state.view === v.k ? 'page' : null,
+      }, icon(v.i, 20), h('span', { text: v.t }))));
+    }
+  }
+  function irPara(v) {
+    state.view = v;
+    for (const b of document.querySelectorAll('[data-view]')) {
+      if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    }
+    for (const x of VIEWS) $('#view-' + x.k).hidden = x.k !== v;
+    $('#f-ind-wrap').hidden = v !== 'geral';
+    renderTudo();
+    window.scrollTo({ top: 0 });
+  }
+
+  function renderActions() {
+    const s = state.source;
+    const carregando = state.loading;
+    const pasta = $('#btn-pasta');
+    pasta.replaceChildren(icon('folder'), h('span', { text: s && s.kind === 'folder' ? 'Trocar pasta' : 'Conectar pasta' }));
+    pasta.disabled = carregando;
+    const at = $('#btn-atualizar');
+    at.replaceChildren(icon('refresh'), h('span', { text: 'Atualizar' }));
+    at.querySelector('svg').classList.toggle('spin', carregando);
+    at.disabled = carregando;
+    const im = $('#btn-importar');
+    im.replaceChildren(icon('upload'), h('span', { text: 'Importar Excel' }));
+    im.disabled = carregando;
+  }
+  $('#btn-pasta').addEventListener('click', conectarPasta);
+  $('#btn-atualizar').addEventListener('click', atualizar);
+  $('#btn-importar').addEventListener('click', () => $('#inp-files').click());
+
+  function renderSideFoot() {
+    const s = state.source;
+    const foot = $('#side-foot');
+    const okFiles = state.files.filter((f) => f.ok).length;
+    const rows = [];
+    if (s) {
+      rows.push(h('div', null, h('strong', { text: s.kind === 'folder' ? 'Pasta' : 'Arquivos' }), ': ', s.name));
+      rows.push(h('div', { text: s.mode === 'handle' ? 'Acesso contínuo (lê a cada 60 s)' : 'Seleção manual (sem monitoramento)' }));
+      if (state.files.length) rows.push(h('div', { text: okFiles + ' de ' + state.files.length + ' ' + plural(state.files.length, 'arquivo válido', 'arquivos válidos') }));
+      if (state.lastCheck) rows.push(h('div', { text: 'Verificado às ' + hhmmss(state.lastCheck) }));
+    } else {
+      rows.push(h('div', { text: 'Nenhuma fonte conectada' }));
+    }
+    foot.replaceChildren(...rows);
+    const sub = $('#top-sub');
+    if (state.records.length && state.lastRead) {
+      sub.textContent = fmtInt(state.records.length) + ' atividades · atualizado às ' + hhmmss(state.lastRead);
+    } else {
+      sub.textContent = 'Exec, Exoc, negociações, termos aplicados e frentes de serviço';
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Componentes de gráfico                                              */
+  /* ------------------------------------------------------------------ */
+
+  const valorInd = (s, k) => s[k];
+
+  function legenda(itens) {
+    return h('ul', { class: 'legend' }, itens.map((i) => h('li', null, h('span', { class: 'sw', style: { '--c': i.cor } }), i.t)));
+  }
+
+  function alertaIndisponivel(k) {
+    const nomes = (state.cobertura.indisponiveis || {})[k];
+    if (!nomes || !nomes.length) return null;
+    return h('div', { class: 'note warn', text: '⚠ ' + IND[k].curto + ' não pôde ser calculado em ' + nomes.length + ' ' + plural(nomes.length, 'arquivo', 'arquivos') + ' (coluna ausente): ' + nomes.join(', ') + '. Esses arquivos contam 0.' });
+  }
+
+  function periodoTexto() {
+    if (!vm.min) return 'sem datas no filtro';
+    return PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max);
+  }
+
+  function renderKpis() {
+    const s = vm.sum;
+    const cards = [
+      { k: 'atividades', t: 'Atividades', v: s.atividades, sub: [periodoTexto()] },
+      { k: 'exec', t: 'Finalizadas (Exec)', v: s.exec, sub: [fmtPct(s.exec, s.atividades) + ' das atividades'] },
+      { k: 'exoc', t: 'Encerradas com Ocorrência (Exoc)', v: s.exoc, sub: [fmtPct(s.exoc, s.atividades) + ' das atividades'] },
+      { k: 'neg', t: 'Negociações', v: s.neg, sub: ['Débito informado: ' + brl.format(s.debito)].concat(s.debitoNaoInformado ? [s.debitoNaoInformado + ' sem valor informado'] : []) },
+      { k: 'termos', t: 'Termos aplicados', v: s.termos, sub: ['Irregularidade identificada', '110013 Serviços: ' + fmtInt(s.t11) + ' · 310013 VCG: ' + fmtInt(s.t31)] },
+      { k: 'semDesdobro', t: 'Negociações Sem Desdobro', v: s.semDesdobro, sub: ['Parte das negociações (' + fmtPct(s.semDesdobro, s.neg) + ')'] },
+    ];
+    return h('div', { class: 'kpis' }, cards.map((c) => {
+      const indisp = (state.cobertura.indisponiveis || {})[c.k];
+      return h('button', {
+        class: 'kpi', type: 'button', style: { '--kc': COR[c.k] }, dataset: { fk: 'kpi:' + c.k },
+        'aria-label': c.t + ': ' + fmtInt(c.v) + '. Abrir no analítico.',
+        onclick: () => abrirAnalitico(c.k),
+      },
+        h('span', { class: 'kpi-label', text: c.t }),
+        h('span', { class: 'kpi-value num', text: fmtInt(c.v) }),
+        c.sub.map((t) => h('span', { class: 'kpi-sub', text: t })),
+        indisp && indisp.length ? h('span', { class: 'kpi-sub', text: '⚠ indisponível em ' + indisp.length + ' ' + plural(indisp.length, 'arquivo', 'arquivos') }) : null,
+        h('span', { class: 'kpi-go', text: 'Ver no analítico →' })
+      );
+    }));
+  }
+
+  function mesAtivo(mes) {
+    if (!mes) return false;
+    const r = PC.monthRange(mes);
+    return state.filters.from === r.from && state.filters.to === r.to;
+  }
+  function filtrarMes(mes) {
+    const r = PC.monthRange(mes);
+    if (mesAtivo(mes)) { state.filters.from = ''; state.filters.to = ''; }
+    else { state.filters.from = r.from; state.filters.to = r.to; }
+    aplicarFiltros();
+  }
+
+  function renderMensal() {
+    const ind = state.chartInd;
+    const meses = vm.months;
+    const max = Math.max(1, ...meses.map((m) => valorInd(m.sum, ind)));
+    const empilhado = ind === 'atividades';
+    const temOutros = vm.sum.outros > 0;
+    const linhas = meses.map((m) => {
+      const s = m.sum;
+      const v = valorInd(s, ind);
+      const r = v / max;
+      const partes = empilhado
+        ? [{ n: 'Exec', v: s.exec, c: COR.exec }, { n: 'Exoc', v: s.exoc, c: COR.exoc }, { n: 'Outros status', v: s.outros, c: COR.outros }].filter((p) => p.v > 0)
+        : [];
+      const tipText = m.rotulo + '\n' + fmtInt(v) + ' ' + IND[ind].curto.toLowerCase() + (empilhado ? partes.map((p) => '\n' + p.n + ': ' + fmtInt(p.v)).join('') : '') + (ind !== 'atividades' ? '\n' + fmtInt(s.atividades) + ' atividades no mês' : '');
+      const barra = v === 0 ? null : empilhado
+        ? h('span', { class: 'bar', style: { '--r': Math.max(r, 0.006) } }, partes.map((p) => h('i', { style: { flex: p.v + ' 1 0px', '--c': p.c } })))
+        : h('span', { class: 'bar solid', style: { '--r': Math.max(r, 0.006), '--c': COR[ind] } });
+      const conteudo = [h('span', { class: 'brow-label', text: m.rotulo }), h('span', { class: 'track' }, barra, h('span', { class: 'bval', text: fmtInt(v) }))];
+      const aria = m.rotulo + ': ' + fmtInt(v) + ' ' + IND[ind].curto + (m.mes ? '. Filtrar este mês.' : '');
+      return m.mes
+        ? h('button', { class: 'brow' + (mesAtivo(m.mes) ? ' is-active' : ''), type: 'button', dataset: { fk: 'mes:' + m.mes }, 'data-tip': tipText, 'aria-label': aria, 'aria-pressed': mesAtivo(m.mes) ? 'true' : 'false', onclick: () => filtrarMes(m.mes) }, conteudo)
+        : h('div', { class: 'brow', 'data-tip': tipText, tabindex: 0, 'aria-label': aria }, conteudo);
+    });
+    return h('section', { class: 'card', 'aria-labelledby': 'h-mensal' },
+      h('div', { class: 'card-head' },
+        h('div', null, h('h2', { id: 'h-mensal', text: 'Produção mensal — ' + IND[ind].rotulo }), h('p', { class: 'hint', text: 'Clique em um mês para filtrar. Valores por mês também na tabela abaixo.' }))),
+      empilhado ? legenda([{ cor: COR.exec, t: 'Exec' }, { cor: COR.exoc, t: 'Exoc' }].concat(temOutros ? [{ cor: COR.outros, t: 'Outros status' }] : [])) : null,
+      meses.length ? h('div', { class: 'stack' }, linhas) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
+      alertaIndisponivel(ind === 'atividades' ? 'exec' : ind)
+    );
+  }
+
+  function renderStatusDist() {
+    const total = vm.sum.atividades;
+    const max = Math.max(1, ...vm.status.map((x) => x.value));
+    const norm = PC.norm;
+    const cor = (st) => (norm(st) === 'finalizada' ? COR.exec : norm(st) === 'encerrada com ocorrencia' ? COR.exoc : COR.outros);
+    return h('section', { class: 'card', 'aria-labelledby': 'h-status' },
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-status', text: 'Distribuição dos status' }), h('p', { class: 'hint', text: 'Todos os status encontrados na base filtrada.' }))),
+      h('div', { class: 'rank-list' }, vm.status.map((x) =>
+        h('div', { class: 'rrow', 'data-tip': x.status + '\n' + fmtInt(x.value) + ' (' + fmtPct(x.value, total) + ')', tabindex: 0 },
+          h('span', { class: 'rl', text: x.status }),
+          h('span', { class: 'rv num' }, fmtInt(x.value), h('small', { text: fmtPct(x.value, total) })),
+          h('span', { class: 'track' }, h('span', { class: 'bar solid', style: { width: Math.max((x.value / max) * 100, 0.6) + '%', '--c': cor(x.status) } }))))),
+      vm.sum.outros > 0 ? h('p', { class: 'note warn', text: 'Há ' + fmtInt(vm.sum.outros) + ' atividades com status diferente de Finalizada e Encerrada com Ocorrência: Exec + Exoc não é igual ao total de atividades.' }) : null
+    );
+  }
+
+  function renderNegTermo() {
+    const meses = vm.months;
+    const max = Math.max(1, ...meses.map((m) => Math.max(m.sum.neg, m.sum.termos)));
+    const linhas = meses.map((m) => {
+      const s = m.sum;
+      const tipText = m.rotulo + '\nNegociações: ' + fmtInt(s.neg) + '\nTermos aplicados: ' + fmtInt(s.termos) + '\nSem Desdobro: ' + fmtInt(s.semDesdobro);
+      const linha = (v, cor) => h('span', { class: 'track' },
+        v > 0 ? h('span', { class: 'bar solid', style: { '--r': Math.max(v / max, 0.008), '--c': cor } }) : null,
+        h('span', { class: 'bval' }, h('span', { class: 'sw', style: { '--c': cor } }), fmtInt(v)));
+      const conteudo = [
+        h('span', { class: 'brow-label', text: m.rotulo }),
+        h('span', { class: 'tracks' }, linha(s.neg, COR.neg), linha(s.termos, COR.termos)),
+      ];
+      const aria = m.rotulo + ': ' + fmtInt(s.neg) + ' negociações e ' + fmtInt(s.termos) + ' termos aplicados' + (m.mes ? '. Filtrar este mês.' : '');
+      return m.mes
+        ? h('button', { class: 'mgroup' + (mesAtivo(m.mes) ? ' is-active' : ''), type: 'button', dataset: { fk: 'mesnt:' + m.mes }, 'data-tip': tipText, 'aria-label': aria, 'aria-pressed': mesAtivo(m.mes) ? 'true' : 'false', onclick: () => filtrarMes(m.mes) }, conteudo)
+        : h('div', { class: 'mgroup', 'data-tip': tipText, tabindex: 0, 'aria-label': aria }, conteudo);
+    });
+    return h('section', { class: 'card', 'aria-labelledby': 'h-nt' },
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-nt', text: 'Negociações e termos aplicados por mês' }), h('p', { class: 'hint', text: 'Mesma escala nas duas séries. Uma atividade pode ter negociação e termo.' }))),
+      legenda([{ cor: COR.neg, t: 'Negociações' }, { cor: COR.termos, t: 'Termos aplicados' }]),
+      meses.length ? h('div', { class: 'stack' }, linhas) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
+      alertaIndisponivel('neg'), alertaIndisponivel('termos')
+    );
+  }
+
+  function renderTabelaMensal() {
+    const s = vm.sum;
+    const cab = ['Mês', 'Atividades', 'Exec', 'Exoc', 'Negociações', 'Sem Desdobro', 'Termos', 'Débito informado (negociações)'];
+    return h('section', { class: 'card', 'aria-labelledby': 'h-tm' },
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-tm', text: 'Valores mensais' }), h('p', { class: 'hint', text: 'Débito informado = soma de "Valor Total dos Débitos" das negociações. Não é arrecadação nem valor pago.' }))),
+      h('div', { class: 'table-wrap' }, h('table', null,
+        h('thead', null, h('tr', null, cab.map((c, i) => h('th', { scope: 'col', class: i ? 'n' : '', text: c })))),
+        h('tbody', null, vm.months.map((m) => h('tr', null,
+          h('th', { scope: 'row', text: m.rotulo }),
+          [m.sum.atividades, m.sum.exec, m.sum.exoc, m.sum.neg, m.sum.semDesdobro, m.sum.termos].map((v) => h('td', { class: 'n', text: fmtInt(v) })),
+          h('td', { class: 'n', text: brl.format(m.sum.debito) })))),
+        h('tfoot', null, h('tr', null,
+          h('td', { text: 'Total' }),
+          [s.atividades, s.exec, s.exoc, s.neg, s.semDesdobro, s.termos].map((v) => h('td', { class: 'n', text: fmtInt(v) })),
+          h('td', { class: 'n', text: brl.format(s.debito) })))))
+    );
+  }
+
+  const LIMITE_RANK = 8;
+  function renderRank(titulo, dim, filtroKey, chave) {
+    const { items, total } = vm.rank[dim];
+    const todos = state.showAll[dim];
+    const lista = todos ? items : items.slice(0, LIMITE_RANK);
+    const max = Math.max(1, ...items.map((i) => i.value));
+    const ind = state.chartInd;
+    const semFiltro = new Set(['(sem cidade)', '(sem recurso)']);
+    const nMapeadas = dim === 'frente' ? (items.find((i) => i.key === PC.NAO_MAPEADA) || { value: 0 }).value : 0;
+    return h('section', { class: 'card', 'aria-labelledby': 'h-' + dim },
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-' + dim, text: titulo }), h('p', { class: 'hint', text: IND[ind].curto + ' · ' + fmtInt(total) + ' no filtro · ' + items.length + ' ' + plural(items.length, 'item', 'itens') }))),
+      items.length ? h('div', { class: 'rank-list' }, lista.map((it) => {
+        const ativo = state.filters[filtroKey] === it.key;
+        const cont = [
+          h('span', { class: 'rl', text: it.key }),
+          h('span', { class: 'rv num' }, fmtInt(it.value), h('small', { text: fmtPct(it.value, total) })),
+          h('span', { class: 'track' }, h('span', { class: 'bar solid', style: { width: Math.max((it.value / max) * 100, 0.8) + '%', '--c': COR[ind] } })),
+        ];
+        const tipText = it.key + '\n' + fmtInt(it.value) + ' ' + IND[ind].curto.toLowerCase() + ' (' + fmtPct(it.value, total) + ')';
+        return semFiltro.has(it.key)
+          ? h('div', { class: 'rrow', 'data-tip': tipText, tabindex: 0 }, cont)
+          : h('button', { class: 'rrow' + (ativo ? ' is-active' : ''), type: 'button', dataset: { fk: 'rank:' + dim + ':' + it.key }, 'data-tip': tipText, 'aria-pressed': ativo ? 'true' : 'false', 'aria-label': it.key + ': ' + fmtInt(it.value) + '. Filtrar.', onclick: () => setFiltro(filtroKey, it.key) }, cont);
+      })) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
+      items.length > LIMITE_RANK ? h('button', { class: 'btn small more', type: 'button', text: todos ? 'Mostrar menos' : 'Mostrar todos (' + items.length + ')', onclick: () => { state.showAll[dim] = !todos; renderGeral(); } }) : null,
+      dim === 'frente' && nMapeadas > 0 ? h('p', { class: 'note warn', text: fmtInt(nMapeadas) + ' ' + plural(nMapeadas, 'atividade sem frente mapeada', 'atividades sem frente mapeada') + ' (Recurso sem Nomenclatura na aba Frente de Serviço). Veja quais em "Base e regras".' }) : null
+    );
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Visão geral                                                         */
+  /* ------------------------------------------------------------------ */
+
+  function estadoVazio() {
+    const suportaPasta = temPicker();
+    return h('div', { class: 'card empty' },
+      icon('folder', 40),
+      h('h2', { text: 'Nenhuma base carregada' }),
+      h('p', { text: 'O painel calcula os indicadores a partir dos arquivos Excel (.xlsx) da pasta do OneDrive. Nenhum dado é enviado para a internet: a leitura acontece neste computador.' }),
+      h('ol', null,
+        h('li', { text: suportaPasta ? 'Clique em "Conectar pasta" e escolha a pasta sincronizada do OneDrive (as subpastas também são lidas).' : 'Clique em "Conectar pasta" e escolha a pasta sincronizada do OneDrive (este navegador exige selecionar a pasta a cada atualização).' }),
+        h('li', { text: 'Ou clique em "Importar Excel" para escolher um ou vários arquivos .xlsx.' }),
+        h('li', { text: 'Depois, use "Atualizar" (ou aguarde a leitura automática de 60 s, quando o navegador permitir).' })),
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn primary', type: 'button', onclick: conectarPasta }, icon('folder'), 'Conectar pasta'),
+        h('button', { class: 'btn', type: 'button', onclick: () => $('#inp-files').click() }, icon('upload'), 'Importar Excel'))
+    );
+  }
+
+  function renderGeral() {
+    const root = $('#view-geral');
+    if (!state.records.length) { root.replaceChildren(estadoVazio()); return; }
+    root.replaceChildren(h('div', { class: 'stack' },
+      renderKpis(),
+      h('div', { class: 'grid-2' }, renderMensal(), renderStatusDist()),
+      renderNegTermo(),
+      renderTabelaMensal(),
+      h('div', { class: 'grid-rank' },
+        renderRank('Frente de serviço', 'frente', 'frente'),
+        renderRank('Cidade', 'cidade', 'cidade'),
+        renderRank('Equipe (recurso)', 'recurso', 'equipe'))
+    ));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Analítico                                                           */
+  /* ------------------------------------------------------------------ */
+
+  const POR_PAGINA = 50;
+
+  function abrirAnalitico(k) {
+    state.an.ind = k;
+    state.an.page = 1;
+    state.an.expanded = new Set();
+    const sel = $('#an-ind');
+    if (sel) sel.value = k;
+    irPara('analitico');
+  }
+
+  function tag(t, cls) { return h('span', { class: 'tag ' + (cls || ''), text: t }); }
+
+  function detalheRegistro(r) {
+    const dl = h('dl', { class: 'detail-grid' });
+    const add = (k, v) => dl.append(h('div', null, h('dt', { text: k }), h('dd', { text: v === '' || v == null ? '—' : String(v) })));
+    add('Recurso (equipe)', r.recurso); add('Frente', r.frente); add('Cód. Protocolo Origem', r.protocolo); add('ID da Atividade', r.id);
+    add('Matrícula', r.matricula); add('Código/Descrição', r.codigo); add('Data', r.dataTxt); add('Status da Atividade', r.status);
+    add('Nome do Solicitante', r.solicitante); add('Cidade', r.cidade); add('Início do SLA', r.slaInicio); add('Fim do SLA', r.slaFim);
+    add('Tipo do Corte Realizado', r.tipoCorte); add('Qual a situação do imóvel?', r.situacaoPergunta); add('Irregularidade Encontrada?', r.irregularidade);
+    add('Valor Total dos Débitos', r.valor == null ? '' : brl.format(r.valor)); add('Negociou O Débito?', r.negociou); add('Categoria', r.categoria);
+    add('Situação Do Imóvel', r.situacaoImovel); add('Serviço adicionais resposta', r.servAdic); add('Arquivo de origem', r.arquivo);
+    return dl;
+  }
+
+  function renderAnTabela() {
+    const box = $('#an-tabela');
+    const total = anRows.length;
+    const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+    if (state.an.page > paginas) state.an.page = paginas;
+    const ini = (state.an.page - 1) * POR_PAGINA;
+    const pagina = anRows.slice(ini, ini + POR_PAGINA);
+    $('#an-contagem').textContent = fmtInt(total) + ' ' + plural(total, 'registro', 'registros') + ' · ' + IND[state.an.ind].rotulo;
+    const cols = ['', 'Data', 'Protocolo / O.S.', 'Matrícula', 'Solicitante', 'Cidade', 'Equipe', 'Frente', 'Status', 'Negociação', 'Débito', 'Termo'];
+    const linhas = [];
+    pagina.forEach((r, i) => {
+      const idx = ini + i;
+      const aberto = state.an.expanded.has(idx);
+      linhas.push(h('tr', null,
+        h('td', null, h('button', { class: 'expander', type: 'button', 'aria-expanded': aberto ? 'true' : 'false', 'aria-label': (aberto ? 'Recolher' : 'Expandir') + ' detalhes de ' + (r.protocolo || r.matricula || 'registro'), text: aberto ? '−' : '+', onclick: () => { if (aberto) state.an.expanded.delete(idx); else state.an.expanded.add(idx); renderAnTabela(); } })),
+        h('td', { class: 'num', text: r.dataTxt }),
+        h('td', { text: r.protocolo }),
+        h('td', { class: 'num', text: r.matricula }),
+        h('td', { text: r.solicitante }),
+        h('td', { text: r.cidade }),
+        h('td', { text: r.recurso }),
+        h('td', { text: r.frente }),
+        h('td', null, r.exec ? tag('Finalizada', 'exec') : r.exoc ? tag('Encerrada c/ ocorrência', 'exoc') : tag(r.status || '—')),
+        h('td', null, r.semDesdobro ? tag('Sem Desdobro', 'sem') : r.neg ? tag('Negociou', 'neg') : '—'),
+        h('td', { class: 'n', text: r.valor == null ? '—' : brl.format(r.valor) }),
+        h('td', null, r.termo ? [r.t11 ? tag('110013', 'termo') : null, ' ', r.t31 ? tag('310013', 'termo') : null] : '—')));
+      if (aberto) linhas.push(h('tr', { class: 'detail-row' }, h('td', { colspan: cols.length }, h('div', { class: 'detail-inner' }, detalheRegistro(r)))));
+    });
+    box.replaceChildren(
+      h('div', { class: 'table-wrap', style: { maxHeight: '68vh' } }, h('table', null,
+        h('caption', { class: 'sr-only', text: 'Atividades filtradas' }),
+        h('thead', null, h('tr', null, cols.map((c, i) => h('th', { scope: 'col', class: c === 'Débito' ? 'n' : '', text: c || undefined }, i === 0 ? h('span', { class: 'sr-only', text: 'Detalhes' }) : null)))),
+        h('tbody', null, linhas.length ? linhas : h('tr', null, h('td', { colspan: cols.length, text: 'Nenhum registro para os filtros atuais.' }))))),
+      h('div', { class: 'pager' },
+        h('span', { text: total ? 'Exibindo ' + fmtInt(ini + 1) + '–' + fmtInt(Math.min(total, ini + POR_PAGINA)) + ' de ' + fmtInt(total) + ' · página ' + state.an.page + ' de ' + paginas : '' }),
+        h('div', { class: 'btns' },
+          h('button', { class: 'btn small', type: 'button', text: '« Primeira', disabled: state.an.page <= 1, onclick: () => irPagina(1) }),
+          h('button', { class: 'btn small', type: 'button', text: '‹ Anterior', disabled: state.an.page <= 1, onclick: () => irPagina(state.an.page - 1) }),
+          h('button', { class: 'btn small', type: 'button', text: 'Próxima ›', disabled: state.an.page >= paginas, onclick: () => irPagina(state.an.page + 1) }),
+          h('button', { class: 'btn small', type: 'button', text: 'Última »', disabled: state.an.page >= paginas, onclick: () => irPagina(paginas) })))
+    );
+    const larg = box.querySelector('.table-wrap').clientWidth;
+    for (const d of box.querySelectorAll('.detail-inner')) d.style.width = Math.max(larg - 2, 200) + 'px';
+  }
+  function irPagina(p) {
+    state.an.page = p;
+    state.an.expanded = new Set();
+    renderAnTabela();
+    const t = $('#an-tabela');
+    if (t) t.scrollIntoView({ block: 'nearest' });
+  }
+
+  function exportarCsv() {
+    if (!anRows.length) { setStatus({ kind: 'warning', title: 'Nada para exportar', detail: 'Nenhum registro atende aos filtros atuais.' }); return; }
+    const csv = PC.toCsv(anRows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const d = new Date();
+    const nome = 'pos-corte_' + state.an.ind + '_' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '.csv';
+    const a = h('a', { href: url, download: nome });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  let anMontado = false;
+  function montarAnalitico() {
+    const root = $('#view-analitico');
+    let debounce = null;
+    root.replaceChildren(h('div', { class: 'stack' },
+      h('section', { class: 'card' },
+        h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Analítico' }), h('p', { class: 'hint', text: 'Os filtros de data, cidade, frente e equipe valem aqui. A exportação inclui todas as linhas filtradas, não só a página exibida.' }))),
+        h('div', { class: 'toolbar' },
+          h('div', { class: 'field' }, h('label', { for: 'an-ind', text: 'Indicador' }),
+            h('select', { id: 'an-ind', onchange: (e) => { state.an.ind = e.target.value; state.an.page = 1; state.an.expanded = new Set(); calcular(); renderAnTabela(); } },
+              INDS.map((i) => h('option', { value: i.key, text: i.key === 'atividades' ? 'Todas as atividades' : i.rotulo, selected: i.key === state.an.ind })))),
+          h('div', { class: 'field grow' }, h('label', { for: 'an-busca', text: 'Buscar matrícula, protocolo/O.S., ID ou nome' }),
+            h('input', { id: 'an-busca', type: 'search', autocomplete: 'off', value: state.an.busca, oninput: (e) => {
+              clearTimeout(debounce);
+              const v = e.target.value;
+              debounce = setTimeout(() => { state.an.busca = v; state.an.page = 1; state.an.expanded = new Set(); calcular(); renderAnTabela(); }, 200);
+            } })),
+          h('div', { class: 'field', style: { flex: '0 0 auto' } }, h('label', { text: ' ' }), h('button', { class: 'btn primary', type: 'button', onclick: exportarCsv }, icon('download'), 'Exportar CSV'))),
+        h('p', { class: 'count-note', id: 'an-contagem', style: { marginTop: '10px' } })),
+      h('section', { class: 'card' }, h('div', { id: 'an-tabela' }))
+    ));
+    anMontado = true;
+  }
+  function renderAnalitico() {
+    if (!state.records.length) { $('#view-analitico').replaceChildren(estadoVazio()); anMontado = false; return; }
+    if (!anMontado) montarAnalitico();
+    $('#an-ind').value = state.an.ind;
+    renderAnTabela();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Base e regras                                                       */
+  /* ------------------------------------------------------------------ */
+
+  function verificacoes() {
+    const recs = state.records;
+    const s = PC.summarize(recs);
+    const out = [];
+    const add = (ok, t, d) => out.push({ ok, t, d });
+    add(s.exec + s.exoc + s.outros === s.atividades, 'Exec + Exoc + outros status = Atividades', fmtInt(s.exec) + ' + ' + fmtInt(s.exoc) + ' + ' + fmtInt(s.outros) + ' = ' + fmtInt(s.atividades));
+    add(s.semDesdobro <= s.neg, 'Sem Desdobro é subconjunto das negociações', fmtInt(s.semDesdobro) + ' de ' + fmtInt(s.neg));
+    for (const [dim, nome] of [['frente', 'frentes'], ['cidade', 'cidades'], ['recurso', 'equipes']]) {
+      const r = PC.ranking(recs, dim, 'atividades');
+      const soma = r.items.reduce((a, i) => a + i.value, 0);
+      add(soma === s.atividades, 'Soma dos rankings de ' + nome + ' = Atividades', fmtInt(soma) + ' de ' + fmtInt(s.atividades));
+    }
+    const meses = PC.monthlySeries(recs);
+    const somaMeses = meses.reduce((a, m) => a + m.sum.atividades, 0);
+    add(somaMeses === s.atividades, 'Soma dos meses = Atividades', fmtInt(somaMeses) + ' de ' + fmtInt(s.atividades));
+    const cons = state.consolidado;
+    if (cons) add(cons.records.length + cons.duplicatas === cons.lidos, 'Registros lidos − duplicatas = Atividades', fmtInt(cons.lidos) + ' − ' + fmtInt(cons.duplicatas) + ' = ' + fmtInt(cons.records.length));
+    const semData = recs.filter((r) => !r.data).length;
+    add(semData === 0, 'Registros com data válida', semData ? fmtInt(semData) + ' sem data válida (saem de filtros de período)' : 'todos');
+    const naoMap = recs.filter((r) => r.frente === PC.NAO_MAPEADA).length;
+    add(naoMap === 0, 'Registros com frente mapeada', naoMap ? fmtInt(naoMap) + ' em "Não mapeada"' : 'todos');
+    return out;
+  }
+
+  function tabelaArquivos() {
+    const linhas = state.files
+      .slice()
+      .sort((a, b) => (a.ok && b.ok ? a.res.lastModified - b.res.lastModified : a.ok ? -1 : 1))
+      .map((f) => {
+        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
+        const r = f.res;
+        const conf = r.conferencia.map((c) => c.erro ? c.rotulo + ': ' + c.erro : c.rotulo + ': ' + (c.conciliado ? 'conciliado com a aba ' + c.aba + ' (' + fmtInt(c.linhas) + ')' : 'DIVERGE da aba ' + c.aba + ' (aba ' + fmtInt(c.linhas) + ' · cálculo ' + fmtInt(c.calculadoNaBase) + ' · na Base ' + fmtInt(c.naBase) + ')'));
+        return h('tr', null,
+          h('td', { text: r.path }), h('td', { class: 'num', text: fmtDataHora(r.lastModified) }), h('td', { class: 'num', text: fmtBytes(r.size) }),
+          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }),
+          h('td', null, tag('OK', 'exec'), r.warnings.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, r.warnings.map((w) => h('li', { text: w }))) : null,
+            conf.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, conf.map((c) => h('li', { text: c }))) : null));
+      });
+    return h('div', { class: 'table-wrap' }, h('table', null,
+      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Linhas lidas', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 ? 'n' : '', text: c })))),
+      h('tbody', null, linhas)));
+  }
+
+  function cardFonte() {
+    const s = state.source;
+    const c = state.consolidado;
+    const kv = h('dl', { class: 'kv' });
+    const add = (k, v) => { kv.append(h('dt', { text: k }), h('dd', { text: v })); };
+    add('Fonte', s ? (s.kind === 'folder' ? 'Pasta "' + s.name + '"' : s.name) : 'nenhuma');
+    add('Modo', !s ? '—' : s.mode === 'handle' ? 'Acesso contínuo: leitura a cada 60 s com a página visível, e botão Atualizar' : 'Seleção manual: selecione novamente para atualizar (sem monitoramento automático)');
+    add('Última leitura com mudanças', state.lastRead ? fmtDataHora(state.lastRead.getTime()) : '—');
+    add('Última verificação', state.lastCheck ? hhmmss(state.lastCheck) : '—');
+    add('Arquivos válidos', state.files.length ? state.files.filter((f) => f.ok).length + ' de ' + state.files.length : '—');
+    add('Registros lidos / atividades', c ? fmtInt(c.lidos) + ' / ' + fmtInt(c.records.length) : '—');
+    add('Duplicatas removidas', c ? fmtInt(c.duplicatas) : '—');
+    if (c && c.semChave) add('Linhas sem chave completa', fmtInt(c.semChave) + ' (nunca são unidas a outras)');
+    if (state.records.length) {
+      let mn = '', mx = '';
+      for (const r of state.records) if (r.data) { if (!mn || r.data < mn) mn = r.data; if (!mx || r.data > mx) mx = r.data; }
+      add('Período dos dados', mn ? PC.isoToBR(mn) + ' a ' + PC.isoToBR(mx) : 'sem datas');
+    }
+    return h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('h2', { text: 'Fonte e arquivos lidos' })),
+      kv,
+      state.files.length ? h('div', { style: { marginTop: '12px' } }, tabelaArquivos()) : null,
+      state.ignoradosFormato.length ? h('p', { class: 'note warn', text: 'Ignorados (formato não suportado; salve como .xlsx): ' + state.ignoradosFormato.join(', ') }) : null,
+      h('p', { class: 'note', text: 'A ordem dos arquivos para deduplicação é a data de modificação (do mais antigo ao mais recente). É um critério operacional, não garante que o conteúdo seja o mais atual: evite misturar versões conflitantes na pasta.' })
+    );
+  }
+
+  function cardVerificacoes() {
+    const v = verificacoes();
+    return h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Conferências automáticas' }), h('p', { class: 'hint', text: 'Calculadas sobre a base completa, sem filtros.' }))),
+      h('ul', { class: 'checks' }, v.map((x) => h('li', null, h('span', { class: x.ok ? 'ok' : 'bad' }, icon(x.ok ? 'check' : 'alert', 18)), h('div', null, h('strong', { text: x.t }), h('div', { class: 'count-note', text: x.d }))))));
+  }
+
+  function cardColunas() {
+    const okFiles = state.files.filter((f) => f.ok).map((f) => f.res);
+    const campos = PC.FIELDS;
+    const sel = h('select', { id: 'al-campo', 'aria-label': 'Campo do painel' }, campos.map((f) => h('option', { value: f.key, text: f.header })));
+    const inp = h('input', { id: 'al-nome', type: 'text', autocomplete: 'off', placeholder: 'Nome da coluna no seu arquivo' });
+    const adicionar = () => {
+      const nome = inp.value.trim();
+      if (!nome) return;
+      const lista = state.aliases[sel.value] || (state.aliases[sel.value] = []);
+      if (!lista.includes(nome)) lista.push(nome);
+      salvarAliases();
+      inp.value = '';
+      reprocessar();
+    };
+    const listaAl = Object.entries(state.aliases).flatMap(([k, ns]) => ns.map((n) => ({ k, n })));
+    return h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Colunas reconhecidas' }), h('p', { class: 'hint', text: 'O painel usa só estas 19 colunas; as demais são apenas auditadas. A comparação ignora maiúsculas, acentos e pontuação.' }))),
+      okFiles.length ? okFiles.map((r) => h('details', { style: { marginBottom: '8px' } },
+        h('summary', { text: r.name + ' — ' + r.cobertura.reconhecidas.length + ' de ' + campos.length + ' colunas reconhecidas' + (r.cobertura.ausentes.length ? ' (' + r.cobertura.ausentes.length + ' ausentes)' : '') }),
+        h('div', { class: 'table-wrap', style: { marginTop: '8px' } }, h('table', null,
+          h('thead', null, h('tr', null, ['Campo esperado', 'Coluna no arquivo', 'Situação'].map((c) => h('th', { scope: 'col', text: c })))),
+          h('tbody', null, campos.map((f) => {
+            const rec = r.cobertura.reconhecidas.find((x) => x.campo === f.key);
+            return h('tr', null, h('td', { text: f.header }), h('td', { text: rec ? rec.planilha : '—' }), h('td', null, rec ? tag('reconhecida', 'exec') : tag('ausente', 'exoc')));
+          })))))) : h('p', { class: 'note', text: 'Carregue um arquivo para ver as colunas reconhecidas.' }),
+      h('h3', { style: { fontSize: '14px', margin: '14px 0 6px' }, text: 'Nomes alternativos de colunas' }),
+      h('p', { class: 'hint', text: 'Se em algum arquivo uma coluna tem outro nome (por exemplo, "Status" em vez de "Status da Atividade"), informe o nome alternativo. Fica salvo neste navegador e vale para todos os arquivos.' }),
+      h('div', { class: 'toolbar', style: { marginTop: '8px' } },
+        h('div', { class: 'field' }, h('label', { for: 'al-campo', text: 'Campo' }), sel),
+        h('div', { class: 'field grow' }, h('label', { for: 'al-nome', text: 'Nome no arquivo' }), inp),
+        h('div', { class: 'field', style: { flex: '0 0 auto' } }, h('label', { text: ' ' }), h('button', { class: 'btn', type: 'button', text: 'Adicionar e reler', onclick: adicionar }))),
+      listaAl.length ? h('ul', { class: 'checks', style: { marginTop: '10px' } }, listaAl.map((a) => h('li', null, h('span', null), h('div', null,
+        h('strong', { text: campos.find((f) => f.key === a.k).header }), ' ← "', a.n, '" ',
+        h('button', { class: 'btn small ghost', type: 'button', text: 'Remover', onclick: () => { state.aliases[a.k] = state.aliases[a.k].filter((x) => x !== a.n); if (!state.aliases[a.k].length) delete state.aliases[a.k]; salvarAliases(); reprocessar(); } }))))) : null
+    );
+  }
+
+  function cardFrentes() {
+    const map = [...state.frenteMap.values()].sort((a, b) => a.frente.localeCompare(b.frente, 'pt-BR') || a.nomenclatura.localeCompare(b.nomenclatura, 'pt-BR'));
+    const naoMap = new Map();
+    for (const r of state.records) if (r.frente === PC.NAO_MAPEADA) naoMap.set(r.recurso || '(sem recurso)', (naoMap.get(r.recurso || '(sem recurso)') || 0) + 1);
+    const lista = [...naoMap].sort((a, b) => b[1] - a[1]);
+    const total = lista.reduce((a, x) => a + x[1], 0);
+    return h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Frentes de serviço' }), h('p', { class: 'hint', text: 'A frente é definida pelo início do Recurso (Nomenclatura), sem diferenciar maiúsculas; havendo mais de um prefixo, vale o mais longo. Sem correspondência: "Não mapeada".' }))),
+      total ? h('div', { class: 'note warn' },
+        h('strong', { text: fmtInt(total) + ' atividades em "Não mapeada". ' }), 'Recursos sem Nomenclatura correspondente: ',
+        lista.slice(0, 30).map((x) => x[0] + ' (' + fmtInt(x[1]) + ')').join(', ') + (lista.length > 30 ? ', … +' + (lista.length - 30) : '') + '. Para mapear, inclua a Nomenclatura na aba "Frente de Serviço" do arquivo.') : h('p', { class: 'note', text: 'Todos os recursos da base têm frente mapeada.' }),
+      h('details', { style: { marginTop: '10px' } }, h('summary', { text: 'Mapeamento em uso (' + map.length + ' nomenclaturas)' }),
+        h('div', { class: 'table-wrap', style: { marginTop: '8px', maxHeight: '320px' } }, h('table', null,
+          h('thead', null, h('tr', null, ['Nomenclatura (prefixo do Recurso)', 'Frente', 'Origem'].map((c) => h('th', { scope: 'col', text: c })))),
+          h('tbody', null, map.map((m) => h('tr', null, h('td', { text: m.nomenclatura }), h('td', { text: m.frente }), h('td', { text: m.origem || '—' })))))))
+    );
+  }
+
+  function cardAuditoria() {
+    const arq = state.files.filter((f) => f.ok).map((f) => f.res).sort((a, b) => b.lastModified - a.lastModified)[0];
+    if (!arq) return null;
+    const cols = arq.audit.colunas;
+    const linhas = arq.audit.linhas;
+    const aberta = state.auditoriaAberta;
+    const dados = cols.slice().sort((a, b) => (b.mantida - a.mantida) || a.coluna - b.coluna);
+    return h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Auditoria de preenchimento das colunas' }), h('p', { class: 'hint', text: 'Arquivo mais recente: ' + arq.name + ' · ' + fmtInt(linhas) + ' linhas · ' + cols.length + ' colunas com cabeçalho · ' + cols.filter((c) => c.mantida).length + ' usadas pelo painel.' }))),
+      h('details', { ontoggle: (e) => { state.auditoriaAberta = e.target.open; } , open: aberta },
+        h('summary', { text: 'Ver todas as colunas' }),
+        h('div', { class: 'table-wrap', style: { marginTop: '8px', maxHeight: '420px' } }, h('table', null,
+          h('thead', null, h('tr', null, ['Coluna', 'Nome', 'Preenchidas', '%', 'Usada no painel'].map((c, i) => h('th', { scope: 'col', class: i === 2 || i === 3 ? 'n' : '', text: c })))),
+          h('tbody', null, dados.map((c) => h('tr', null,
+            h('td', { class: 'num', text: colLetra(c.coluna) }), h('td', { text: c.nome }), h('td', { class: 'n', text: fmtInt(c.preenchidas) }),
+            h('td', { class: 'n', text: fmtPct(c.preenchidas, linhas) }), h('td', null, c.mantida ? tag('sim', 'exec') : '—'))))))));
+  }
+  function colLetra(i) {
+    let s = '';
+    for (i += 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s;
+    return s;
+  }
+
+  function cardRegras() {
+    const li = (...t) => h('li', null, ...t);
+    return h('section', { class: 'card rules' },
+      h('div', { class: 'card-head' }, h('h2', { text: 'Regras dos indicadores' })),
+      h('h3', { text: 'Atividades' }),
+      h('p', { text: 'Registros da aba Base após a deduplicação entre arquivos e os filtros escolhidos. As abas de Termos e Negociações são recortes da Base: não são somadas a ela (só conferidas).' }),
+      h('h3', { text: 'Exec e Exoc' }),
+      h('ul', null, li(h('strong', { text: 'Exec' }), ': Status da Atividade = ', h('code', { text: 'Finalizada' }), '.'), li(h('strong', { text: 'Exoc' }), ': Status da Atividade = ', h('code', { text: 'Encerrada com Ocorrência' }), '. Outros status aparecem na distribuição dos status.')),
+      h('h3', { text: 'Negociações e Sem Desdobro' }),
+      h('ul', null,
+        li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
+        li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.')),
+      h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
+      h('ul', null,
+        li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),
+        li('Os códigos precisam ter limites numéricos: ', h('code', { text: '1100130' }), ' ou ', h('code', { text: '9310013' }), ' não contam.'),
+        li('Cada atividade conta uma única vez, mesmo com os dois códigos. ', h('code', { text: 'Irregularidade Encontrada? = Sim' }), ' sozinho não conta.'),
+        li('Negociação e termo podem ocorrer na mesma atividade; não some os dois para obter visitas. Não há filtro adicional de status.')),
+      h('h3', { text: 'Valores' }),
+      h('p', { text: 'O valor das negociações é o débito informado nas atividades (Valor Total dos Débitos, no padrão brasileiro R$ 1.234,56). Não é arrecadação, valor recebido nem valor pago.' }),
+      h('h3', { text: 'Deduplicação' }),
+      h('ul', null,
+        li('Chave: ', h('code', { text: 'ID da Atividade' }), '. Sem ID: Protocolo + Matrícula + Código/Descrição + Data + Recurso (se algum desses campos estiver vazio, a linha não é unida a nenhuma outra).'),
+        li('Chave repetida: prevalece o registro do arquivo com a data de modificação mais recente. Matrículas repetidas com IDs diferentes são visitas distintas e são preservadas.'),
+        li('Arquivos temporários (~$) são ignorados; subpastas são lidas.')),
+      h('h3', { text: 'Formatos e limites' }),
+      h('ul', null,
+        li('Lê .xlsx sem senha. Não lê .xls, .xlsb, arquivos com senha nem ZIP64. Fórmulas são lidas pelo resultado gravado, sem recalcular.'),
+        li('Arquivos com menos colunas ou outra aba principal são aceitos: a aba "Base" é preferida; sem ela, vale a única aba com as colunas esperadas. Indicadores sem a coluna necessária são marcados como indisponíveis, nunca como zero silencioso.'),
+        li('Este painel não grava no OneDrive nem atualiza com a página fechada. A base carregada não fica salva no arquivo HTML: ao reabrir, conecte a pasta novamente (o navegador pode lembrar a última pasta).'))
+    );
+  }
+
+  function renderBase() {
+    const root = $('#view-base');
+    root.replaceChildren(h('div', { class: 'stack' },
+      state.records.length ? [cardFonte(), cardVerificacoes(), cardColunas(), cardFrentes(), cardAuditoria(), cardRegras()] : [estadoVazio(), cardColunas(), cardRegras()]
+    ));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Renderização geral                                                  */
+  /* ------------------------------------------------------------------ */
+
+  function renderTudo() {
+    const ativo = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : '';
+    const tem = state.records.length > 0;
+    $('#filters').hidden = !tem;
+    calcular();
+    renderChips();
+    if (state.view === 'geral') renderGeral();
+    else if (state.view === 'analitico') renderAnalitico();
+    else renderBase();
+    renderSideFoot();
+    if (ativo) {
+      const el = [...document.querySelectorAll('[data-fk]')].find((x) => x.dataset.fk === ativo);
+      if (el) el.focus({ preventScroll: true });
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Inicialização                                                       */
+  /* ------------------------------------------------------------------ */
+
+  function init() {
+    $('#f-ind').replaceChildren(...INDS.map((i) => h('option', { value: i.key, text: i.rotulo })));
+    $('#f-ind').addEventListener('change', (e) => { state.chartInd = e.target.value; renderTudo(); });
+    $('#f-from').addEventListener('change', (e) => { state.filters.from = e.target.value; aplicarFiltros(); });
+    $('#f-to').addEventListener('change', (e) => { state.filters.to = e.target.value; aplicarFiltros(); });
+    $('#f-cidade').addEventListener('change', (e) => { state.filters.cidade = e.target.value; aplicarFiltros(); });
+    $('#f-frente').addEventListener('change', (e) => { state.filters.frente = e.target.value; aplicarFiltros(); });
+    $('#f-equipe').addEventListener('change', (e) => { state.filters.equipe = e.target.value; aplicarFiltros(); });
+    montarNav();
+    montarFiltros();
+    renderActions();
+    renderTudo();
+    if (typeof DecompressionStream === 'undefined' || typeof Blob === 'undefined' || !Blob.prototype.stream) {
+      setStatus({ kind: 'error', title: 'Navegador sem suporte', detail: 'Este painel precisa de um Chrome ou Edge atualizado para ler arquivos Excel.' });
+      for (const id of ['#btn-pasta', '#btn-atualizar', '#btn-importar']) $(id).disabled = true;
+      return;
+    }
+    if (!temPicker()) {
+      setStatus({ kind: 'info', title: 'Seleção manual de pasta', detail: 'Este navegador não permite acesso contínuo à pasta. Use "Conectar pasta" para escolhê-la e selecione-a de novo quando quiser atualizar. Para leitura automática a cada 60 s, abra o painel no Chrome ou no Edge.' });
+    }
+    restaurarPasta();
+  }
+  window.__poscorte = { state, PC, carregar, get vm() { return vm; }, get anRows() { return anRows; } }; // gancho para testes e diagnóstico
+  init();
+})();
+
+</script>
+</body>
+</html>

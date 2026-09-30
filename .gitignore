@@ -1,0 +1,8 @@
+# Planilhas de teste são geradas por tools/make_fixtures.py (sintéticas) e nunca vão para o repositório.
+tests/fixtures/
+node_modules/
+# Nunca versionar planilhas: a base real contém dados pessoais (nomes, matrículas, débitos).
+*.xlsx
+*.xls
+*.xlsb
+*.csv

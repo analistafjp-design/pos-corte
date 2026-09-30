@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acompanhamento de Pós Corte · AnalistaFJP</title>
+<meta name="description" content="Painel de acompanhamento de Pós Corte: Exec, Exoc, negociações, termos aplicados e frentes de serviço, atualizado por arquivos Excel de uma pasta do OneDrive.">
+<style>
+/*INLINE:css*/
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Ir para o conteúdo</a>
+<div class="app">
+  <aside class="side" aria-label="Menu lateral">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">FJP</div>
+      <div><div class="brand-name">AnalistaFJP</div><div class="brand-sub">Pós Corte</div></div>
+    </div>
+    <nav class="nav" id="nav-side" aria-label="Seções"></nav>
+    <div class="side-foot" id="side-foot"></div>
+  </aside>
+
+  <div class="main-col">
+    <header class="top">
+      <div class="top-title">
+        <div class="brand-mark" aria-hidden="true">FJP</div>
+        <div>
+          <h1>Acompanhamento de Pós Corte</h1>
+          <div class="sub" id="top-sub">Exec, Exoc, negociações, termos aplicados e frentes de serviço</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="btn-pasta" type="button"></button>
+        <button class="btn" id="btn-atualizar" type="button"></button>
+        <button class="btn" id="btn-importar" type="button"></button>
+      </div>
+    </header>
+
+    <div id="status" aria-live="polite"></div>
+
+    <section class="filters" id="filters" aria-label="Filtros" hidden>
+      <div class="field"><label for="f-from">Data inicial</label><input type="date" id="f-from"></div>
+      <div class="field"><label for="f-to">Data final</label><input type="date" id="f-to"></div>
+      <div class="field"><label for="f-cidade">Cidade</label><select id="f-cidade"></select></div>
+      <div class="field"><label for="f-frente">Frente de serviço</label><select id="f-frente"></select></div>
+      <div class="field"><label for="f-equipe">Equipe (recurso)</label><select id="f-equipe"></select></div>
+      <div class="field" id="f-ind-wrap"><label for="f-ind">Indicador dos gráficos</label><select id="f-ind"></select></div>
+    </section>
+    <div class="chips" id="chips" aria-label="Filtros aplicados"></div>
+
+    <main id="main" tabindex="-1">
+      <section id="view-geral" aria-label="Visão geral"></section>
+      <section id="view-analitico" aria-label="Analítico" hidden></section>
+      <section id="view-base" aria-label="Base e regras" hidden></section>
+    </main>
+  </div>
+</div>
+<nav class="tabbar" id="nav-bottom" aria-label="Seções"></nav>
+
+<input type="file" id="inp-files" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
+<input type="file" id="inp-folder" webkitdirectory multiple hidden>
+
+<script>
+/*INLINE:frentes*/
+</script>
+<script>
+/*INLINE:core*/
+</script>
+<script>
+/*INLINE:app*/
+</script>
+</body>
+</html>
