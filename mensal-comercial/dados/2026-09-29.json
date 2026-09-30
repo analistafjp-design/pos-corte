@@ -1,0 +1,240 @@
+{
+  "esquema": 1,
+  "referencia": {
+    "data": "2026-09-29",
+    "mes": "2026-09",
+    "exportado_em": "2026-09-30",
+    "fonte": "Relatório Power BI \"Mensal Comercial\" exportado em PDF (4 páginas: Report, Corte, Negociações e uma página auxiliar de Vendas)",
+    "observacao": "Foto de UM dia (29/09/2026), transcrita do PDF. Sem série diária e sem acumulado do mês."
+  },
+  "premissas": {
+    "dias_uteis": 22,
+    "orcado_e_mensal": true,
+    "limiares": {
+      "taxa_execucao": { "bom": 0.9, "atencao": 0.8 },
+      "meta": { "bom": 1.0, "atencao": 0.8 }
+    }
+  },
+  "cidades_nomes": {
+    "S.FCO.DO ITABAPOANA": "São Francisco de Itabapoana",
+    "S.SEBASTIAO DO ALTO": "São Sebastião do Alto",
+    "CASIMIRO DE ABREU": "Casimiro de Abreu",
+    "RIO BONITO": "Rio Bonito",
+    "CANTAGALO": "Cantagalo",
+    "CORDEIRO": "Cordeiro",
+    "MIRACEMA": "Miracema",
+    "ITAOCARA": "Itaocará",
+    "CAMBUCI": "Cambuci",
+    "APERIBE": "Aperibé",
+    "DUAS BARRAS": "Duas Barras"
+  },
+  "metas": [
+    { "id": "corte_cavalete", "grupo": "Corte", "rotulo": "Corte no cavalete", "original": "Corte Cavalete", "orcado": 1200, "orcado_exibido": "1,2 Mil", "orcado_aprox": true, "real": 29, "dif_relatorio": 0, "servico": "CORTE DE ÁGUA NO CAVALETE" },
+    { "id": "corte_lisc", "grupo": "Corte", "rotulo": "Corte no cavalete — débito (LISC)", "original": "Corte Lisc Meta", "orcado": 175, "real": 13, "dif_relatorio": 0, "servico": "CORTE DE ÁGUA NO CAVALETE - DÉBITO (LISC)" },
+    { "id": "corte_ramal", "grupo": "Corte", "rotulo": "Corte no ramal", "original": "Corte Ramal Me(ta)", "orcado": 175, "real": null, "dif_relatorio": null, "servico": null },
+    { "id": "relig_cavalete", "grupo": "Religação", "rotulo": "Religação no cavalete", "original": "Religação Cava(lete)", "orcado": 1000, "orcado_exibido": "1 Mil", "orcado_aprox": true, "real": 58, "dif_relatorio": 0, "servico": "RELIGAÇÃO DE ÁGUA NO CAVALETE" },
+    { "id": "relig_lisc", "grupo": "Religação", "rotulo": "Religação no cavalete — débito (LISC)", "original": "Religação Lisc M(eta)", "orcado": 159, "real": 3, "dif_relatorio": 0, "servico": "RELIGAÇÃO DE ÁGUA NO CAVALETE - DÉBITO (LISC)" },
+    { "id": "relig_ramal", "grupo": "Religação", "rotulo": "Religação no ramal", "original": "Religação Rama(l)", "orcado": 159, "real": 12, "dif_relatorio": 0, "servico": "RELIGAÇÃO DE ÁGUA NO RAMAL" },
+    { "id": "meta_negociacao", "grupo": "Negociação", "rotulo": "Negociação originada no corte", "original": "Meta Negociaç(ão)", "orcado": 1186, "orcado_exibido": "1,186 Mil", "real": null, "dif_relatorio": null, "servico": null },
+    { "id": "instalacao_hidrometro", "grupo": "Hidrômetro", "rotulo": "Instalação de hidrômetro", "original": "Instalação de H", "rotulo_inferido": true, "orcado": 36, "real": null, "dif_relatorio": null, "servico": null },
+    { "id": "substituicao_hidrometro", "grupo": "Hidrômetro", "rotulo": "Substituição de hidrômetro", "original": "Substituição de", "rotulo_inferido": true, "orcado": 120, "real": 2, "dif_relatorio": 0, "servico": null },
+    { "id": "termos", "grupo": "Irregularidade", "rotulo": "Termos aplicados", "original": "Termos Meta", "orcado": 318, "real": 29, "dif_relatorio": 0, "servico": null }
+  ],
+  "totais_relatorio": {
+    "corte_meta": { "valor": 1550, "exibido": "1,55 Mil" },
+    "corte_real": { "valor": 42 },
+    "relig_meta": { "valor": 1318, "exibido": "1,318 Mil" },
+    "relig_real": { "valor": 73 },
+    "neg_corte_meta": { "valor": 1186, "exibido": "1,186 Mil" },
+    "neg_corte_real": { "valor": null },
+    "neg_corte_valor": { "valor": null },
+    "ticket_corte": { "valor": null }
+  },
+  "servicos": [
+    { "nome": "RELIGAÇÃO DE ÁGUA NO CAVALETE - DÉBITO (LISC)", "familia": "Religação", "eq": 2, "exec": 3, "exoc": 0 },
+    { "nome": "CORTE DE ÁGUA NO CAVALETE - DÉBITO (LISC)", "familia": "Corte", "eq": 5, "exec": 13, "exoc": 0 },
+    { "nome": "CORTE DE ÁGUA NO CAVALETE", "familia": "Corte", "eq": 8, "exec": 29, "exoc": 4 },
+    { "nome": "RELIGAÇÃO DE ÁGUA NO RAMAL", "familia": "Religação", "eq": 9, "exec": 12, "exoc": 1 },
+    { "nome": "VERIFICAÇÃO CADASTRAL", "familia": "Cadastro", "eq": 9, "exec": 74, "exoc": 23 },
+    { "nome": "RELIGAÇÃO DE ÁGUA NO CAVALETE", "familia": "Religação", "eq": 13, "exec": 58, "exoc": 1 },
+    { "nome": "VISTORIA DE IRREGULARIDADE", "familia": "Vistoria", "eq": 14, "exec": 62, "exoc": 8 },
+    { "nome": "VISTORIA PÓS CORTE", "familia": "Vistoria", "eq": 14, "exec": 78, "exoc": 7 },
+    { "nome": "COBRANÇA", "familia": "Cobrança", "eq": 19, "exec": 124, "exoc": 1 }
+  ],
+  "servicos_total": { "eq": 57, "exec": 453, "exoc": 45, "perc": 498, "taxa_relatorio": 0.91 },
+  "categorias": [
+    { "categoria": "VISTORIA PÓS CORTE", "os_exec": 78, "neg": 5, "neg_ass": 0.0588, "termos": 9, "efet_termos": 0.43 },
+    { "categoria": "VISTORIA DE IRREGULARIDADE", "os_exec": 62, "neg": null, "neg_ass": null, "termos": 11, "efet_termos": 0.34 },
+    { "categoria": "CORTE", "os_exec": 42, "neg": null, "neg_ass": null, "termos": null, "efet_termos": "Infinito" }
+  ],
+  "categorias_total": { "os_exec": 182, "neg": 5, "neg_ass": 0.0249, "termos": 19, "efet_termos": 1.0 },
+  "motivos_nao_execucao": [
+    { "motivo": "CLIENTE A…", "qtd": 13 },
+    { "motivo": "CLIENTE IMPEDIU …", "qtd": 8 },
+    { "motivo": "RETORNAR DEPOIS", "qtd": 8 },
+    { "motivo": "NADA A FAZER NO LO…", "qtd": 7 },
+    { "motivo": "ENDEREÇO NÃO LOCA…", "qtd": 6 },
+    { "motivo": "UTILIZA POÇO", "qtd": 4 },
+    { "motivo": "ÁREA DE RISCO", "qtd": 3 },
+    { "motivo": "DUPLICIDADE DE MAT…", "qtd": 3 },
+    { "motivo": "INVIABILIDADE TÉCNICA", "qtd": 3 },
+    { "motivo": "RAMAL/REDE NÃO LO…", "qtd": 3 },
+    { "motivo": "SERVIÇO JÁ EXECUTADO", "qtd": 2 },
+    { "motivo": "AMEAÇA AO COLABO…", "qtd": 1 },
+    { "motivo": "COMPROVOU PAGAM…", "qtd": 1 },
+    { "motivo": "FECHADO SEM VISÃO/…", "qtd": 1 },
+    { "motivo": "IMÓVEL DEMOLIDO / L…", "qtd": 1 },
+    { "motivo": "IMÓVEL FECHADO SE…", "qtd": 1 },
+    { "motivo": "SUSPENSO", "qtd": 1 }
+  ],
+  "outros_indicadores": {
+    "rec_cavalete": 9,
+    "rec_ramal": 38,
+    "vendas": 17,
+    "vendas_meta": 244,
+    "vendas_all": 2261
+  },
+  "frentes": {
+    "corte": {
+      "linhas": [
+        { "frente": "Corte e Religa", "eq": 9, "exec": 36, "exoc": 3, "ass_relatorio": 0.99 },
+        { "frente": "Fiscalização", "eq": 1, "exec": 6, "exoc": 1, "ass_relatorio": 1.07 }
+      ],
+      "total": { "eq": 10, "exec": 42, "exoc": 4, "ass_relatorio": 1.0 }
+    },
+    "religacao": {
+      "linhas": [
+        { "frente": "Corte e Religa", "eq": 12, "exec": 59, "exoc": 1, "ass_relatorio": 1.237 },
+        { "frente": "Pós Corte", "eq": 5, "exec": 10, "exoc": 0, "ass_relatorio": null },
+        { "frente": "Vcg - Rio Bonito", "eq": 11, "exec": 2, "exoc": 0, "ass_relatorio": null },
+        { "frente": "Fiscalização", "eq": 1, "exec": 1, "exoc": 0, "ass_relatorio": null },
+        { "frente": "Serviços Comerciais", "eq": 1, "exec": 1, "exoc": 0, "ass_relatorio": null }
+      ],
+      "total": { "eq": 30, "exec": 73, "exoc": 1, "ass_relatorio": 1.0 }
+    },
+    "pos_corte": {
+      "linhas": [
+        { "frente": "Corte e Religa", "eq": 6, "exec": 28, "exoc": 5 },
+        { "frente": "Pós Corte", "eq": 5, "exec": 20, "exoc": 0 },
+        { "frente": "Fiscalização", "eq": 3, "exec": 10, "exoc": 0 },
+        { "frente": "Serviços Comerciais", "eq": 1, "exec": 3, "exoc": 0 },
+        { "frente": "Recuperação de Cortados", "eq": 4, "exec": 0, "exoc": 0 }
+      ],
+      "total": { "eq": 19, "exec": 61, "exoc": 5 }
+    }
+  },
+  "corte_por_tipo": [
+    { "tipo": "Cavalete", "qtd": 29 },
+    { "tipo": "LISC", "qtd": 13 }
+  ],
+  "religacao_por_tipo": [
+    { "tipo": "Cavalete", "qtd": 58 },
+    { "tipo": "Ramal", "qtd": 12 },
+    { "tipo": "LISC", "qtd": 3 }
+  ],
+  "dia_a_dia": { "corte": 42, "religacao": 73, "pos_corte": 78 },
+  "corte_por_cidade": {
+    "linhas": [
+      { "cidade": "CANTAGALO", "eq": 6, "exec": 3, "exoc": 0, "ass_relatorio": 0.913 },
+      { "cidade": "CORDEIRO", "eq": 6, "exec": 1, "exoc": 0, "ass_relatorio": 0.913 },
+      { "cidade": "MIRACEMA", "eq": 9, "exec": 13, "exoc": 0, "ass_relatorio": 0.913 },
+      { "cidade": "RIO BONITO", "eq": 23, "exec": 1, "exoc": 0, "ass_relatorio": 0.913 },
+      { "cidade": "S.SEBASTIAO DO ALTO", "eq": 1, "exec": 6, "exoc": 0, "ass_relatorio": 0.913 },
+      { "cidade": "S.FCO.DO ITABAPOANA", "eq": 15, "exec": 5, "exoc": 1, "ass_relatorio": 1.0957 },
+      { "cidade": "CASIMIRO DE ABREU", "eq": 7, "exec": 13, "exoc": 3, "ass_relatorio": 1.1237 }
+    ],
+    "total": { "eq": 61, "exec": 42, "exoc": 4, "ass_relatorio": 1.0 }
+  },
+  "ranking_corte": {
+    "linhas": [
+      { "recurso": "RIOCERIN-020", "rank": 1, "os_corte": 13, "neg": 1 },
+      { "recurso": "RIOCERIN-010", "rank": 2, "os_corte": 7, "neg": null },
+      { "recurso": "RIOCERIN-007", "rank": 3, "os_corte": 6, "neg": 1 },
+      { "recurso": "RIOFSCIN-011", "rank": 3, "os_corte": 6, "neg": null },
+      { "recurso": "RIOCERIN-001", "rank": 4, "os_corte": 4, "neg": null },
+      { "recurso": "RIOCERIN-012", "rank": 5, "os_corte": 3, "neg": null },
+      { "recurso": "RIOCERIN-022", "rank": 6, "os_corte": 2, "neg": 2 },
+      { "recurso": "RIOCERIN-017", "rank": 7, "os_corte": 1, "neg": null }
+    ],
+    "total": { "os_corte": 42, "neg": 4 }
+  },
+  "corte_kpis_relatorio": { "neg_corte": null, "neg_corte_valor": null, "ticket_medio": null },
+  "negociacoes": {
+    "kpis": {
+      "principal": 124,
+      "cadastro_desdobro": null,
+      "corte": null,
+      "desdobro": 0,
+      "pos_corte": 8,
+      "total": 132
+    },
+    "valores": {
+      "principal": 40382,
+      "desdobro_corte": null,
+      "desdobro": 0,
+      "desdobro_pos_corte": 18046,
+      "total": 58427.47
+    },
+    "resumo_report": { "qtd": 131, "valor": 58104.64, "ticket_medio": 443.55 },
+    "por_tipo_os": [
+      { "tipo": "COBRANÇA", "qtd": 124 },
+      { "tipo": "VISTORIA PÓS CORTE", "qtd": 7 },
+      { "tipo": "RELIGAÇÃO", "qtd": 5, "derivado": true }
+    ],
+    "por_cidade": {
+      "linhas": [
+        { "cidade": "ITAOCARA", "qtd": 10, "valor": 18950.61 },
+        { "cidade": "CANTAGALO", "qtd": 18, "valor": 12334.98 },
+        { "cidade": "CASIMIRO DE ABREU", "qtd": 14, "valor": 10395.67 },
+        { "cidade": "MIRACEMA", "qtd": 30, "valor": 5054.49 },
+        { "cidade": "RIO BONITO", "qtd": 21, "valor": 4788.42 },
+        { "cidade": "S.FCO.DO ITABAPOANA", "qtd": 17, "valor": 2506.72 },
+        { "cidade": "CORDEIRO", "qtd": 6, "valor": 1961.42 },
+        { "cidade": "CAMBUCI", "qtd": 4, "valor": 987.18 },
+        { "cidade": "APERIBE", "qtd": 4, "valor": 600.38 },
+        { "cidade": "DUAS BARRAS", "qtd": 6, "valor": 493.9 },
+        { "cidade": "S.SEBASTIAO DO ALTO", "qtd": 1, "valor": 30.87 }
+      ],
+      "total": { "qtd": 132, "valor": 58427.47 }
+    },
+    "top_equipes": {
+      "linhas": [
+        { "recurso": "RIOLTRIN-016", "top": 1, "qtd": 16, "valor": 3572.94 },
+        { "recurso": "RIOLTRIN-009", "top": 3, "qtd": 12, "valor": 2610.36 },
+        { "recurso": "RIOLTRIN-023", "top": 2, "qtd": 12, "valor": 9991.36 },
+        { "recurso": "RIOLTRIN-013", "top": 4, "qtd": 11, "valor": 2451.64 },
+        { "recurso": "RIOLTRIN-001", "top": 5, "qtd": 10, "valor": 2464.58 },
+        { "recurso": "RIOLTRIN-027", "top": 5, "qtd": 10, "valor": 2133.47 },
+        { "recurso": "RIOLTRIN-007", "top": 6, "qtd": 9, "valor": 8245.01 },
+        { "recurso": "RIOLTRIN-018", "top": 7, "qtd": 8, "valor": 770.51 },
+        { "recurso": "RIOLTRIN-010", "top": 8, "qtd": 7, "valor": 1730.42 },
+        { "recurso": "RIOLTRIN-017", "top": 9, "qtd": 6, "valor": 757.28 },
+        { "recurso": "RIOLTRIN-012", "top": 10, "qtd": 5, "valor": 718.43 }
+      ],
+      "total": { "qtd": 106, "valor": 35446 }
+    },
+    "perfis": [
+      { "perfil": "Inadimplente", "qtd": 71, "valor": 33942.74, "frentes": [
+        { "frente": "Leitura", "qtd": 65, "valor": 15787.9 },
+        { "frente": "Corte e Religa", "qtd": 5, "valor": 16138.98 },
+        { "frente": "Pós Corte", "qtd": 1, "valor": 2015.86 }
+      ] },
+      { "perfil": "Adimplente", "qtd": 52, "valor": 21629.38, "frentes": [
+        { "frente": "Leitura", "qtd": 47, "valor": 19911.13 },
+        { "frente": "Corte e Religa", "qtd": 4, "valor": 519.82 },
+        { "frente": "Pós Corte", "qtd": 1, "valor": 1198.43 }
+      ] },
+      { "perfil": null, "qtd": 5, "valor": 2249.83, "frentes": [] },
+      { "perfil": "Nunca Pagou", "qtd": 3, "valor": 282.69, "frentes": [
+        { "frente": "Leitura", "qtd": 2, "valor": 282.69 },
+        { "frente": "Recadastro", "qtd": 1, "valor": null }
+      ] }
+    ],
+    "perfis_total": { "qtd": 131, "valor": 58104.64 }
+  },
+  "regras_rodape": [
+    "Exoc - Desconsiderando negociação como Exoc.",
+    "Efetividade - Considerando as negociações como Exec - Exec / Vistorias realizadas (Exec + Exoc)",
+    "Assertividade de Negociação e Irregularidade - Negociações ou Irregularidade / Vistorias realizadas (Exec + Exoc) - Quantas visitas são necessárias para efetivar a negociação."
+  ]
+}

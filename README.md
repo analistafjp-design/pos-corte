@@ -47,3 +47,24 @@ Observações: a página publicada é pública (quem tiver a URL a vê, mas só 
 ## Bases de campo
 
 A aba **Bases de campo** recebe as bases geradas pela estratégia que saem para campo (o nome do arquivo deve ter a data, ex.: `Base_Campo_28_09_2026.xlsx`). Ao subir a base, o painel cruza cada linha (Cód. Protocolo Origem, ou Matrícula quando não há protocolo) com as atividades Exec/Exoc já carregadas, realizadas a partir da data da base, e mostra: total da base, data que subiu, percorrido, quanto falta, Exec, Exoc, termos, assertividade, negociações, efetividade, sem desdobro e total de equipes. O botão **Baixar o que falta (Excel)** exporta as linhas ainda não percorridas. As bases ficam gravadas no navegador, organizadas por mês e pela data em que subiram.
+
+## Painel "Mensal Comercial"
+
+Painel de decisão feito a partir do relatório Power BI **Mensal Comercial** (PDF de 29/09/2026): resumo do dia, corte e religação, negociações, metas, **conferência automática dos números** e dicionário de indicadores. É outro painel, independente do Pós-Corte, em `mensal-comercial/`.
+
+| Arquivo | Para quê |
+|---|---|
+| `mensal-comercial/Dashboard_Mensal_Comercial.html` | O painel (HTML único, sem rede e sem bibliotecas). Abra com duplo clique |
+| `mensal-comercial/Analise_Relatorio_Mensal_Comercial.md` | Estrutura do relatório, colunas, medidas, regras deduzidas e onde os números não fecham |
+| `mensal-comercial/Prompt_Dashboard_Mensal_Comercial.md` | Prompt profissional para continuar o desenvolvimento |
+| `mensal-comercial/dados/2026-09-29.json` | Dados do dia (agregados, sem dados pessoais) |
+| `mensal-comercial/dashboard.src.html`, `build.mjs` | Modelo e gerador do HTML |
+
+```bash
+node mensal-comercial/build.mjs [dados/OUTRO.json]   # gera o HTML com outro dia
+npm run test:mensal                                  # 18 testes no Chromium
+```
+
+Outro dia pode ser carregado no próprio painel pelo botão **Importar dados** (JSON no mesmo formato; aceita uma lista de dias).
+
+> **Não publique este painel no GitHub Pages.** Ao contrário do Pós-Corte, ele traz números de negócio embutidos (metas, valores negociados, códigos de equipe). Por isso não foi copiado para `docs/`.
