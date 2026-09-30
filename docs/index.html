@@ -2449,7 +2449,7 @@ window.FRENTES_PADRAO = [
           preenchidas++;
           nomes[cols[j]] = t;
           const h = normHeader(t);
-          if (BASE_PROTOCOLO.has(h)) achou = true;
+          if (BASE_MATRICULA.has(h)) achou = true;
         }
         if (!candidato && preenchidas >= 2) candidato = nomes.filter(Boolean);
         if (achou) {
@@ -2471,35 +2471,33 @@ window.FRENTES_PADRAO = [
       if (row.some((x) => trimStr(x) !== '')) linhas.push(row);
     }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo a base', fraction: f }); });
     if (!cabecalho && candidato) {
-      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
     }
     if (!cabecalho) {
-      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Cód. Protocolo Origem".');
+      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Matrícula".');
     }
-    if (colProtocolo < 0) {
-      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
+    if (colMatricula < 0) {
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
     }
     if (!linhas.length) throw new PcError('SEM_LINHAS', 'A aba "' + sheet.name + '" não tem linhas de dados abaixo do cabeçalho.');
     return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name, opts.ref), truncado, nomeProtocolo: colProtocolo >= 0 ? cabecalho.nomes[colProtocolo] : '', nomeMatricula: colMatricula >= 0 ? cabecalho.nomes[colMatricula] : '' };
   }
 
   /**
-   * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pelo
-   * Cód. Protocolo Origem (igual, ou só a parte antes da "/" quando a base não traz o sufixo), em qualquer data.
-   * De cada item vale a atividade mais recente. Linhas sem protocolo contam como faltantes.
+   * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pela Matrícula e
+   * só com os serviços de pós-corte (110010-110012, 210010-210012, 310010-310012). Havendo data da base, conta
+   * apenas atividade realizada a partir dela; sem data, qualquer data. De cada matrícula vale a atividade mais recente.
+   * Linhas sem matrícula contam como faltantes.
    */
-  function avaliarBase(base, records) {
-    const porProt = new Map();
-    const porPref = new Map();
-    const guarda = (mapa, k, r) => {
-      if (!k) return;
-      const a = mapa.get(k);
-      if (!a || (r.data || '') > (a.data || '')) mapa.set(k, r);
-    };
+  function avaliarBase(base, records, dataBase) {
+    const porMat = new Map();
     for (const r of records) {
-      const p = chaveNorm(r.protocolo);
-      guarda(porProt, p, r);
-      if (p.includes('/')) guarda(porPref, p.split('/')[0], r);
+      if (!CODIGOS_SERVICO.includes(codigoServico(r.codigo))) continue;
+      if (dataBase && !(r.data && r.data >= dataBase)) continue;
+      const m = chaveNorm(r.matricula);
+      if (!m) continue;
+      const a = porMat.get(m);
+      if (!a || (r.data || '') > (a.data || '')) porMat.set(m, r);
     }
     const vistos = new Set();
     const casadas = [];
@@ -2507,15 +2505,15 @@ window.FRENTES_PADRAO = [
     let duplicadas = 0;
     let semChave = 0;
     let exemploBase = '';
-    const cp = base.colProtocolo;
+    const cm = base.colMatricula;
     base.linhas.forEach((row, i) => {
-      const p = cp >= 0 ? chaveNorm(row[cp]) : '';
-      if (p) {
-        if (vistos.has(p)) { duplicadas++; return; }
-        vistos.add(p);
-        if (!exemploBase) exemploBase = p;
+      const m = cm >= 0 ? chaveNorm(row[cm]) : '';
+      if (m) {
+        if (vistos.has(m)) { duplicadas++; return; }
+        vistos.add(m);
+        if (!exemploBase) exemploBase = m;
       } else semChave++;
-      const r = p ? porProt.get(p) || (!p.includes('/') ? porPref.get(p) : null) || null : null;
+      const r = m ? porMat.get(m) || null : null;
       if (r) casadas.push(r); else pendentes.push(i);
     });
     const total = vistos.size + semChave;
@@ -2529,8 +2527,8 @@ window.FRENTES_PADRAO = [
       duplicadas,
       semChave,
       exemploBase,
-      exemploRealizado: records.length ? records[0].protocolo || '' : '',
-      chave: 'Cód. Protocolo Origem',
+      exemploRealizado: records.length ? String(records[0].matricula || '') : '',
+      chave: 'Matrícula',
     };
   }
 
@@ -2855,8 +2853,8 @@ window.FRENTES_PADRAO = [
         [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
         [],
         [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
-        ['Total da base', intCel(av.total), 'Protocolos distintos da base (' + av.chave + ')'],
-        ['Percorrido da base', intCel(av.percorridos), 'Protocolos da base com atividade Exec ou Exoc no histórico da base principal'],
+        ['Total da base', intCel(av.total), 'Matrículas distintas da base'],
+        ['Percorrido da base', intCel(av.percorridos), 'Matrículas da base com atividade Exec ou Exoc (serviços de pós-corte)' + (meta.dataBase ? ' realizada a partir de ' + meta.dataBase : '')],
         ['Faltam percorrer', intCel(av.faltam), 'Total da base − percorrido (linhas na aba "Faltam percorrer")'],
         ['% percorrido', pctCel(av.pct), 'Percorrido ÷ total da base'],
         ['Total de Exec', intCel(r.exec), 'Status da Atividade = Finalizada'],
@@ -4387,7 +4385,7 @@ window.FRENTES_PADRAO = [
       for (const b of lista || []) if (b && b.id && !ids.has(b.id)) state.bases.push(b);
       // bases gravadas antes do reconhecimento de datas sem ano no nome ("Base 18.09"): completa a data, uma vez
       for (const b of state.bases) {
-        if (b.dataBase) continue;
+        if (b.dataBase || b.dataManual) continue;
         const d = PC.dataDoNome(b.nome, new Date(b.enviadoEm));
         if (d) { b.dataBase = b.dataNome = d; idb.basePut(b.id, b).catch(() => {}); }
       }
@@ -4397,9 +4395,9 @@ window.FRENTES_PADRAO = [
 
   function avaliacaoDaBase(b) {
     if (state.baseEvalRecords !== state.records) { state.baseEval.clear(); state.baseEvalRecords = state.records; }
-    const k = b.id;
+    const k = b.id + '|' + (b.dataBase || '');
     let av = state.baseEval.get(k);
-    if (!av) { av = PC.avaliarBase(b, state.records); state.baseEval.set(k, av); }
+    if (!av) { av = PC.avaliarBase(b, state.records, b.dataBase || ''); state.baseEval.set(k, av); }
     return av;
   }
 
@@ -4469,6 +4467,14 @@ window.FRENTES_PADRAO = [
     renderTudo();
   }
 
+  async function mudarDataBase(b, iso) {
+    b.dataBase = iso || '';
+    b.dataManual = true;
+    state.baseEval.clear();
+    try { await idb.basePut(b.id, b); } catch (_) { /* ignora */ }
+    renderTudo();
+  }
+
   async function baixarFaltantes(b) {
     const av = avaliacaoDaBase(b);
     try {
@@ -4517,17 +4523,19 @@ window.FRENTES_PADRAO = [
     const av = avaliacaoDaBase(b);
     const r = av.resumo;
     const pctTxt = av.pct == null ? '—' : (av.pct * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    const campoData = h('input', { type: 'date', value: b.dataBase || '', 'aria-label': 'Data da base ' + b.nome, onchange: (e) => mudarDataBase(b, e.target.value) });
     const notas = [];
     if (av.duplicadas) notas.push(fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'linha repetida', 'linhas repetidas') + ' na base (contadas uma vez).');
-    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' protocolo (contam como faltantes).');
+    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' matrícula (contam como faltantes).');
     if (!state.records.length) notas.push('As atividades realizadas ainda não foram carregadas: conecte a pasta para calcular o percorrido.');
-    else if (av.percorridos === 0 && av.exemploBase) notas.push('Nenhum item achou atividade. Exemplo de protocolo na base: "' + av.exemploBase + '"; exemplo no realizado: "' + av.exemploRealizado + '". Se os formatos forem diferentes, me avise.');
+    else if (av.percorridos === 0 && av.exemploBase) notas.push('Nenhuma matrícula achou atividade' + (b.dataBase ? ' a partir de ' + dataBR(b.dataBase) + ' (limpe a "Data da base" para considerar qualquer data)' : '') + '. Exemplo de matrícula na base: "' + av.exemploBase + '"; exemplo no realizado: "' + av.exemploRealizado + '".');
     return h('article', { class: 'basecard', dataset: { baseId: b.id }, 'aria-label': 'Base ' + b.nome },
       h('div', { class: 'basehead' },
         h('div', { class: 'basetitle' },
           h('h3', { text: b.nome }),
-          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento pelo ' + av.chave })),
+          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento pela ' + av.chave + ' (serviços 110010-12, 210010-12 e 310010-12)' })),
         h('div', { class: 'basetools' },
+          h('label', { class: 'datefield' }, h('span', { text: 'Data da base' }), campoData),
           h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar' }, disabled: av.faltam === 0, onclick: () => baixarFaltantes(b) }, icon('download', 16), h('span', { text: 'Baixar o que falta (Excel)' })),
           h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Excluir a base ' + b.nome, title: 'Excluir esta base da lista', onclick: () => excluirBase(b) }, icon('trash', 16)))),
       h('div', { class: 'progresso' },
@@ -4574,9 +4582,9 @@ window.FRENTES_PADRAO = [
       h('div', { class: 'card-head' },
         h('div', null,
           h('h2', { text: 'Bases de campo' }),
-          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (precisam ter a coluna Cód. Protocolo Origem). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
+          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (precisam ter a coluna Matrícula). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
         subir),
-      h('p', { class: 'note', text: 'Cruzamento sempre pelo Cód. Protocolo Origem, com o histórico da base principal em qualquer data: o item está percorrido quando há atividade Exec ou Exoc com o mesmo protocolo (vale a mais recente). Linhas sem protocolo contam como faltantes. Total da base = protocolos distintos.' }));
+      h('p', { class: 'note', text: 'Cruzamento pela Matrícula com o histórico da base principal, sempre só com os serviços de pós-corte (110010/110011/110012, 210010/210011/210012 e 310010/310011/310012): a matrícula está percorrida quando há atividade Exec ou Exoc dela. Havendo "Data da base" (do nome do arquivo, editável), conta só atividade a partir dessa data; sem data, qualquer data. Vale a atividade mais recente. Linhas sem matrícula contam como faltantes. Total da base = matrículas distintas.' }));
     if (!state.bases.length) {
       root.replaceChildren(h('div', { class: 'stack' }, topo, h('section', { class: 'card empty' },
         h('h2', { text: 'Nenhuma base enviada ainda' }),
