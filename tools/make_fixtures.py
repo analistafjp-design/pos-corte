@@ -46,6 +46,16 @@ CIDADES = ["Cidade Norte", "Cidade Sul", "Cidade Leste", "Cidade Oeste", "Vila A
            "Porto Novo", "Alto Vale", "Bela Serra", "Campo Belo", "Rio Claro", "Monte Alto"]
 NOMES = ["Ana Souza", "Bruno Lima", "Carla Dias", "Diego Rocha", "Elisa Prado", "Fabio Neri",
          "Gina Braga", "Hugo Melo", "Iris Alves", "João Cruz"]
+CODIGOS_SERVICO = ["110010-VISTORIA PÓS CORTE", "110011-VISTORIA PÓS CORTE - INTERMEDIÁRIO", "110012-VISTORIA PÓS CORTE - AVANÇADO",
+                   "210010-VISTORIA PÓS CORTE", "210011-VISTORIA PÓS CORTE - INTERMEDIÁRIO", "210012-VISTORIA PÓS CORTE - AVANÇADO",
+                   "310010-VISTORIA PÓS CORTE", "310011-VISTORIA PÓS CORTE - INTERMEDIÁRIO", "310012-VISTORIA PÓS CORTE - AVANÇADO"]
+EM_ESCOPO = re.compile(r"^\s*(110010|110011|110012|210010|210011|210012|310010|310011|310012)(?!\d)")
+
+
+def em_escopo(r):
+    return bool(EM_ESCOPO.match(str(r.get("Código/Descrição") or "")))
+
+
 OUTROS_CODIGOS = ["120045 - Religação", "120077 - Troca de hidrômetro", "130001 - Vistoria", "140010 - Reparo cavalete",
                   "150022 - Ramal", "160005 - Supressão"]
 EXTRA_PREFIX = "Campo extra"
@@ -86,7 +96,7 @@ def nova_matriz(rng, n_rows, spec):
             "Cód. Protocolo Origem": f"OS{5000000 + rng.randrange(0, 900000)}",
             "ID da Atividade": ids[i],
             "Matrícula": f"{rng.randrange(100000, 999999)}",
-            "Código/Descrição": f"{rng.choice([180001, 180002, 180003])} - Pós corte",
+            "Código/Descrição": rng.choice(CODIGOS_SERVICO),
             "Data": d,
             "Status da Atividade": status[i],
             "Nome do Solicitante": rng.choice(NOMES),
@@ -148,6 +158,7 @@ def esperados(rows, frentes=FRENTES):
                 best = (k, v)
         return best[1] if best else "Não mapeada"
 
+    rows = [r for r in rows if em_escopo(r)]  # só os serviços dos 9 códigos entram na base
     out = {"atividades": 0, "exec": 0, "exoc": 0, "neg": 0, "termos": 0, "semDesdobro": 0, "t11": 0, "t31": 0,
            "debito": 0.0, "negETermo": 0, "porMes": {}, "porFrente": {}, "porCidade": {}, "porEquipe": {}}
     for r in rows:
@@ -339,7 +350,7 @@ def montar_pequeno(out):
             names[i] = f"{EXTRA_PREFIX} {i}"
     base = {
         "Recurso": "AL-01", "Cód. Protocolo Origem": "OS1", "ID da Atividade": 1, "Matrícula": "1001",
-        "Código/Descrição": "180001 - Pós corte", "Data": date(2026, 7, 3), "Status da Atividade": "Finalizada",
+        "Código/Descrição": "110010-VISTORIA PÓS CORTE", "Data": date(2026, 7, 3), "Status da Atividade": "Finalizada",
         "Nome do Solicitante": "Ana & <Souza>", "Cidade": "Cidade Norte", "Início do SLA": datetime(2026, 7, 3, 8),
         "Fim do SLA": datetime(2026, 7, 5, 8), "Tipo do Corte Realizado": "Cavalete",
         "Qual a situação do imóvel?": "Ocupado", "Irregularidade Encontrada?": "Não",
@@ -365,7 +376,11 @@ def montar_pequeno(out):
         dict(**{"ID da Atividade": 16, "Recurso": "QQ-01", "Negociou O Débito?": "Sim", "Valor Total dos Débitos": "R$ 1.000,50", "Serviço adicionais resposta": "130001"}),  # sem frente
         dict(**{"ID da Atividade": 17, "Data": date(2026, 9, 28), "Nome do Solicitante": "=HYPERLINK(\"x\")"}),  # texto com fórmula
         dict(**{"ID da Atividade": 18, "Serviço adicionais resposta": "Termo 110013.\nMais texto"}),  # quebra de linha, código com ponto
-        dict(**{"ID da Atividade": 19, "Serviço adicionais resposta": "110013,5"}),  # código seguido de vírgula e dígito: 5 é dígito -> conta? (110013 seguido de ',') sim conta
+        dict(**{"ID da Atividade": 19, "Serviço adicionais resposta": "110013,5"}),
+        # fora dos 9 códigos de serviço: não devem ser carregados (mesmo negociando e com termo)
+        dict(**{"ID da Atividade": 20, "Código/Descrição": "180001 - OUTRO SERVIÇO", "Negociou O Débito?": "Sim", "Serviço adicionais resposta": "110013"}),
+        dict(**{"ID da Atividade": 21, "Código/Descrição": "", "Status da Atividade": "Encerrada com Ocorrência"}),
+        dict(**{"ID da Atividade": 22, "Código/Descrição": "1100100-CÓDIGO MAIOR", "Negociou O Débito?": "Sim"}),  # código seguido de vírgula e dígito: 5 é dígito -> conta? (110013 seguido de ',') sim conta
     ]
     rows = []
     for i, c in enumerate(casos):
@@ -441,7 +456,7 @@ def main():
     ws.append([])
     ws.append(["gerado em 29/09/2026"])
     ws.append(leves)
-    for r in rows:
+    for r in [x for x in rows if em_escopo(x)]:
         vals = []
         for n in leves:
             v = r[n]
@@ -459,7 +474,7 @@ def main():
     ws = wb.active
     ws.title = "Planilha1"
     ws.append([ren[n] for n in leves])
-    for r in rows:
+    for r in [x for x in rows if em_escopo(x)]:
         ws.append([datetime(r[n].year, r[n].month, r[n].day) if n == "Data" else r[n] for n in leves])
     wb.save(out / "leve_nomes_diferentes.xlsx")
 
@@ -501,6 +516,16 @@ def main():
     rng = random.Random(2026)
     spec = dict(exoc=675, neg=230, termos=389, neg_e_termo=25, sem_desdobro=2, decoy_num=40, irreg_sem_codigo=60, neg_decoy=15, outros=0)
     rows = nova_matriz(rng, 8136, spec)
+    fora = []
+    for k in range(50):  # outros serviços: devem ser ignorados sem alterar os números
+        r = dict(rng.choice(rows))
+        r["ID da Atividade"] = 990000 + k
+        r["Código/Descrição"] = rng.choice(["180001 - OUTRO SERVIÇO", "120045 - RELIGAÇÃO", ""])
+        r["Negociou O Débito?"] = "Sim"
+        r["Serviço adicionais resposta"] = "110013"
+        r["_idx"] = 900000 + k
+        fora.append(r)
+    rows = rows + fora
     names = cabecalho(rng)
     rec = recortes(rows)
     escrever_xlsxwriter(out / "grande_sintetico.xlsx", names, rows, rec)

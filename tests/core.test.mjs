@@ -110,6 +110,17 @@ test('sem desdobro: negociação com serviço adicional vazio/nulo/espaços', ()
   assert.equal(c('Sim', '').neg, true, 'continua sendo negociação');
 });
 
+test('serviços considerados: só os 9 códigos no início de "Código/Descrição"', () => {
+  const c = PC.codigoServico;
+  for (const ok of ['110010-VISTORIA PÓS CORTE', '110011-VISTORIA PÓS CORTE - INTERMEDIÁRIO', '110012-X', '210010-X', '210011-X', '210012-X', '310010-X', '310011-X', '310012-VISTORIA', ' 310012 - X', '210012']) {
+    assert.ok(PC.CODIGOS_SERVICO.includes(c(ok)), ok);
+  }
+  for (const fora of ['180001 - OUTRO', '1100100-MAIOR', '9110010', '', null, undefined, 'PÓS CORTE 110010', '11001']) {
+    assert.ok(!PC.CODIGOS_SERVICO.includes(c(fora)), String(fora));
+  }
+  assert.deepEqual(PC.CODIGOS_SERVICO, ['110010', '110011', '110012', '210010', '210011', '210012', '310010', '310011', '310012']);
+});
+
 test('status: Exec e Exoc', () => {
   assert.equal(PC.classify('Finalizada', '', '').exec, true);
   assert.equal(PC.classify(' finalizada ', '', '').exec, true);
@@ -193,6 +204,9 @@ for (const nome of ['pequeno_xlsxwriter', 'pequeno_inline', 'pequeno_1904', 'peq
     const res = await ler(fx(nome + '.xlsx'));
     assert.equal(res.abaBase, 'Base');
     assert.equal(res.frentes.length, 52);
+    assert.equal(res.records.length, 19);
+    assert.equal(res.foraServico, 3, 'IDs 20 (outro serviço), 21 (sem código) e 22 (código maior) não entram');
+    assert.ok(!res.records.some((r) => ['20', '21', '22'].includes(r.id)));
     const cons = PC.consolidate([{ ...res, path: nome, lastModified: 1 }]);
     comFrentes({ records: cons.records, frentes: res.frentes, name: nome });
     conferirEsperados(cons.records, json('pequeno_esperados.json'));
@@ -274,6 +288,8 @@ test('arquivo leve: outra aba, título antes do cabeçalho, poucas colunas, sem 
   assert.equal(res.abaBase, 'Resumo');
   assert.ok(res.warnings.some((w) => /Aba "Base" não encontrada: foi usada a aba "Resumo"/.test(w)));
   assert.ok(res.warnings.some((w) => /ID da Atividade/.test(w)));
+  assert.ok(res.warnings.some((w) => /Código\/Descrição.*filtro pelos serviços.*não pôde ser aplicado/.test(w)), 'sem a coluna de código o filtro não se aplica, e isso é avisado');
+  assert.equal(res.filtroServico, false);
   assert.deepEqual(res.cobertura.indisponiveis, []);
   assert.equal(res.frentes, null);
   const cons = PC.consolidate([{ ...res, path: 'leve', lastModified: 1 }]);
@@ -430,9 +446,11 @@ for (const nome of ['grande_sintetico', 'grande_sintetico_inline']) {
     const t0 = performance.now();
     const res = await ler(fx(nome + '.xlsx'));
     const ms = Math.round(performance.now() - t0);
-    console.log(`  ${nome}: ${res.records.length} registros, ${res.audit.totalColunas} colunas, ${ms} ms`);
-    assert.equal(res.audit.totalColunas, 296);
+    console.log(`  ${nome}: ${res.records.length} registros, ${ms} ms`);
+    assert.equal(res.cobertura.reconhecidas.length, 19, 'só as 19 colunas usadas são lidas');
     assert.equal(res.records.length, 8136);
+    assert.equal(res.foraServico, 50, 'linhas de outros serviços são ignoradas e contadas');
+    assert.equal(res.filtroServico, true);
     const cons = PC.consolidate([{ ...res, path: nome, lastModified: 1 }]);
     comFrentes({ records: cons.records, frentes: res.frentes, name: nome });
     const esp = json('grande_esperados.json');
@@ -452,7 +470,8 @@ test('amostra real (opcional): números de referência do projeto', { skip: !pro
   comFrentes({ records: cons.records, frentes: res.frentes, name: 'amostra' });
   const s = PC.summarize(cons.records);
   assert.deepEqual([s.atividades, s.exec, s.exoc, s.neg, s.termos, s.semDesdobro], [8136, 7461, 675, 230, 389, 2]);
-  assert.equal(res.audit.totalColunas, 296);
+  assert.equal(res.cobertura.reconhecidas.length, 19);
+  assert.equal(res.foraServico, 0, 'todos os serviços da amostra estão nos 9 códigos');
   assert.equal(res.frentes.length, 52);
   assert.deepEqual(res.conferencia.map((c) => [c.tipo, c.linhas, c.conciliado]), [['termos', 389, true], ['negociacoes', 230, true]]);
   const datas = cons.records.map((r) => r.data).sort();

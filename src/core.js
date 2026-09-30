@@ -28,6 +28,17 @@
   const normHeader = (v) => norm(v).replace(/[^a-z0-9]+/g, ' ').trim();
   const isBlank = (v) => v == null || String(v).trim() === '';
 
+  /** Versão das regras de leitura; muda quando o resultado gravado deixa de valer. */
+  const PARSER_VERSION = 2;
+
+  /** Serviços considerados (início de "Código/Descrição"); os demais não são carregados. */
+  const CODIGOS_SERVICO = ['110010', '110011', '110012', '210010', '210011', '210012', '310010', '310011', '310012'];
+  const RE_CODIGO_SERVICO = /^\s*(\d{6})(?!\d)/;
+  function codigoServico(v) {
+    const m = RE_CODIGO_SERVICO.exec(String(v == null ? '' : v));
+    return m ? m[1] : '';
+  }
+
   const NAO_MAPEADA = 'Não mapeada';
   const SEM_DATA = 'Sem data';
 
@@ -374,6 +385,15 @@
   /* XML incremental (estilo SAX)                                        */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * Devolve uma cópia independente do texto. Trechos (substring) de textos longos ficam presos ao
+   * pedaço grande de XML de onde saíram e o mantêm na memória; copiar libera esses pedaços.
+   * O espaço inicial é removido: todo consumidor aplica trim aos valores.
+   */
+  function own(s) {
+    return s.length < 13 ? s : (' ' + s).trimStart();
+  }
+
   function decodeEntities(s) {
     if (s.indexOf('&') < 0) return s;
     return s.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|lt|gt|amp|quot|apos);/g, (m, e) => {
@@ -641,7 +661,7 @@
           close(name) {
             if (name === 't') inT = false;
             else if (name === 'rPh') inRPh = false;
-            else if (name === 'si') { sst.push(acc); inSi = false; }
+            else if (name === 'si') { sst.push(own(acc)); inSi = false; }
           },
           text(t, raw) {
             if (inT) acc += raw ? t : decodeText(t);
@@ -693,7 +713,7 @@
    * Percorre a aba emitindo onRow(n, cols, vals, kinds) por linha (arrays reutilizados).
    * kinds: 0 texto, 1 número cru (texto original de <v>), 2 número com formato de data (já ISO).
    */
-  async function scanSheet(wb, sheet, ctx, onRow, onProgress) {
+  async function scanSheet(wb, sheet, ctx, onRow, onProgress, wantCol) {
     const entry = findEntry(wb.zip, sheet.path);
     const { sst, dateStyle, date1904 } = ctx;
     const cols = [], vals = [], kinds = [];
@@ -705,6 +725,7 @@
     let stopped = false;
 
     function finishCell() {
+      if (wantCol !== undefined && !wantCol(cCol)) return; // coluna que o painel não usa: nem é lida
       let v, k = 0;
       switch (cType) {
         case 's': {
@@ -713,8 +734,8 @@
           if (v === undefined) { badSst++; return; }
           break;
         }
-        case 'inlineStr': v = tAcc; break;
-        case 'str': v = decodeText(vAcc); break;
+        case 'inlineStr': v = own(tAcc); break;
+        case 'str': v = own(decodeText(vAcc)); break;
         case 'b': v = vAcc === '1' ? 'VERDADEIRO' : 'FALSO'; break;
         case 'e': return;
         case 'd': v = vAcc; break;
@@ -818,7 +839,6 @@
     const fieldOfCol = new Int16Array(16384).fill(-1);
     let header = null;
     let headers = [];
-    let filled = null;
     let scanned = 0;
     let dataRows = 0;
     let ignoredRows = 0;
@@ -827,6 +847,9 @@
     let hasServ = true;
     const records = [];
     const stats = { semData: 0, dataInvalida: 0, valorInvalido: 0 };
+    const codigos = opts.codigos === undefined ? new Set(CODIGOS_SERVICO) : opts.codigos; // null = sem filtro
+    let foraServico = 0;
+    let filtroAtivo = false;
     const fv = new Array(FIELDS.length);
     const fk = new Array(FIELDS.length);
     const D1904 = ctx.date1904;
@@ -849,8 +872,8 @@
       header = { found, dups };
       headers = names;
       hasServ = found.has(FIELD_INDEX.servAdic);
+      filtroAtivo = codigos !== null && found.has(FIELD_INDEX.codigo);
       for (const [fi, c] of found) fieldOfCol[c] = fi;
-      filled = new Int32Array(names.length + 1);
       return true;
     }
 
@@ -939,8 +962,7 @@
           const c = cols[j];
           const v = vals[j];
           const blank = kinds[j] === 0 && (v.length === 0 || v.trim().length === 0);
-          if (!blank && opts.audit && c < filled.length) filled[c]++;
-          const fi = fieldOfCol[c];
+          const fi = c < 16384 ? fieldOfCol[c] : -1;
           if (fi >= 0) {
             fv[fi] = v;
             fk[fi] = kinds[j];
@@ -948,9 +970,11 @@
           }
         }
         if (!any) { ignoredRows++; dataRows--; return; }
+        if (filtroAtivo && !codigos.has(codigoServico(fv[FIELD_INDEX.codigo]))) { foraServico++; dataRows--; return; }
         records.push(buildRecord());
       },
-      opts.onProgress
+      opts.onProgress,
+      (c) => header === null || (c < 16384 && fieldOfCol[c] >= 0)
     );
 
     if (!header) {
@@ -1010,6 +1034,9 @@
     if (stats.dataInvalida) warnings.push(`${stats.dataInvalida} registros com "Data" que não pôde ser interpretada.`);
     if (stats.valorInvalido) warnings.push(`${stats.valorInvalido} registros com "Valor Total dos Débitos" que não pôde ser interpretado.`);
 
+    if (codigos !== null && !has('codigo')) {
+      warnings.push('Coluna "Código/Descrição" não encontrada: o filtro pelos serviços 110010-110012, 210010-210012 e 310010-310012 não pôde ser aplicado; todas as linhas foram carregadas.');
+    }
     const found = {};
     const reconhecidas = [];
     for (const [fi, c] of header.found) {
@@ -1019,9 +1046,10 @@
     return {
       records,
       headers,
-      filled,
       dataRows,
       ignoredRows,
+      foraServico,
+      filtroServico: filtroAtivo,
       stats,
       warnings,
       missing: missing.map((f) => f.header),
@@ -1158,9 +1186,9 @@
     const warnings = [];
     const { base, frente } = await pickSheets(wb, ctx, matcher, warnings);
     const baseRes = await readRecordsSheet(wb, base.s, ctx, {
-      audit: true,
       arquivo: opts.path || file.name,
       matcher,
+      codigos: opts.codigos,
       onProgress: (f) => progress({ phase: `Lendo aba ${base.s.name}`, fraction: f }),
     });
     warnings.push(...baseRes.warnings);
@@ -1196,7 +1224,7 @@
       }
       try {
         progress({ phase: `Conferindo aba ${sh.name}`, fraction: 0 });
-        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher });
+        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher, codigos: opts.codigos });
         let naBase = 0;
         let regraOk = 0;
         let semChave = 0;
@@ -1224,17 +1252,6 @@
       }
     }
 
-    // auditoria de preenchimento das colunas
-    const columns = [];
-    const keptByCol = new Map();
-    for (const [key, c] of Object.entries(baseRes.columns)) keptByCol.set(c, key);
-    for (let c = 0; c < baseRes.headers.length; c++) {
-      const h = baseRes.headers[c];
-      if (h === undefined || h === '') continue;
-      const key = keptByCol.get(c);
-      columns.push({ coluna: c, nome: h, preenchidas: baseRes.filled[c], mantida: !!key, campo: key || '' });
-    }
-
     return {
       sheetNames,
       abaBase: base.s.name,
@@ -1244,7 +1261,9 @@
       conferencia,
       cobertura: baseRes.cobertura,
       semChave: baseSemChave,
-      audit: { linhas: baseRes.dataRows, colunas: columns, totalColunas: columns.length, linhasIgnoradas: baseRes.ignoredRows },
+      audit: { linhas: baseRes.dataRows, linhasIgnoradas: baseRes.ignoredRows },
+      foraServico: baseRes.foraServico,
+      filtroServico: baseRes.filtroServico,
       stats: baseRes.stats,
       colunasNaoEncontradas: baseRes.missing,
     };
@@ -1546,7 +1565,7 @@
   /* ------------------------------------------------------------------ */
 
   return {
-    PcError, FIELDS, INDICADORES, INDICADOR_BY_KEY, NAO_MAPEADA, SEM_DATA, CSV_COLUMNS,
+    PcError, PARSER_VERSION, CODIGOS_SERVICO, codigoServico, FIELDS, INDICADORES, INDICADOR_BY_KEY, NAO_MAPEADA, SEM_DATA, CSV_COLUMNS,
     norm, normHeader, isBlank, decodeEntities, decodeText,
     parseDateText, parseDateValue, serialToParts, parseValor, fmtBR, isoToBR, isDateFormatCode,
     classify, recordKey,
