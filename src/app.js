@@ -878,7 +878,7 @@
     if (state.records.length && state.lastRead) {
       sub.textContent = fmtInt(state.records.length) + ' percorridas · atualizado às ' + hhmmss(state.lastRead);
     } else {
-      sub.textContent = 'Percorrido, Exec, Exoc, assertividade, efetividade e produtividade';
+      sub.textContent = 'Percorrido, Exec, Exoc, assertividade, efetividade e equipes';
     }
   }
 
@@ -1050,15 +1050,14 @@
     );
   }
 
-  /** Produtividade por cidade: percorrido ÷ equipe-dias (visitas por equipe por dia trabalhado). */
+  /** Resultados por cidade (a produtividade ainda não é exibida no painel). */
   function renderCidades() {
     const linhas = PC.agrupar(vm.filtered, 'cidade');
-    const maxProd = Math.max(0.0001, ...linhas.map((g) => g.produtividade || 0));
-    const cab = ['Cidade', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes', 'Equipe-dias', 'Produtividade'];
+    const cab = ['Cidade', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes'];
     return h('section', { class: 'card', 'aria-labelledby': 'h-cidades' },
       h('div', { class: 'card-head' }, h('div', null,
-        h('h2', { id: 'h-cidades', text: 'Produtividade por cidade' }),
-        h('p', { class: 'hint', text: 'Produtividade = Percorrido ÷ equipe-dias, ou seja, visitas por equipe por dia trabalhado (uma equipe trabalhando um dia = 1 equipe-dia). Clique em uma cidade para filtrar.' }))),
+        h('h2', { id: 'h-cidades', text: 'Resultados por cidade' }),
+        h('p', { class: 'hint', text: 'Clique em uma cidade para filtrar.' }))),
       linhas.length ? h('div', { class: 'table-wrap' }, h('table', null,
         h('thead', null, h('tr', null, cab.map((c, i) => h('th', { scope: 'col', class: i ? 'n' : '', text: c })))),
         h('tbody', null, linhas.map((g) => {
@@ -1066,16 +1065,15 @@
           const filtravel = g.chave !== '(sem cidade)';
           return h('tr', { class: ativo ? 'is-active' : '' },
             h('th', { scope: 'row' }, filtravel
-              ? h('button', { class: 'linkbtn', type: 'button', dataset: { fk: 'cid:' + g.chave }, 'aria-pressed': ativo ? 'true' : 'false', 'aria-label': g.chave + ': ' + fmtDec(g.produtividade) + ' visitas por equipe-dia. Filtrar.', text: g.chave, onclick: () => setFiltro('cidade', g.chave) })
+              ? h('button', { class: 'linkbtn', type: 'button', dataset: { fk: 'cid:' + g.chave }, 'aria-pressed': ativo ? 'true' : 'false', 'aria-label': g.chave + ': ' + fmtInt(g.percorrido) + ' percorridas. Filtrar.', text: g.chave, onclick: () => setFiltro('cidade', g.chave) })
               : g.chave),
-            [fmtInt(g.percorrido), fmtInt(g.exec), fmtInt(g.exoc), fmtInt(g.termos), fmtPctVal(g.assertividade), fmtInt(g.neg), fmtPctVal(g.efetividade), fmtInt(g.equipes), fmtInt(g.equipeDias)].map((v) => h('td', { class: 'n', text: v })),
-            h('td', { class: 'n', 'data-tip': g.chave + '\n' + fmtDec(g.produtividade) + ' visitas por equipe-dia\n' + fmtInt(g.percorrido) + ' percorridas em ' + fmtInt(g.equipeDias) + ' equipe-dias' },
-              h('span', { class: 'prod' }, h('span', { class: 'prodbar', style: { width: Math.max(((g.produtividade || 0) / maxProd) * 60, 2) + 'px' } }), h('strong', { text: fmtDec(g.produtividade) }))));
+            [fmtInt(g.percorrido), fmtInt(g.exec), fmtInt(g.exoc), fmtInt(g.termos), fmtPctVal(g.assertividade), fmtInt(g.neg), fmtPctVal(g.efetividade), fmtInt(g.equipes)].map((v) => h('td', { class: 'n', text: v })),
+            null);
         })),
         h('tfoot', null, h('tr', null,
           h('td', { text: 'Total' }),
-          [fmtInt(vm.sum.percorrido), fmtInt(vm.sum.exec), fmtInt(vm.sum.exoc), fmtInt(vm.sum.termos), fmtPctVal(vm.sum.assertividade), fmtInt(vm.sum.neg), fmtPctVal(vm.sum.efetividade), fmtInt(vm.sum.equipes), fmtInt(vm.sum.equipeDias)].map((v) => h('td', { class: 'n', text: v })),
-          h('td', { class: 'n', text: fmtDec(vm.sum.produtividade) }))))) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
+          [fmtInt(vm.sum.percorrido), fmtInt(vm.sum.exec), fmtInt(vm.sum.exoc), fmtInt(vm.sum.termos), fmtPctVal(vm.sum.assertividade), fmtInt(vm.sum.neg), fmtPctVal(vm.sum.efetividade), fmtInt(vm.sum.equipes)].map((v) => h('td', { class: 'n', text: v })),
+          null)))) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
       h('p', { class: 'note', text: 'No total, "Equipes" conta cada equipe uma vez, mesmo que tenha trabalhado em mais de uma cidade; por isso a soma das cidades pode ser maior.' })
     );
   }

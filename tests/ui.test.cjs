@@ -635,18 +635,17 @@ test('cartões em destaque: percorrido, exec, exoc, equipes, assertividade e efe
   await page.context().close();
 });
 
-test('produtividade por cidade: visitas por equipe-dia, total e filtro por clique', async () => {
+test('resultados por cidade: sem produtividade, total e filtro por clique', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
   const linhas = await page.$$eval('section[aria-labelledby=h-cidades] tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent.trim())));
   assert.equal(linhas.length, 1);
   assert.equal(linhas[0][0], 'Cidade Norte');
   assert.equal(linhas[0][1], '19');
-  assert.equal(linhas[0][9], '5', 'equipe-dias');
-  assert.equal(linhas[0][10], '3,8', '19 percorridas ÷ 5 equipe-dias');
+  assert.equal(linhas[0].length, 9, 'sem colunas de equipe-dias e produtividade');
   const total = await page.$$eval('section[aria-labelledby=h-cidades] tfoot td', (tds) => tds.map((c) => c.textContent.trim()));
-  assert.equal(total[10], '3,8');
-  assert.match(await page.textContent('section[aria-labelledby=h-cidades]'), /Produtividade = Percorrido ÷ equipe-dias/);
+  assert.equal(total.length, 9);
+  assert.doesNotMatch(await page.textContent('section[aria-labelledby=h-cidades]'), /[Pp]rodutividade/);
   await page.click('[data-fk="cid:Cidade Norte"]');
   assert.equal(await page.inputValue('#f-cidade'), 'Cidade Norte');
   await page.click('[data-fk="cid:Cidade Norte"]');
