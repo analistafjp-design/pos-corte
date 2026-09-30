@@ -110,17 +110,17 @@ test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
   // clicar no mês filtra e clicar de novo limpa
-  await page.click('.brow[data-fk="mes:2026-07"]');
+  await page.click('.cc-col[data-fk="mes:2026-07"]');
   assert.deepEqual((await kpis(page))[0], '17');
   assert.match(await page.textContent('#chips'), /Período: 01\/07\/2026 a 31\/07\/2026/);
   assert.equal(await page.inputValue('#f-from'), '2026-07-01');
-  await page.click('.brow[data-fk="mes:2026-07"]');
+  await page.click('.cc-col[data-fk="mes:2026-07"]');
   assert.equal((await kpis(page))[0], '19');
   // agosto mostra somente agosto
   await page.fill('#f-from', '2026-08-01');
   await page.fill('#f-to', '2026-08-31');
   assert.deepEqual(await kpis(page), ['1', '1', '0', '0', '0', '0']);
-  assert.equal(await page.locator('.brow[data-fk^="mes:"]').count(), 1);
+  assert.equal(await page.locator('.cc-col[data-fk^="mes:"]').count(), 1);
   await page.click('#chips button.ghost');
   assert.deepEqual(await kpis(page), KPIS_PEQUENO);
   // clicar em item de ranking filtra pela frente; chip remove
@@ -146,7 +146,7 @@ test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   // seletor do indicador dos gráficos
   await page.selectOption('#f-ind', 'termos');
   assert.match(await page.textContent('#h-mensal'), /Termos aplicados/);
-  const mensal = await page.$$eval('section[aria-labelledby=h-mensal] .bval', (els) => els.map((e) => e.textContent));
+  const mensal = await page.$$eval('section[aria-labelledby=h-mensal] .cc-val', (els) => els.map((e) => e.textContent));
   assert.deepEqual(mensal, ['7', '0', '0']);
   await page.selectOption('#f-ind', 'atividades');
   semErros(page);
@@ -295,7 +295,7 @@ test('pasta pelo seletor manual (webkitdirectory): ignora ~$, .txt e .xls; nomei
   assert.match(t, /antigo\.xls/);
   assert.match(t, new RegExp(meta.duplicatas + ' duplicatas removidas'));
   assert.equal((await kpis(page))[0], String(meta.unicos));
-  assert.match(await page.textContent('#side-foot'), /Seleção manual/);
+  assert.equal(await page.locator('#side-foot').count(), 0, 'sem etiquetas de fonte no topo');
   semErros(page);
   await page.context().close();
 });
@@ -305,7 +305,6 @@ test('modo manual: "Atualizar" pede a pasta novamente e não promete monitoramen
   await page.evaluate(() => { delete window.showDirectoryPicker; });
   await page.setInputFiles('#inp-folder', fx('pasta_dedup'));
   await page.waitForSelector('.kpi-value');
-  assert.match(await page.textContent('#side-foot'), /Seleção manual \(sem monitoramento\)/);
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#btn-atualizar')]);
   assert.equal(chooser.isMultiple(), true);
   assert.match(await statusTitulo(page), /Selecione a pasta novamente/);
@@ -353,7 +352,6 @@ test('pasta com acesso contínuo: conectar, atualizar, subpastas, arquivo removi
   await opfsEscrever(page, 'notas.txt', Buffer.from('x'));
   await page.click('#btn-pasta');
   await aguardaTitulo(page, /Base carregada: 200 atividades de 1 arquivo/);
-  assert.match(await page.textContent('#side-foot'), /Acesso contínuo/);
   assert.equal(await page.evaluate(() => window.__poscorte.state.source.mode), 'handle');
   // um segundo arquivo em uma subpasta: soma sem duplicar os 150 repetidos
   await page.waitForTimeout(50);
@@ -551,7 +549,6 @@ test('a última pasta é lembrada e recarregada ao reabrir o painel (sem guardar
   await aguardaTitulo(page, /Base carregada: 200 atividades/);
   await page.reload();
   await aguardaTitulo(page, /Base carregada: 200 atividades/);
-  assert.match(await page.textContent('#side-foot'), /Pasta.*onedrive/);
   // nada de dados em armazenamento do navegador
   const guardado = await page.evaluate(async () => JSON.stringify({ ls: Object.keys(localStorage), ss: Object.keys(sessionStorage) }));
   assert.ok(!/\d{6,}/.test(guardado), 'sem registros no armazenamento local');
@@ -719,18 +716,18 @@ test('nome do painel e abas: Pós-Corte Interior; Visão geral, Analítico e Arq
   assert.equal(await page.title(), 'Pós-Corte Interior');
   assert.equal(await page.textContent('h1'), 'Pós-Corte Interior');
   assert.match(await page.textContent('.title h1'), /Pós-Corte Interior/);
-  assert.deepEqual(await page.$$eval('#nav-tabs button', (bs) => bs.map((b) => b.textContent.trim())), ['Visão geral', 'Analítico', 'Bases de campo', 'Arquivos e regras']);
+  assert.deepEqual(await page.$$eval('#nav-tabs button', (bs) => bs.map((b) => b.textContent.trim())), ['Visão geral', 'Bases de campo', 'Analítico', 'Arquivos e regras']);
   await page.context().close();
 });
 
 test('teclado: cartão e barras acessíveis; foco preservado após filtrar', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
-  await page.focus('.brow[data-fk="mes:2026-07"]');
+  await page.focus('.cc-col[data-fk="mes:2026-07"]');
   await page.keyboard.press('Enter');
   assert.equal(await page.evaluate(() => document.activeElement.dataset.fk), 'mes:2026-07', 'foco mantido depois de re-renderizar');
   assert.equal((await kpis(page))[0], '17');
-  assert.equal(await page.getAttribute('.brow[data-fk="mes:2026-07"]', 'aria-pressed'), 'true');
+  assert.equal(await page.getAttribute('.cc-col[data-fk="mes:2026-07"]', 'aria-pressed'), 'true');
   await page.keyboard.press('Space');
   assert.equal((await kpis(page))[0], '19');
   await page.focus('.kpi[data-fk="kpi:exoc"]');

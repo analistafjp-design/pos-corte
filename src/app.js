@@ -753,8 +753,8 @@
 
   const VIEWS = [
     { k: 'geral', t: 'Visão geral', i: 'dash' },
-    { k: 'analitico', t: 'Analítico', i: 'table' },
     { k: 'bases', t: 'Bases de campo', i: 'layers' },
+    { k: 'analitico', t: 'Analítico', i: 'table' },
     { k: 'base', t: 'Arquivos e regras', i: 'book' },
   ];
   function montarNav() {
@@ -874,19 +874,6 @@
   window.addEventListener('beforeprint', montarCabecalhoImpressao);
 
   function renderSideFoot() {
-    const s = state.source;
-    const foot = $('#side-foot');
-    const okFiles = state.files.filter((f) => f.ok).length;
-    const rows = [];
-    if (s) {
-      rows.push(h('span', { class: 'pill' }, icon('folder', 14), h('strong', { text: s.kind === 'folder' ? 'Pasta' : 'Arquivos' }), ': ', s.name));
-      rows.push(h('span', { class: 'pill', text: s.mode === 'handle' ? 'Acesso contínuo (lê a cada 60 s)' : 'Seleção manual (sem monitoramento)' }));
-      if (state.files.length) rows.push(h('span', { class: 'pill', text: okFiles + ' de ' + state.files.length + ' ' + plural(state.files.length, 'arquivo válido', 'arquivos válidos') }));
-      if (state.lastCheck) rows.push(h('span', { class: 'pill', text: 'Verificado às ' + hhmmss(state.lastCheck) }));
-    } else {
-      rows.push(h('span', { class: 'pill', text: 'Nenhuma fonte conectada' }));
-    }
-    foot.replaceChildren(...rows);
     const sub = $('#top-sub');
     if (state.records.length && state.lastRead) {
       sub.textContent = fmtInt(state.records.length) + ' percorridas · atualizado às ' + hhmmss(state.lastRead);
@@ -978,28 +965,49 @@
     const max = Math.max(1, ...meses.map((m) => valorInd(m.sum, ind)));
     const empilhado = ind === 'atividades';
     const temOutros = vm.sum.outros > 0;
-    const linhas = meses.map((m) => {
+    const n = meses.length;
+    // gráfico de colunas com linha: colunas empilhadas (Exec/Exoc) ou simples e uma linha ligando os topos; os valores ficam sempre visíveis
+    const colunas = meses.map((m, i) => {
       const s = m.sum;
       const v = valorInd(s, ind);
-      const r = v / max;
       const partes = empilhado
         ? [{ n: 'Exec', v: s.exec, c: COR.exec }, { n: 'Exoc', v: s.exoc, c: COR.exoc }, { n: 'Outros status', v: s.outros, c: COR.outros }].filter((p) => p.v > 0)
         : [];
       const tipText = m.rotulo + '\n' + fmtInt(v) + ' ' + IND[ind].curto.toLowerCase() + (empilhado ? partes.map((p) => '\n' + p.n + ': ' + fmtInt(p.v)).join('') : '') + (ind !== 'atividades' ? '\n' + fmtInt(s.atividades) + ' atividades no mês' : '');
-      const barra = v === 0 ? null : empilhado
-        ? h('span', { class: 'bar', style: { '--r': Math.max(r, 0.006) } }, partes.map((p) => h('i', { style: { flex: p.v + ' 1 0px', '--c': p.c } })))
-        : h('span', { class: 'bar solid', style: { '--r': Math.max(r, 0.006), '--c': COR[ind] } });
-      const conteudo = [h('span', { class: 'brow-label', text: m.rotulo }), h('span', { class: 'track' }, barra, h('span', { class: 'bval', text: fmtInt(v) }))];
+      const alt = (v / max) * 100;
+      const pilha = v === 0 ? null : h('span', { class: 'cc-stack', style: { height: Math.max(alt, 0.8) + '%' } },
+        empilhado ? partes.map((p) => h('i', { style: { flex: p.v + ' 1 0px', '--c': p.c } })) : h('i', { style: { flex: '1 1 0px', '--c': COR[ind] } }));
+      const conteudo = [
+        h('span', { class: 'cc-plot' }, pilha),
+        h('span', { class: 'cc-label', text: m.rotulo }),
+      ];
       const aria = m.rotulo + ': ' + fmtInt(v) + ' ' + IND[ind].curto + (m.mes ? '. Filtrar este mês.' : '');
-      return m.mes
-        ? h('button', { class: 'brow' + (mesAtivo(m.mes) ? ' is-active' : ''), type: 'button', dataset: { fk: 'mes:' + m.mes }, 'data-tip': tipText, 'aria-label': aria, 'aria-pressed': mesAtivo(m.mes) ? 'true' : 'false', onclick: () => filtrarMes(m.mes) }, conteudo)
-        : h('div', { class: 'brow', 'data-tip': tipText, tabindex: 0, 'aria-label': aria }, conteudo);
+      const el = m.mes
+        ? h('button', { class: 'cc-col' + (mesAtivo(m.mes) ? ' is-active' : ''), type: 'button', dataset: { fk: 'mes:' + m.mes }, 'data-tip': tipText, 'aria-label': aria, 'aria-pressed': mesAtivo(m.mes) ? 'true' : 'false', onclick: () => filtrarMes(m.mes) }, conteudo)
+        : h('div', { class: 'cc-col', 'data-tip': tipText, tabindex: 0, 'aria-label': aria }, conteudo);
+      return { el, v, alt, x: ((i + 0.5) / n) * 100 };
     });
+    const pontos = colunas.map((c) => c.x + ',' + (100 - c.alt)).join(' ');
+    const grafico = h('div', { class: 'colchart', style: { minWidth: Math.max(n * 58, 240) + 'px' } },
+      h('div', { class: 'cc-area' },
+        h('div', { class: 'cc-grid', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
+        h('div', { class: 'cc-cols', style: { '--n': n } }, colunas.map((c) => c.el)),
+        h('div', { class: 'cc-over', 'aria-hidden': 'true' },
+          (() => {
+            const svg = document.createElementNS(SVG_NS, 'svg');
+            svg.setAttribute('viewBox', '0 0 100 100');
+            svg.setAttribute('preserveAspectRatio', 'none');
+            const pl = document.createElementNS(SVG_NS, n > 1 ? 'polyline' : 'g');
+            if (n > 1) pl.setAttribute('points', pontos);
+            svg.append(pl);
+            return svg;
+          })(),
+          colunas.map((c) => h('span', { class: 'cc-pt', style: { left: c.x + '%', bottom: c.alt + '%' } }, h('b', { class: 'cc-val num', text: fmtInt(c.v) }))))));
     return h('section', { class: 'card card-mensal', 'aria-labelledby': 'h-mensal' },
       h('div', { class: 'card-head' },
         h('div', null, h('h2', { id: 'h-mensal', text: 'Produção mensal — ' + IND[ind].rotulo }), h('p', { class: 'hint', text: 'Clique em um mês para filtrar. Valores por mês também na tabela abaixo.' }))),
       empilhado ? legenda([{ cor: COR.exec, t: 'Exec' }, { cor: COR.exoc, t: 'Exoc' }].concat(temOutros ? [{ cor: COR.outros, t: 'Outros status' }] : [])) : null,
-      meses.length ? h('div', { class: 'stack' }, linhas) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
+      meses.length ? h('div', { class: 'cc-wrap' }, grafico) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
       alertaIndisponivel(ind === 'atividades' ? 'exec' : ind)
     );
   }
