@@ -202,7 +202,7 @@ test('paginação de 50 linhas e exportação completa com 8.136 registros', { t
   const page = await abrir();
   await importar(page, fx('grande_sintetico.xlsx'));
   assert.deepEqual(await kpis(page), ['8.136', '7.461', '675', '230', '389', '2']);
-  await page.click('#nav-side button[data-view=analitico]');
+  await page.click('#nav-tabs button[data-view=analitico]');
   await page.waitForSelector('#an-tabela table');
   assert.equal(await page.locator('#an-tabela tbody tr').count(), 50);
   assert.match(await page.textContent('.pager'), /1–50 de 8\.136 · página 1 de 163/);
@@ -215,7 +215,7 @@ test('paginação de 50 linhas e exportação completa com 8.136 registros', { t
   const csv = fs.readFileSync(await dl.path(), 'utf8');
   assert.equal(csv.slice(1).split('\r\n').length, 8136 + 2, 'a exportação não se limita à página');
   // conferências automáticas
-  await page.click('#nav-side button[data-view=base]');
+  await page.click('#nav-tabs button[data-view=base]');
   const bad = await page.locator('.checks .bad').count();
   assert.equal(bad, 1, 'só a conferência de frentes mapeadas pode alertar (prefixo ZZ do arquivo sintético)');
   assert.match(await page.textContent('#view-base'), /Termos: conciliado com a aba Pós Corte com Termo \(389\)/);
@@ -265,7 +265,7 @@ test('nomes alternativos de colunas: cadastro na tela reprocessa os arquivos sel
   await importar(page, fx('leve_nomes_diferentes.xlsx'), false);
   await page.waitForFunction(() => /Nenhuma base válida/.test(document.querySelector('#status').textContent));
   assert.match(await statusTexto(page), /nenhuma aba tem as colunas esperadas/);
-  await page.click('#nav-side button[data-view=base]');
+  await page.click('#nav-tabs button[data-view=base]');
   if (!(await page.locator('#al-campo').isVisible())) await page.click('.avancado > summary');
   const alias = { recurso: 'Equipe', data: 'Dt', status: 'Situação', cidade: 'Município', valor: 'Débito', negociou: 'Negociou?', servAdic: 'Serviços adicionais' };
   for (const [campo, nome] of Object.entries(alias)) {
@@ -274,7 +274,7 @@ test('nomes alternativos de colunas: cadastro na tela reprocessa os arquivos sel
     await page.click('text=Adicionar e reler');
     await page.waitForFunction(() => !document.querySelector('#btn-atualizar svg.spin'));
   }
-  await page.click('#nav-side button[data-view=geral]');
+  await page.click('#nav-tabs button[data-view=geral]');
   await page.waitForSelector('.kpi-value');
   assert.deepEqual(await kpis(page), KPIS_PEQUENO);
   // persiste no navegador
@@ -448,7 +448,7 @@ test('lê só arquivo novo ou modificado: Atualizar, arquivo novo, arquivo alter
   assert.ok(await page.locator('.kpi-groups').isVisible());
 
   // limpar os dados gravados: a leitura seguinte volta a ler tudo
-  await page.click('#nav-side button[data-view=base]');
+  await page.click('#nav-tabs button[data-view=base]');
   await page.click('text=Limpar dados gravados');
   await page.waitForFunction(() => /Dados gravados apagados/.test(document.querySelector('#status')?.textContent || ''));
   await page.reload();
@@ -464,7 +464,7 @@ test('só Finalizada e Encerrada com Ocorrência contam; arquivo marcado "só co
   const stat = await page.evaluate(() => window.__poscorte.state.records.map((r) => r.status));
   assert.ok(stat.every((x) => x === 'Finalizada' || x === 'Encerrada com Ocorrência'));
   assert.ok(!(await page.evaluate(() => window.__poscorte.state.records.some((r) => ['24', '25'].includes(r.id)))), 'Cancelada e Paralisada não entram');
-  await page.click('#nav-side button[data-view=base]');
+  await page.click('#nav-tabs button[data-view=base]');
   assert.match(await page.textContent('#view-base'), /Fora de Finalizada e Encerrada com Ocorrência2 atividades/);
   await page.context().close();
 
@@ -474,7 +474,7 @@ test('só Finalizada e Encerrada com Ocorrência contam; arquivo marcado "só co
   await p2.setInputFiles('#inp-files', [fx('pasta_dedup', 'snapshot_antigo.xlsx'), fx('pasta_dedup', 'sub', 'snapshot_novo.xlsx')]);
   await p2.waitForSelector('.kpi-value');
   const statusDe = () => p2.evaluate((id) => window.__poscorte.state.records.find((r) => r.id === id).status, String(meta.status_alterado_id));
-  await p2.click('#nav-side button[data-view=base]');
+  await p2.click('#nav-tabs button[data-view=base]');
   const antes = await statusDe();
   // marca o arquivo que tinha a versão vencedora como complementar: passa a valer a versão do outro
   const linha = p2.locator('#view-base tbody tr', { hasText: 'snapshot_novo.xlsx' }).first();
@@ -496,7 +496,7 @@ test('somente os serviços dos 9 códigos são carregados e as colunas fora de u
   assert.ok(!ids.some((i) => ['20', '21', '22'].includes(i)));
   const chaves = await page.evaluate(() => Object.keys(window.__poscorte.state.records[0]).sort());
   assert.ok(!chaves.includes('filled'), 'sem auditoria das demais colunas');
-  await page.click('#nav-side button[data-view=base]');
+  await page.click('#nav-tabs button[data-view=base]');
   const t = await page.textContent('#view-base');
   assert.match(t, /Serviços considerados/);
   assert.match(t, /110010, 110011, 110012, 210010, 210011, 210012, 310010, 310011, 310012/);
@@ -579,7 +579,7 @@ for (const [w, h] of [[390, 844], [820, 1000], [1440, 900]]) {
     await importar(page, PEQUENO);
     for (const v of ['geral', 'analitico', 'base']) {
       await page.evaluate((v) => document.querySelector(`[data-view=${v}]:not([hidden])`) && null, v);
-      const nav = w >= 960 ? '#nav-side' : '#nav-bottom';
+      const nav = '#nav-tabs';
       await page.click(`${nav} button[data-view=${v}]`);
       await page.waitForTimeout(150);
       const sobra = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -589,7 +589,7 @@ for (const [w, h] of [[390, 844], [820, 1000], [1440, 900]]) {
       const naoCortada = await page.$$eval(`${nav} button`, (bs) => bs.every((b) => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth && r.width > 0; }));
       assert.ok(naoCortada, 'navegação cortada');
     }
-    await page.click(`${w >= 960 ? '#nav-side' : '#nav-bottom'} button[data-view=geral]`);
+    await page.click(`${'#nav-tabs'} button[data-view=geral]`);
     const caixas = await page.$$eval('.kpi', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }));
     for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
       const a = caixas[i], b = caixas[j];
@@ -694,14 +694,14 @@ test('exportar PDF: o botão abre a impressão da Visão geral e o layout de imp
   await page.click('#btn-pdf');
   assert.deepEqual(await page.evaluate(() => window.__prints), ['geral']);
   // estando em outra aba, volta para a Visão geral antes de imprimir
-  await page.click('#nav-side button[data-view=analitico]');
+  await page.click('#nav-tabs button[data-view=analitico]');
   await page.click('#btn-pdf');
   await page.waitForFunction(() => window.__prints.length === 2);
   assert.deepEqual(await page.evaluate(() => window.__prints), ['geral', 'geral']);
   // layout de impressão
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
   await page.emulateMedia({ media: 'print' });
-  for (const sel of ['.side', '.tabbar', '.actions', '.filters', '#nav-side', '#view-analitico', '.card-status']) {
+  for (const sel of ['.topbar', '.actions', '.filters', '#nav-tabs', '#view-analitico', '.card-status']) {
     assert.equal(await page.locator(sel).first().isVisible(), false, sel + ' oculto na impressão');
   }
   assert.ok(await page.locator('#print-head').isVisible());
@@ -717,10 +717,10 @@ test('exportar PDF: o botão abre a impressão da Visão geral e o layout de imp
 
 test('nome do painel e abas: Pós-Corte Interior; Visão geral, Analítico e Arquivos e regras', async () => {
   const page = await abrir();
-  assert.equal(await page.title(), 'Pós-Corte Interior · AnalistaFJP');
+  assert.equal(await page.title(), 'Pós-Corte Interior');
   assert.equal(await page.textContent('h1'), 'Pós-Corte Interior');
-  assert.match(await page.textContent('.brand-sub'), /Pós-Corte Interior/);
-  assert.deepEqual(await page.$$eval('#nav-side button', (bs) => bs.map((b) => b.textContent.trim())), ['Visão geral', 'Analítico', 'Arquivos e regras']);
+  assert.match(await page.textContent('.title h1'), /Pós-Corte Interior/);
+  assert.deepEqual(await page.$$eval('#nav-tabs button', (bs) => bs.map((b) => b.textContent.trim())), ['Visão geral', 'Analítico', 'Arquivos e regras']);
   await page.context().close();
 });
 
@@ -740,7 +740,7 @@ test('teclado: cartão e barras acessíveis; foco preservado após filtrar', asy
   assert.equal(await page.inputValue('#an-ind'), 'exoc');
   assert.match(await page.textContent('#an-contagem'), /^1 registro /);
   // dica ao focar por teclado
-  await page.click('#nav-side button[data-view=geral]');
+  await page.click('#nav-tabs button[data-view=geral]');
   await page.keyboard.press('Tab');
   semErros(page);
   await page.context().close();
@@ -749,7 +749,7 @@ test('teclado: cartão e barras acessíveis; foco preservado após filtrar', asy
 test('Base e regras: fonte, conferências, colunas, frentes e regras em português', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
-  await page.click('#nav-side button[data-view=base]');
+  await page.click('#nav-tabs button[data-view=base]');
   const t = await page.textContent('#view-base');
   for (const trecho of [
     'Fonte e arquivos lidos', 'Conferências automáticas', 'Colunas reconhecidas', 'Frentes de serviço',

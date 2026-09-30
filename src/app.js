@@ -1,5 +1,5 @@
 /*!
- * Acompanhamento de Pós Corte — interface (AnalistaFJP)
+ * Acompanhamento de Pós Corte — interface
  * Depende de window.PosCorte (core.js) e window.FRENTES_PADRAO (frentes-padrao.js).
  */
 (function () {
@@ -56,6 +56,7 @@
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const ICONS = {
+    arrow: '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>',
     folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
     refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
     upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
@@ -744,11 +745,9 @@
     { k: 'base', t: 'Arquivos e regras', i: 'book' },
   ];
   function montarNav() {
-    for (const [sel, cls] of [['#nav-side', ''], ['#nav-bottom', '']]) {
-      $(sel).replaceChildren(...VIEWS.map((v) => h('button', {
-        type: 'button', dataset: { view: v.k }, onclick: () => irPara(v.k), 'aria-current': state.view === v.k ? 'page' : null,
-      }, icon(v.i, 20), h('span', { text: v.t }))));
-    }
+    $('#nav-tabs').replaceChildren(...VIEWS.map((v) => h('button', {
+      type: 'button', dataset: { view: v.k }, onclick: () => irPara(v.k), 'aria-current': state.view === v.k ? 'page' : null,
+    }, h('span', { text: v.t }))));
   }
   function irPara(v) {
     state.view = v;
@@ -767,10 +766,12 @@
     const pasta = $('#btn-pasta');
     pasta.replaceChildren(icon('folder'), h('span', { text: s && s.kind === 'folder' ? 'Trocar pasta' : 'Conectar pasta' }));
     pasta.disabled = carregando;
+    pasta.className = 'btn' + (!s ? ' primary' : '');
     const at = $('#btn-atualizar');
     at.replaceChildren(icon('refresh'), h('span', { text: 'Atualizar' }));
     at.querySelector('svg').classList.toggle('spin', carregando);
     at.disabled = carregando;
+    at.className = 'btn' + (s ? ' primary' : '');
     const im = $('#btn-importar');
     im.replaceChildren(icon('upload'), h('span', { text: 'Importar Excel' }));
     im.disabled = carregando;
@@ -865,12 +866,12 @@
     const okFiles = state.files.filter((f) => f.ok).length;
     const rows = [];
     if (s) {
-      rows.push(h('div', null, h('strong', { text: s.kind === 'folder' ? 'Pasta' : 'Arquivos' }), ': ', s.name));
-      rows.push(h('div', { text: s.mode === 'handle' ? 'Acesso contínuo (lê a cada 60 s)' : 'Seleção manual (sem monitoramento)' }));
-      if (state.files.length) rows.push(h('div', { text: okFiles + ' de ' + state.files.length + ' ' + plural(state.files.length, 'arquivo válido', 'arquivos válidos') }));
-      if (state.lastCheck) rows.push(h('div', { text: 'Verificado às ' + hhmmss(state.lastCheck) }));
+      rows.push(h('span', { class: 'pill' }, icon('folder', 14), h('strong', { text: s.kind === 'folder' ? 'Pasta' : 'Arquivos' }), ': ', s.name));
+      rows.push(h('span', { class: 'pill', text: s.mode === 'handle' ? 'Acesso contínuo (lê a cada 60 s)' : 'Seleção manual (sem monitoramento)' }));
+      if (state.files.length) rows.push(h('span', { class: 'pill', text: okFiles + ' de ' + state.files.length + ' ' + plural(state.files.length, 'arquivo válido', 'arquivos válidos') }));
+      if (state.lastCheck) rows.push(h('span', { class: 'pill', text: 'Verificado às ' + hhmmss(state.lastCheck) }));
     } else {
-      rows.push(h('div', { text: 'Nenhuma fonte conectada' }));
+      rows.push(h('span', { class: 'pill', text: 'Nenhuma fonte conectada' }));
     }
     foot.replaceChildren(...rows);
     const sub = $('#top-sub');
@@ -912,11 +913,10 @@
     const cartao = (c) => {
       const indisp = (state.cobertura.indisponiveis || {})[c.ind || c.dep];
       const conteudo = [
-        h('span', { class: 'kpi-label', text: c.t }),
+        h('span', { class: 'kpi-label' }, h('i', { class: 'kdot' }), h('span', { text: c.t }), c.ind ? h('span', { class: 'kpi-go', 'aria-hidden': 'true' }, icon('arrow', 14)) : null),
         h('span', { class: 'kpi-value num', text: c.v }),
         c.sub.map((t) => h('span', { class: 'kpi-sub', text: t })),
         indisp && indisp.length ? h('span', { class: 'kpi-sub', text: '⚠ indisponível em ' + indisp.length + ' ' + plural(indisp.length, 'arquivo', 'arquivos') }) : null,
-        c.ind ? h('span', { class: 'kpi-go', text: 'Ver no analítico →' }) : null,
       ];
       const props = { class: 'kpi' + (c.ind ? '' : ' static'), style: { '--kc': c.cor }, dataset: { fk: 'kpi:' + c.k } };
       return c.ind
@@ -941,7 +941,9 @@
       { k: 'semDesdobro', ind: 'semDesdobro', t: 'Negociações Sem Desdobro', v: fmtInt(s.semDesdobro), cor: COR.semDesdobro, sub: ['Parte das negociações (' + fmtPct(s.semDesdobro, s.neg) + ')'] },
     ];
     return h('div', { class: 'kpi-groups' },
+      h('div', { class: 'grp-title', text: 'Resultado', 'aria-hidden': 'true' }),
       h('div', { class: 'kpis kpis-4', role: 'group', 'aria-label': 'Resultado' }, resultado.map(cartao)),
+      h('div', { class: 'grp-title', text: 'Qualidade', 'aria-hidden': 'true' }),
       h('div', { class: 'kpis kpis-5', role: 'group', 'aria-label': 'Qualidade' }, qualidade.map(cartao)));
   }
 
