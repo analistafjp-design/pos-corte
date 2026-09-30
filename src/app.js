@@ -1647,7 +1647,7 @@
     const pctTxt = av.pct == null ? '—' : (av.pct * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
     const campoData = h('input', { type: 'date', value: b.dataBase || '', 'aria-label': 'Data da base ' + b.nome, onchange: (e) => mudarDataBase(b, e.target.value) });
     const notas = [];
-    if (av.duplicadas) notas.push(fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'linha repetida', 'linhas repetidas') + ' na base (contadas uma vez).');
+    if (av.duplicadas) notas.push('Linhas repetidas: a base tem ' + fmtInt(b.linhas.length) + ' linhas, mas ' + fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'repete uma matrícula', 'repetem matrículas') + ' já listada' + (av.duplicadas === 1 ? '' : 's') + ' (o mesmo imóvel aparece mais de uma vez). ' + plural(av.duplicadas, 'Ela conta', 'Elas contam') + ' uma só vez: o total é de matrículas distintas (' + fmtInt(av.total) + ').');
     if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' matrícula (contam como faltantes).');
     if (!state.records.length) notas.push('As atividades realizadas ainda não foram carregadas: conecte a pasta para calcular o percorrido.');
     else if (av.percorridos === 0 && av.exemploBase) notas.push('Nenhuma matrícula achou atividade' + (b.dataBase ? ' a partir de ' + dataBR(b.dataBase) + ' (limpe a "Data da base" para considerar qualquer data)' : '') + '. Exemplo de matrícula na base: "' + av.exemploBase + '"; exemplo no realizado: "' + av.exemploRealizado + '".');
@@ -1664,7 +1664,7 @@
         h('div', { class: 'progresso-bar', role: 'img', 'aria-label': pctTxt + ' da base percorrido' }, h('span', { style: { width: Math.min(100, (av.pct || 0) * 100) + '%' } })),
         h('span', { class: 'progresso-txt num', text: pctTxt + ' percorrido' })),
       h('div', { class: 'minis minis-base' },
-        miniKpi('total', 'Total da base', fmtInt(av.total), 'itens distintos', COR.atividades),
+        miniKpi('total', 'Total da base', fmtInt(av.total), av.duplicadas ? 'matrículas distintas de ' + fmtInt(b.linhas.length) + ' linhas (' + fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'repetida', 'repetidas') + ')' : 'matrículas distintas', COR.atividades),
         miniKpi('percorrido', 'Percorrido', fmtInt(av.percorridos), 'Exec + Exoc desta base', COR.exec),
         miniKpi('faltam', 'Faltam percorrer', fmtInt(av.faltam), 'sobra da base', COR.exoc),
         miniKpi('subiu', 'Data que subiu', dataBR(ymdLocal(b.enviadoEm)), b.dataBase ? 'data da base: ' + dataBR(b.dataBase) : 'sem data da base', COR.atividades)),
@@ -1675,7 +1675,6 @@
         miniKpi('assertividade', 'Assertividade', fmtPctVal(r.assertividade), 'Termos ÷ Exec', COR.termos),
         miniKpi('neg', 'Negociações', fmtInt(r.neg), null, COR.neg),
         miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), 'Negociações ÷ Exec', COR.neg),
-        miniKpi('semDesdobro', 'Sem Desdobro', fmtInt(r.semDesdobro), null, COR.semDesdobro),
         miniKpi('equipes', 'Total de equipes', fmtInt(r.equipes), null, COR.atividades)),
       cartaoRecorte(r),
       notas.length ? h('p', { class: 'note', text: notas.join(' ') }) : null);
