@@ -1733,7 +1733,7 @@
           preenchidas++;
           nomes[cols[j]] = t;
           const h = normHeader(t);
-          if (BASE_PROTOCOLO.has(h)) achou = true;
+          if (BASE_MATRICULA.has(h)) achou = true;
         }
         if (!candidato && preenchidas >= 2) candidato = nomes.filter(Boolean);
         if (achou) {
@@ -1755,35 +1755,33 @@
       if (row.some((x) => trimStr(x) !== '')) linhas.push(row);
     }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo a base', fraction: f }); });
     if (!cabecalho && candidato) {
-      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
     }
     if (!cabecalho) {
-      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Cód. Protocolo Origem".');
+      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Matrícula".');
     }
-    if (colProtocolo < 0) {
-      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
+    if (colMatricula < 0) {
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
     }
     if (!linhas.length) throw new PcError('SEM_LINHAS', 'A aba "' + sheet.name + '" não tem linhas de dados abaixo do cabeçalho.');
     return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name, opts.ref), truncado, nomeProtocolo: colProtocolo >= 0 ? cabecalho.nomes[colProtocolo] : '', nomeMatricula: colMatricula >= 0 ? cabecalho.nomes[colMatricula] : '' };
   }
 
   /**
-   * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pelo
-   * Cód. Protocolo Origem (igual, ou só a parte antes da "/" quando a base não traz o sufixo), em qualquer data.
-   * De cada item vale a atividade mais recente. Linhas sem protocolo contam como faltantes.
+   * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pela Matrícula e
+   * só com os serviços de pós-corte (110010-110012, 210010-210012, 310010-310012). Havendo data da base, conta
+   * apenas atividade realizada a partir dela; sem data, qualquer data. De cada matrícula vale a atividade mais recente.
+   * Linhas sem matrícula contam como faltantes.
    */
-  function avaliarBase(base, records) {
-    const porProt = new Map();
-    const porPref = new Map();
-    const guarda = (mapa, k, r) => {
-      if (!k) return;
-      const a = mapa.get(k);
-      if (!a || (r.data || '') > (a.data || '')) mapa.set(k, r);
-    };
+  function avaliarBase(base, records, dataBase) {
+    const porMat = new Map();
     for (const r of records) {
-      const p = chaveNorm(r.protocolo);
-      guarda(porProt, p, r);
-      if (p.includes('/')) guarda(porPref, p.split('/')[0], r);
+      if (!CODIGOS_SERVICO.includes(codigoServico(r.codigo))) continue;
+      if (dataBase && !(r.data && r.data >= dataBase)) continue;
+      const m = chaveNorm(r.matricula);
+      if (!m) continue;
+      const a = porMat.get(m);
+      if (!a || (r.data || '') > (a.data || '')) porMat.set(m, r);
     }
     const vistos = new Set();
     const casadas = [];
@@ -1791,15 +1789,15 @@
     let duplicadas = 0;
     let semChave = 0;
     let exemploBase = '';
-    const cp = base.colProtocolo;
+    const cm = base.colMatricula;
     base.linhas.forEach((row, i) => {
-      const p = cp >= 0 ? chaveNorm(row[cp]) : '';
-      if (p) {
-        if (vistos.has(p)) { duplicadas++; return; }
-        vistos.add(p);
-        if (!exemploBase) exemploBase = p;
+      const m = cm >= 0 ? chaveNorm(row[cm]) : '';
+      if (m) {
+        if (vistos.has(m)) { duplicadas++; return; }
+        vistos.add(m);
+        if (!exemploBase) exemploBase = m;
       } else semChave++;
-      const r = p ? porProt.get(p) || (!p.includes('/') ? porPref.get(p) : null) || null : null;
+      const r = m ? porMat.get(m) || null : null;
       if (r) casadas.push(r); else pendentes.push(i);
     });
     const total = vistos.size + semChave;
@@ -1813,8 +1811,8 @@
       duplicadas,
       semChave,
       exemploBase,
-      exemploRealizado: records.length ? records[0].protocolo || '' : '',
-      chave: 'Cód. Protocolo Origem',
+      exemploRealizado: records.length ? String(records[0].matricula || '') : '',
+      chave: 'Matrícula',
     };
   }
 

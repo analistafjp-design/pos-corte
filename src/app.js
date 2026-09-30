@@ -1501,7 +1501,7 @@
       for (const b of lista || []) if (b && b.id && !ids.has(b.id)) state.bases.push(b);
       // bases gravadas antes do reconhecimento de datas sem ano no nome ("Base 18.09"): completa a data, uma vez
       for (const b of state.bases) {
-        if (b.dataBase) continue;
+        if (b.dataBase || b.dataManual) continue;
         const d = PC.dataDoNome(b.nome, new Date(b.enviadoEm));
         if (d) { b.dataBase = b.dataNome = d; idb.basePut(b.id, b).catch(() => {}); }
       }
@@ -1511,9 +1511,9 @@
 
   function avaliacaoDaBase(b) {
     if (state.baseEvalRecords !== state.records) { state.baseEval.clear(); state.baseEvalRecords = state.records; }
-    const k = b.id;
+    const k = b.id + '|' + (b.dataBase || '');
     let av = state.baseEval.get(k);
-    if (!av) { av = PC.avaliarBase(b, state.records); state.baseEval.set(k, av); }
+    if (!av) { av = PC.avaliarBase(b, state.records, b.dataBase || ''); state.baseEval.set(k, av); }
     return av;
   }
 
@@ -1583,6 +1583,14 @@
     renderTudo();
   }
 
+  async function mudarDataBase(b, iso) {
+    b.dataBase = iso || '';
+    b.dataManual = true;
+    state.baseEval.clear();
+    try { await idb.basePut(b.id, b); } catch (_) { /* ignora */ }
+    renderTudo();
+  }
+
   async function baixarFaltantes(b) {
     const av = avaliacaoDaBase(b);
     try {
@@ -1631,17 +1639,19 @@
     const av = avaliacaoDaBase(b);
     const r = av.resumo;
     const pctTxt = av.pct == null ? '—' : (av.pct * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    const campoData = h('input', { type: 'date', value: b.dataBase || '', 'aria-label': 'Data da base ' + b.nome, onchange: (e) => mudarDataBase(b, e.target.value) });
     const notas = [];
     if (av.duplicadas) notas.push(fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'linha repetida', 'linhas repetidas') + ' na base (contadas uma vez).');
-    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' protocolo (contam como faltantes).');
+    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' matrícula (contam como faltantes).');
     if (!state.records.length) notas.push('As atividades realizadas ainda não foram carregadas: conecte a pasta para calcular o percorrido.');
-    else if (av.percorridos === 0 && av.exemploBase) notas.push('Nenhum item achou atividade. Exemplo de protocolo na base: "' + av.exemploBase + '"; exemplo no realizado: "' + av.exemploRealizado + '". Se os formatos forem diferentes, me avise.');
+    else if (av.percorridos === 0 && av.exemploBase) notas.push('Nenhuma matrícula achou atividade' + (b.dataBase ? ' a partir de ' + dataBR(b.dataBase) + ' (limpe a "Data da base" para considerar qualquer data)' : '') + '. Exemplo de matrícula na base: "' + av.exemploBase + '"; exemplo no realizado: "' + av.exemploRealizado + '".');
     return h('article', { class: 'basecard', dataset: { baseId: b.id }, 'aria-label': 'Base ' + b.nome },
       h('div', { class: 'basehead' },
         h('div', { class: 'basetitle' },
           h('h3', { text: b.nome }),
-          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento pelo ' + av.chave })),
+          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento pela ' + av.chave + ' (serviços 110010-12, 210010-12 e 310010-12)' })),
         h('div', { class: 'basetools' },
+          h('label', { class: 'datefield' }, h('span', { text: 'Data da base' }), campoData),
           h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar' }, disabled: av.faltam === 0, onclick: () => baixarFaltantes(b) }, icon('download', 16), h('span', { text: 'Baixar o que falta (Excel)' })),
           h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Excluir a base ' + b.nome, title: 'Excluir esta base da lista', onclick: () => excluirBase(b) }, icon('trash', 16)))),
       h('div', { class: 'progresso' },
@@ -1688,9 +1698,9 @@
       h('div', { class: 'card-head' },
         h('div', null,
           h('h2', { text: 'Bases de campo' }),
-          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (precisam ter a coluna Cód. Protocolo Origem). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
+          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (precisam ter a coluna Matrícula). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
         subir),
-      h('p', { class: 'note', text: 'Cruzamento sempre pelo Cód. Protocolo Origem, com o histórico da base principal em qualquer data: o item está percorrido quando há atividade Exec ou Exoc com o mesmo protocolo (vale a mais recente). Linhas sem protocolo contam como faltantes. Total da base = protocolos distintos.' }));
+      h('p', { class: 'note', text: 'Cruzamento pela Matrícula com o histórico da base principal, sempre só com os serviços de pós-corte (110010/110011/110012, 210010/210011/210012 e 310010/310011/310012): a matrícula está percorrida quando há atividade Exec ou Exoc dela. Havendo "Data da base" (do nome do arquivo, editável), conta só atividade a partir dessa data; sem data, qualquer data. Vale a atividade mais recente. Linhas sem matrícula contam como faltantes. Total da base = matrículas distintas.' }));
     if (!state.bases.length) {
       root.replaceChildren(h('div', { class: 'stack' }, topo, h('section', { class: 'card empty' },
         h('h2', { text: 'Nenhuma base enviada ainda' }),

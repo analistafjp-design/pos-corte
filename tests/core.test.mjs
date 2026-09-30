@@ -682,27 +682,27 @@ test('bases de campo: leitura de todas as colunas e cabeçalho de chave', { skip
   await assert.rejects(PC.readBaseCampo(arquivo(fx('Base_Sem_Chave.xlsx'))), (e) => e.code === 'SEM_CHAVE');
 });
 
-test('bases de campo: cruzamento sempre pelo Cód. Protocolo Origem (qualquer data, prefixo, repetidas e sem protocolo)', () => {
-  const rec = (o) => ({ protocolo: '', matricula: '', data: '2026-09-10', recurso: 'E1', exec: true, exoc: false, neg: false, semDesdobro: false, termo: false, t11: false, t31: false, valor: null, recorte: false, recorteTipo: '', ...o });
+test('bases de campo: cruzamento pela Matrícula, só serviços de pós-corte, data da base, repetidas e sem matrícula', () => {
+  const rec = (o) => ({ codigo: '110010-PÓS CORTE', protocolo: '', matricula: '', data: '2026-09-10', recurso: 'E1', exec: true, exoc: false, neg: false, semDesdobro: false, termo: false, t11: false, t31: false, valor: null, recorte: false, recorteTipo: '', ...o });
   const records = [
-    rec({ protocolo: 'OS1', matricula: '1001', data: '2026-09-10' }),
-    rec({ protocolo: 'OS1', matricula: '1001', data: '2026-09-12', exec: false, exoc: true, recurso: 'E2' }), // mais recente
-    rec({ protocolo: 'OS2', matricula: '2002', data: '2026-01-05', neg: true, semDesdobro: true, termo: true, t11: true }),
-    rec({ protocolo: '1234/2025-1', matricula: '5005', data: '2026-06-01', recorte: true, recorteTipo: 'RAMAL' }),
-    rec({ protocolo: '', matricula: '4004' }),
+    rec({ matricula: '1001', data: '2026-09-10' }),
+    rec({ matricula: '1001', data: '2026-09-12', exec: false, exoc: true, recurso: 'E2' }), // mais recente
+    rec({ matricula: '2002', data: '2026-01-05', neg: true, semDesdobro: true, termo: true, t11: true }),
+    rec({ matricula: '5005', data: '2026-06-01', recorte: true, recorteTipo: 'RAMAL', codigo: '310012 - AVANÇADO' }),
+    rec({ matricula: '6006', codigo: '180001 - OUTRO SERVIÇO' }), // fora dos serviços de pós-corte: não amarra
+    rec({ matricula: '7007', codigo: '' }),
   ];
   const base = {
     colProtocolo: 0, colMatricula: 1,
-    linhas: [['OS1', '1001'], ['os1 ', '1001'], ['OS2', '2002'], ['OS3', '3003'], ['', '4004'], ['1234', '9999'], ['OS9', '2002']],
+    linhas: [['a', '1001'], ['b', ' 1001 '], ['c', '2002'], ['d', '3003'], ['e', ''], ['f', '5005'], ['g', '6006'], ['h', '7007']],
   };
-  const av = PC.avaliarBase(base, records);
-  assert.equal(av.duplicadas, 1, 'OS1 repetida (caixa e espaços não importam)');
-  assert.equal(av.semChave, 1, 'sem protocolo: a matrícula não é usada');
-  assert.equal(av.total, 6);
-  assert.equal(av.percorridos, 3, 'OS1, OS2 (qualquer data) e 1234 (pelo prefixo do protocolo)');
-  assert.deepEqual(av.pendentes, [3, 4, 6]);
-  assert.equal(av.faltam, 3);
-  assert.equal(av.resumo.exoc, 1, 'vale a atividade mais recente de OS1');
+  const av = PC.avaliarBase(base, records, '');
+  assert.equal(av.duplicadas, 1, '1001 repetida');
+  assert.equal(av.semChave, 1);
+  assert.equal(av.total, 7);
+  assert.equal(av.percorridos, 3, '1001, 2002 e 5005; 6006 e 7007 não são serviços de pós-corte');
+  assert.deepEqual(av.pendentes, [3, 4, 6, 7]);
+  assert.equal(av.resumo.exoc, 1, 'vale a atividade mais recente de 1001');
   assert.equal(av.resumo.exec, 2);
   assert.equal(av.resumo.neg, 1);
   assert.equal(av.resumo.semDesdobro, 1);
@@ -710,6 +710,10 @@ test('bases de campo: cruzamento sempre pelo Cód. Protocolo Origem (qualquer da
   assert.equal(av.resumo.recortes, 1);
   assert.deepEqual(av.resumo.recorteTipos, { RAMAL: 1 });
   assert.equal(av.resumo.equipes, 2);
+  // com data da base só conta atividade a partir dela
+  const com = PC.avaliarBase(base, records, '2026-09-01');
+  assert.equal(com.percorridos, 1, 'só 1001 (2002 e 5005 são anteriores)');
+  assert.deepEqual(com.pendentes, [2, 3, 4, 5, 6, 7]);
 });
 
 test('recorte: Fez o corte novamente = Sim e tipo por "Onde Foi Feito O Corte?"', { skip: !fs.existsSync(fx('pequeno_xlsxwriter.xlsx')) && 'gere as planilhas' }, async () => {

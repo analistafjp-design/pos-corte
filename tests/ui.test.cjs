@@ -769,9 +769,9 @@ test('bases de campo: subir base, cruzamento por protocolo, recortes, pastas por
   // base sem coluna de chave é recusada com mensagem clara
   await page.setInputFiles('#inp-bases', BASE_SEM_CHAVE);
   await page.waitForFunction(() => /Nenhuma base foi enviada/.test(document.querySelector('#status').textContent));
-  assert.match(await statusTexto(page), /precisa ter a coluna "Cód\. Protocolo Origem"/);
+  assert.match(await statusTexto(page), /precisa ter a coluna "Matrícula"/);
   assert.equal(await page.locator('.basecard').count(), 0);
-  // base válida: cruza pelo Cód. Protocolo Origem com o histórico (no realizado todas as atividades têm protocolo OS1)
+  // base válida: data 28/09/2026 (do nome) => cruza pela Matrícula só com o realizado a partir dela (ID 17, matrícula 1001)
   await page.setInputFiles('#inp-bases', BASE_CAMPO);
   await page.waitForSelector('.basecard');
   assert.equal(await page.textContent('.basecard h3'), 'Base_Campo_28_09_2026.xlsx');
@@ -791,7 +791,13 @@ test('bases de campo: subir base, cruzamento por protocolo, recortes, pastas por
   assert.equal(await page.locator('details.pasta-mes').count(), 1);
   assert.equal(await page.locator('details.pasta-mes details.pasta-dia').count(), 1);
   assert.match(await page.textContent('details.pasta-dia > summary'), new RegExp('Subiu em ' + hoje.replace(/\//g, '\\/')));
-  // card de recortes: sem recorte no histórico de OS1 => zero; depois marca um recorte no ramal e confere % e tipos
+  // trocar a data da base recalcula: a partir de 29/09 nada foi percorrido; limpar a data considera qualquer data
+  await page.fill('.basecard input[type=date]', '2026-09-29');
+  await page.waitForFunction(() => document.querySelector('.basecard [data-bk="percorrido"] .mini-value').textContent === '0');
+  assert.equal(await miniTxt(page, 'faltam'), '4');
+  await page.fill('.basecard input[type=date]', '2026-09-28');
+  await page.waitForFunction(() => document.querySelector('.basecard [data-bk="percorrido"] .mini-value').textContent === '1');
+  // card de recortes: sem recorte na atividade mais recente de 1001 => zero; depois marca um recorte no ramal e confere % e tipos
   assert.equal(await page.textContent('.basecard [data-rk=total]'), '0');
   assert.match(await page.textContent('.basecard [data-rk=pct]'), /0,0% do Exec/);
   await page.evaluate(() => {
