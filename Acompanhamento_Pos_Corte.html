@@ -4036,6 +4036,11 @@ window.FRENTES_PADRAO = [
     if (!state.records.length) { root.replaceChildren(estadoVazio()); return; }
     root.replaceChildren(h('div', { class: 'stack' },
       renderKpis(),
+      h('section', { class: 'card card-recorte', 'aria-labelledby': 'h-recorte' },
+        h('div', { class: 'card-head' }, h('div', null,
+          h('h2', { id: 'h-recorte', text: 'Recortes realizados' }),
+          h('p', { class: 'hint', text: 'Atividades com "Fez o corte novamente" = Sim, por tipo de corte (Onde Foi Feito O Corte?), no filtro atual. Total recorte ÷ Exec.' }))),
+        cartaoRecorte(vm.sum)),
       h('div', { class: 'grid-2' }, renderMensal(), renderStatusDist()),
       renderNegTermo(),
       renderCidades(),
