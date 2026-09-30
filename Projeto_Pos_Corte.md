@@ -1,7 +1,7 @@
-# Projeto — Acompanhamento de Pós Corte
+# Projeto — Pós-Corte Interior
 
 **Responsável:** Fábio Passos / AnalistaFJP  
-**Versão do documento:** 30/09/2026 (revisão 2)  
+**Versão do documento:** 30/09/2026 (revisão 3)  
 **Entrega:** painel HTML independente, documentação e prompt para continuidade.
 
 ## 1. Objetivo
@@ -102,13 +102,21 @@ A comparação de cabeçalhos ignora maiúsculas, acentos e pontuação.
 
 | Indicador | Regra |
 |---|---|
-| Atividades | Registros da aba principal **dos serviços considerados** (abaixo), após deduplicação e filtros. |
+| Percorrido (= Atividades) | Exec + Exoc: registros da aba principal **dos serviços e status considerados** (abaixo), após deduplicação e filtros. |
+| Assertividade | Termos aplicados ÷ Exec. Sem Exec no filtro, mostra "—". |
+| Efetividade | Negociações ÷ Exec. Sem Exec no filtro, mostra "—". |
+| Equipes que trabalharam | Recursos distintos com ao menos uma atividade no dia ou no período filtrado. Também mostra a média de equipes por dia e os dias com atividade. |
+| Produtividade por cidade | Percorrido ÷ equipe-dias, isto é, visitas por equipe por dia trabalhado (uma equipe trabalhando um dia = 1 equipe-dia). É uma definição adotada por mim, a confirmar. |
 | Finalizadas — Exec | `Status da Atividade = Finalizada`. |
-| Encerradas com Ocorrência — Exoc | `Status da Atividade = Encerrada com Ocorrência`. Outros status aparecem na distribuição dos status. |
+| Encerradas com Ocorrência — Exoc | `Status da Atividade = Encerrada com Ocorrência`. |
 | Negociações | `Negociou O Débito? = Sim` (espaços nas pontas e caixa ignorados). Códigos, texto livre, valor ou desdobro não criam negociação. |
 | Negociações Sem Desdobro | Negociação com `Serviço adicionais resposta` vazio, nulo ou só espaços. **Subconjunto** das negociações (não somar). |
 | Termos aplicados (irregularidade identificada) | `Serviço adicionais resposta` contém o código completo `110013` (Serviços) ou `310013` (VCG) em qualquer posição. |
 | Débito das negociações | Soma de `Valor Total dos Débitos` das negociações no filtro. É o **débito informado**; não é arrecadação nem valor pago. |
+
+### Status considerados
+
+**Só entram atividades Finalizada (Exec) ou Encerrada com Ocorrência (Exoc).** Cancelada, Paralisada, Pendente, Iniciada, Em Rota etc. não contam (Atividades = Exec + Exoc). Decisão de 30/09/2026: a pasta de 272 arquivos trazia 7.936 atividades desses outros status que a base de referência não tem. Como a deduplicação usa a versão mais nova, uma atividade cujo arquivo mais recente a traz como Cancelada (por exemplo) **deixa de contar**, mesmo que um arquivo antigo a traga como Finalizada; o painel informa quantas foram anuladas. Sem a coluna `Status da Atividade` o filtro não pode ser aplicado (o arquivo entra inteiro, com aviso, e Exec/Exoc ficam indisponíveis).
 
 ### Serviços considerados
 
@@ -153,7 +161,7 @@ Testado com versões da própria amostra: (a) só as 19 colunas em uma aba "Dado
 1. Ignorar arquivos temporários `~$`.
 2. Ordenar por data de modificação (do mais antigo ao mais recente).
 3. Chave principal: `ID da Atividade`; sem ID: `Cód. Protocolo Origem + Matrícula + Código/Descrição + Data + Recurso`.
-4. Chave repetida: prevalece o registro do arquivo modificado mais recentemente.
+4. Chave repetida: prevalece o registro do arquivo modificado mais recentemente. **Exceção — arquivo complementar:** em "Base e regras → Fonte e arquivos lidos" cada arquivo tem a opção "só completa". Um arquivo assim (normalmente a base completa de referência) só preenche o que não existe nos demais; em duplicidade a linha dele é descartada, qualquer que seja a data de modificação. A marcação é guardada no navegador pelo nome do arquivo e reprocessa sem reler os arquivos.
 5. A quantidade de duplicatas removidas é informada.
 
 A data de modificação é um critério operacional, não garante que o conteúdo seja o mais atual. Evite misturar snapshots conflitantes. Um registro que some de um snapshot novo continua contado se estiver em um mais antigo que permanece na pasta.
@@ -188,7 +196,11 @@ Exec + Exoc = 8.136 porque essa base só tem esses dois status; em outras bases 
 ## 10. Interface
 
 - Navegação: **Visão geral**, **Analítico**, **Base e regras** (menu lateral no computador; barra inferior no celular).
-- Cartões de atividades, Exec, Exoc, negociações (com débito informado), termos (com 110013/310013) e Sem Desdobro.
+- Cartões em destaque, em dois grupos: **Percorrido, Total de Exec, Total de Exoc, Equipes que trabalharam** e **Termos, Assertividade, Negociações, Efetividade, Sem Desdobro** (com o débito informado e 110013/310013). Assertividade, Efetividade e Equipes são informativos; os demais abrem o Analítico.
+- **Produtividade por cidade**: tabela com percorrido, Exec, Exoc, termos, assertividade, negociações, efetividade, equipes, equipe-dias e produtividade; clicar na cidade filtra.
+- **Exportar Excel**: baixa um `.xlsx` (sem bibliotecas externas) com as planilhas Resumo, Mensal, Produtividade por cidade, Equipes, Frentes e Registros do filtro atual. Textos iniciados por `=`, `+`, `-` ou `@` ficam como texto, não como fórmula.
+- **Exportar PDF**: abre a impressão do navegador com o layout da Visão geral em A4 paisagem (cerca de 3 páginas); escolha "Salvar como PDF". O PDF não é gerado por biblioteca própria.
+- Abas: **Visão geral**, **Analítico** (auditoria linha a linha, busca e CSV) e **Arquivos e regras** (arquivos lidos, prioridade "só completa", conferências, frentes sem mapeamento e, recolhidos, colunas/nomes alternativos e regras).
 - Produção mensal em barras horizontais (Exec/Exoc/Outros empilhados quando o indicador é Atividades), distribuição dos status, gráfico separado de negociações e termos com a mesma escala, tabela mensal e rankings por frente, cidade e equipe ("Mostrar todos").
 - Cores fixas por indicador (paleta validada quanto a daltonismo); valores sempre em texto ao lado das barras; dica com os valores ao passar o mouse ou focar por teclado.
 - Filtros valem para cartões, gráficos, analítico e exportação; o foco do teclado é mantido ao filtrar.
@@ -209,12 +221,12 @@ Exec + Exoc = 8.136 porque essa base só tem esses dois status; em outras bases 
 
 | O quê | Como | Resultado |
 |---|---|---|
-| Regras (termos, negociação, Sem Desdobro, Exec/Exoc), serviços dos 9 códigos, valores, datas, XML em pedaços de 1 caractere, frentes, deduplicação, filtros/rankings, CSV | 28 testes automatizados no Node (`npm run test:core`; 1 deles é opcional e usa a planilha real) | Passam |
+| Regras (termos, negociação, Sem Desdobro, Exec/Exoc), serviços dos 9 códigos, valores, datas, XML em pedaços de 1 caractere, frentes, deduplicação, filtros/rankings, CSV | 34 testes automatizados no Node (`npm run test:core`; 1 deles é opcional e usa a planilha real) | Passam |
 | Planilha de amostra real | Comparada a um cálculo **independente** em Python/openpyxl: totais, frente por frente, meses, débito e conciliação com as abas de Termos/Negociações | Idênticos |
 | Planilhas sintéticas de 296 colunas × 8.136 linhas (xlsxwriter com textos compartilhados e inline; openpyxl; datas 1900/1904/texto) | Node | Reproduzem 8.136 / 7.461 / 675 / 230 / 389 / 2 |
 | Arquivos inválidos: vazio, texto disfarçado, `.xls`/senha (OLE2), truncado, `.xlsb`, ZIP sem planilha, sem partes, sem cabeçalho, abas ambíguas, sem colunas de indicador, ZIP64 | Node e interface | Mensagem clara, sem virar base vazia |
 | Leitura incremental: Atualizar sem mudanças (0 arquivos lidos), arquivo novo (1), arquivo alterado (1), recarga da página (0, tudo reaproveitado do gravado), limpar dados gravados, pasta com mais de 40 arquivos | Chromium (Playwright) | Passam |
-| Interface: filtros, mês/ranking, chips, analítico, busca, paginação, CSV, lote misto, pasta manual, pasta com acesso contínuo (handle real do sistema de arquivos do navegador), arquivo novo/removido/corrompido/pasta vazia, leitura a cada 60 s (relógio simulado), aba oculta, permissão expirada, última pasta lembrada, nomes alternativos, teclado, layout 390/820/1440 px | 21 testes no Chromium 141 (Playwright) (`npm run test:ui`, incluindo os da linha acima) | Passam |
+| Interface: filtros, mês/ranking, chips, analítico, busca, paginação, CSV, lote misto, pasta manual, pasta com acesso contínuo (handle real do sistema de arquivos do navegador), arquivo novo/removido/corrompido/pasta vazia, leitura a cada 60 s (relógio simulado), aba oculta, permissão expirada, última pasta lembrada, nomes alternativos, teclado, layout 390/820/1440 px | 27 testes no Chromium 141 (Playwright) (`npm run test:ui`, incluindo os da linha acima) | Passam |
 | Sem chamadas de rede e sem execução dinâmica no HTML | Busca no arquivo gerado | Nenhuma |
 
 ### O que NÃO foi testado

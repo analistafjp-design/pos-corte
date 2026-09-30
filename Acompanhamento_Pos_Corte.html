@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Acompanhamento de Pós Corte · AnalistaFJP</title>
-<meta name="description" content="Painel de acompanhamento de Pós Corte: Exec, Exoc, negociações, termos aplicados e frentes de serviço, atualizado por arquivos Excel de uma pasta do OneDrive.">
+<title>Pós-Corte Interior · AnalistaFJP</title>
+<meta name="description" content="Pós-Corte Interior: percorrido, Exec, Exoc, assertividade, efetividade, equipes e produtividade por cidade, atualizado por arquivos Excel de uma pasta do OneDrive.">
 <style>
 /* Acompanhamento de Pós Corte — AnalistaFJP */
 :root {
@@ -257,7 +257,8 @@ tfoot td { font-weight: 700; background: #f7f7f4; }
 .rules p, .rules li { font-size: 14px; color: var(--ink); }
 .rules ul { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 3px; }
 .rules code, code { background: #eeede8; padding: 1px 5px; border-radius: 5px; font-size: 13px; }
-.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+.kv { display: grid; grid-template-columns: minmax(max-content, 34%) minmax(0, 1fr); gap: 4px 14px; font-size: 14px; }
+.kv dt { overflow-wrap: anywhere; }
 .kv dt { color: var(--ink-2); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 
@@ -287,7 +288,8 @@ tfoot td { font-weight: 700; background: #f7f7f4; }
 
 /* ---------- Responsivo ---------- */
 @media (min-width: 720px) {
-  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .kpis-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .main-col { padding: 20px 22px 96px; }
 }
@@ -302,12 +304,15 @@ tfoot td { font-weight: 700; background: #f7f7f4; }
   .grid-2 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
 }
 @media (min-width: 1280px) {
-  .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .grid-rank { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .kpi-value { font-size: 28px; }
 }
-@media (min-width: 760px) and (max-width: 1279px) {
+@media (min-width: 760px) {
   .grid-rank { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .kv { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .kv dd { margin-bottom: 8px; }
 }
 @media (max-width: 420px) {
   .brow, .mgroup { grid-template-columns: 62px minmax(0, 1fr); gap: 6px; }
@@ -317,10 +322,67 @@ tfoot td { font-weight: 700; background: #f7f7f4; }
 @media (forced-colors: active) {
   .bar > i, .bar.solid, .sw { forced-color-adjust: none; border: 1px solid CanvasText; }
 }
+.kpi-groups { display: grid; gap: 10px; }
+.kpi.static { cursor: default; }
+.kpi.static:hover { background: var(--surface); border-color: var(--ring); }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--brand-2); font-weight: 600; text-align: left; text-decoration: underline; text-decoration-color: transparent; }
+.linkbtn:hover { text-decoration-color: currentColor; }
+tr.is-active th, tr.is-active td { background: var(--brand-tint); }
+.prod { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; width: 100%; }
+.prodbar { display: inline-block; height: 8px; background: var(--atv); border-radius: 0 4px 4px 0; }
+.print-head { display: none; }
+
+/* ---------- Impressão / PDF: A4 paisagem com o painel da Visão geral ---------- */
+@page { size: A4 landscape; margin: 9mm; }
 @media print {
-  .side, .tabbar, .actions, .filters { display: none !important; }
-  body { background: #fff; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .side, .tabbar, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, .top, #view-analitico, #view-base, .expander { display: none !important; }
+  .app { display: block; }
+  .main-col { padding: 0; gap: 8px; }
+  body { background: #fff; font-size: 12px; }
+  .print-head { display: block; margin-bottom: 6px; }
+  .print-head h1 { font-size: 20px; }
+  .print-head p { color: var(--ink-2); font-size: 11.5px; margin-top: 2px; }
+  .card, .kpi { box-shadow: none; border: 1px solid #c9c8c0; break-inside: avoid; }
+  .kpi-value { font-size: 24px; }
+  .kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .grid-2 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .grid-rank { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .table-wrap { overflow: visible; max-height: none !important; }
+  table { font-size: 10.5px; }
+  th, td { padding: 4px 6px; }
+  .brow, .mgroup, .rrow, tr { break-inside: avoid; }
+  .card h2 { font-size: 14px; }
+  /* disposição: KPIs; produção mensal ao lado de negociações/termos; demais blocos em largura total */
+  #view-geral > .stack { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  #view-geral > .stack > * { grid-column: 1 / -1; }
+  #view-geral > .stack > .grid-2 { display: contents; }
+  #view-geral > .stack > .grid-2 > .card-mensal, #view-geral > .stack > .card-negtermo { grid-column: auto; }
+  .card-status { display: none !important; }
+  .main-col { zoom: 0.8; }
+  /* versão compacta para caber em poucas páginas */
+  .card { padding: 9px 11px; }
+  .card-head { margin-bottom: 6px; }
+  .kpi { padding: 8px 10px 7px; }
+  .kpi-label { min-height: 0; }
+  .stack { gap: 0; }
+  .brow, .mgroup { padding: 1px 4px; gap: 6px; }
+  .track { min-height: 13px; }
+  .bar { height: 11px; }
+  .mgroup .track { min-height: 9px; }
+  .mgroup .bar { height: 7px; }
+  .mgroup .tracks { gap: 1px; }
+  .bval { font-size: 11px; }
+  .legend { margin-bottom: 4px; }
+  .rrow { padding: 2px 6px; gap: 2px 8px; }
+  .rrow .rl, .rrow .rv { font-size: 11px; }
+  .rank-list { gap: 0; }
+  .note { margin-top: 6px; font-size: 11px; }
 }
+.avancado > summary { cursor: pointer; list-style-position: inside; padding: 2px 0; }
+.avancado[open] > summary { margin-bottom: 4px; }
+.avancado .card { box-shadow: none; }
 
 </style>
 </head>
@@ -330,7 +392,7 @@ tfoot td { font-weight: 700; background: #f7f7f4; }
   <aside class="side" aria-label="Menu lateral">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">FJP</div>
-      <div><div class="brand-name">AnalistaFJP</div><div class="brand-sub">Pós Corte</div></div>
+      <div><div class="brand-name">AnalistaFJP</div><div class="brand-sub">Pós-Corte Interior</div></div>
     </div>
     <nav class="nav" id="nav-side" aria-label="Seções"></nav>
     <div class="side-foot" id="side-foot"></div>
@@ -341,16 +403,19 @@ tfoot td { font-weight: 700; background: #f7f7f4; }
       <div class="top-title">
         <div class="brand-mark" aria-hidden="true">FJP</div>
         <div>
-          <h1>Acompanhamento de Pós Corte</h1>
-          <div class="sub" id="top-sub">Exec, Exoc, negociações, termos aplicados e frentes de serviço</div>
+          <h1>Pós-Corte Interior</h1>
+          <div class="sub" id="top-sub">Percorrido, Exec, Exoc, assertividade, efetividade e produtividade</div>
         </div>
       </div>
       <div class="actions">
         <button class="btn primary" id="btn-pasta" type="button"></button>
         <button class="btn" id="btn-atualizar" type="button"></button>
         <button class="btn" id="btn-importar" type="button"></button>
+        <button class="btn" id="btn-excel" type="button"></button>
+        <button class="btn" id="btn-pdf" type="button"></button>
       </div>
     </header>
+    <div class="print-head" id="print-head" aria-hidden="true"></div>
 
     <div id="status" aria-live="polite"></div>
 
@@ -623,7 +688,7 @@ window.FRENTES_PADRAO = [
   const isBlank = (v) => v == null || String(v).trim() === '';
 
   /** Versão das regras de leitura; muda quando o resultado gravado deixa de valer. */
-  const PARSER_VERSION = 2;
+  const PARSER_VERSION = 3;
 
   /** Serviços considerados (início de "Código/Descrição"); os demais não são carregados. */
   const CODIGOS_SERVICO = ['110010', '110011', '110012', '210010', '210011', '210012', '310010', '310011', '310012'];
@@ -1444,6 +1509,10 @@ window.FRENTES_PADRAO = [
     const codigos = opts.codigos === undefined ? new Set(CODIGOS_SERVICO) : opts.codigos; // null = sem filtro
     let foraServico = 0;
     let filtroAtivo = false;
+    const filtrarStatus = opts.somenteRealizadas !== false;
+    let statusAtivo = false;
+    let foraStatus = 0;
+    const descartados = [];
     const fv = new Array(FIELDS.length);
     const fk = new Array(FIELDS.length);
     const D1904 = ctx.date1904;
@@ -1467,6 +1536,7 @@ window.FRENTES_PADRAO = [
       headers = names;
       hasServ = found.has(FIELD_INDEX.servAdic);
       filtroAtivo = codigos !== null && found.has(FIELD_INDEX.codigo);
+      statusAtivo = filtrarStatus && found.has(FIELD_INDEX.status);
       for (const [fi, c] of found) fieldOfCol[c] = fi;
       return true;
     }
@@ -1565,7 +1635,16 @@ window.FRENTES_PADRAO = [
         }
         if (!any) { ignoredRows++; dataRows--; return; }
         if (filtroAtivo && !codigos.has(codigoServico(fv[FIELD_INDEX.codigo]))) { foraServico++; dataRows--; return; }
-        records.push(buildRecord());
+        const rec = buildRecord();
+        if (statusAtivo && !(rec.exec || rec.exoc)) {
+          // Só Finalizada e Encerrada com Ocorrência contam. Guarda apenas a identificação: se esta for a versão mais
+          // nova da atividade, ela anula a versão antiga (ex.: Finalizada -> Cancelada) na consolidação.
+          foraStatus++;
+          dataRows--;
+          descartados.push({ id: rec.id, protocolo: rec.protocolo, matricula: rec.matricula, codigo: rec.codigo, data: rec.data, dataTxt: rec.dataTxt, recurso: rec.recurso, linha: rec.linha, descartado: true });
+          return;
+        }
+        records.push(rec);
       },
       opts.onProgress,
       (c) => header === null || (c < 16384 && fieldOfCol[c] >= 0)
@@ -1644,6 +1723,9 @@ window.FRENTES_PADRAO = [
       ignoredRows,
       foraServico,
       filtroServico: filtroAtivo,
+      foraStatus,
+      filtroStatus: statusAtivo,
+      descartados,
       stats,
       warnings,
       missing: missing.map((f) => f.header),
@@ -1783,6 +1865,7 @@ window.FRENTES_PADRAO = [
       arquivo: opts.path || file.name,
       matcher,
       codigos: opts.codigos,
+      somenteRealizadas: opts.somenteRealizadas,
       onProgress: (f) => progress({ phase: `Lendo aba ${base.s.name}`, fraction: f }),
     });
     warnings.push(...baseRes.warnings);
@@ -1818,7 +1901,7 @@ window.FRENTES_PADRAO = [
       }
       try {
         progress({ phase: `Conferindo aba ${sh.name}`, fraction: 0 });
-        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher, codigos: opts.codigos });
+        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher, codigos: opts.codigos, somenteRealizadas: opts.somenteRealizadas });
         let naBase = 0;
         let regraOk = 0;
         let semChave = 0;
@@ -1858,6 +1941,9 @@ window.FRENTES_PADRAO = [
       audit: { linhas: baseRes.dataRows, linhasIgnoradas: baseRes.ignoredRows },
       foraServico: baseRes.foraServico,
       filtroServico: baseRes.filtroServico,
+      foraStatus: baseRes.foraStatus,
+      filtroStatus: baseRes.filtroStatus,
+      descartados: baseRes.descartados,
       stats: baseRes.stats,
       colunasNaoEncontradas: baseRes.missing,
     };
@@ -1935,29 +2021,40 @@ window.FRENTES_PADRAO = [
    * Consolida resultados de arquivos válidos: ordena por data de modificação,
    * remove duplicatas (o arquivo modificado mais recentemente prevalece).
    */
+  /**
+   * Ordem de precedência: arquivos "complementares" primeiro (menor prioridade: só completam o que não existe),
+   * depois os demais pela data de modificação (o mais recente vence).
+   */
+  function ordenarArquivos(files) {
+    return files.slice().sort((a, b) => (a.complementar ? 0 : 1) - (b.complementar ? 0 : 1) || a.lastModified - b.lastModified || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  }
+
   function consolidate(files) {
-    const ordered = files.slice().sort((a, b) => a.lastModified - b.lastModified || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    const ordered = ordenarArquivos(files);
     const byKey = new Map();
     let lidos = 0;
     let semChave = 0;
     for (const f of ordered) {
-      for (const r of f.records) {
-        lidos++;
+      for (const r of (f.descartados || []).concat(f.records)) {
         let k = recordKey(r);
         if (k === null) {
+          if (r.descartado) continue; // sem chave completa não há como anular outra versão
           // chave alternativa incompleta: a linha nunca é unida a outra
           semChave++;
           k = 'linha:' + f.path + '#' + r.linha;
         }
+        lidos++;
         byKey.set(k, r); // Map mantém a posição da primeira inserção; o valor é o mais recente
       }
     }
-    const records = [...byKey.values()];
-    const duplicatas = lidos - records.length;
+    const todos = [...byKey.values()];
+    const records = todos.filter((r) => !r.descartado);
+    const duplicatas = lidos - todos.length;
+    const anuladas = todos.length - records.length; // atividades cuja versão vencedora não é Finalizada/Encerrada com Ocorrência
     for (const r of records) r.busca = norm([r.matricula, r.protocolo, r.solicitante, r.id].join(' '));
     canonicalize(records, 'cidade');
     canonicalize(records, 'recurso');
-    return { records, lidos, duplicatas, semChave, ordemArquivos: ordered.map((f) => f.path) };
+    return { records, lidos, duplicatas, anuladas, semChave, ordemArquivos: ordered.map((f) => f.path) };
   }
 
   /* ------------------------------------------------------------------ */
@@ -1965,7 +2062,7 @@ window.FRENTES_PADRAO = [
   /* ------------------------------------------------------------------ */
 
   const INDICADORES = [
-    { key: 'atividades', rotulo: 'Atividades', curto: 'Atividades', test: () => true },
+    { key: 'atividades', rotulo: 'Percorrido (Exec + Exoc)', curto: 'Percorrido', test: () => true },
     { key: 'exec', rotulo: 'Finalizadas (Exec)', curto: 'Exec', test: (r) => r.exec },
     { key: 'exoc', rotulo: 'Encerradas com Ocorrência (Exoc)', curto: 'Exoc', test: (r) => r.exoc },
     { key: 'neg', rotulo: 'Negociações', curto: 'Negociações', test: (r) => r.neg },
@@ -1999,8 +2096,17 @@ window.FRENTES_PADRAO = [
     });
   }
 
+  /**
+   * Indicadores de um conjunto de registros. Percorrido = Exec + Exoc (só esses status são carregados).
+   * Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec (null quando não há Exec).
+   * Equipes = recursos distintos que trabalharam; equipeDias = pares (equipe, dia) com atividade;
+   * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
+   */
   function summarize(records) {
     const s = { atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0 };
+    const equipes = new Set();
+    const dias = new Set();
+    const equipeDias = new Set();
     for (const r of records) {
       s.atividades++;
       if (r.exec) s.exec++;
@@ -2018,8 +2124,35 @@ window.FRENTES_PADRAO = [
         if (r.t31) s.t31++;
         if (r.neg) s.negETermo++;
       }
+      if (r.recurso) {
+        equipes.add(r.recurso);
+        if (r.data) equipeDias.add(r.recurso + '|' + r.data);
+      }
+      if (r.data) dias.add(r.data);
     }
+    s.percorrido = s.atividades;
+    s.equipes = equipes.size;
+    s.dias = dias.size;
+    s.equipeDias = equipeDias.size;
+    s.assertividade = s.exec ? s.termos / s.exec : null;
+    s.efetividade = s.exec ? s.neg / s.exec : null;
+    s.produtividade = s.equipeDias ? s.atividades / s.equipeDias : null;
+    s.equipesPorDia = s.dias ? s.equipeDias / s.dias : null;
     return s;
+  }
+
+  /** Agrupa por um campo (cidade, recurso, frente) e calcula os indicadores de cada grupo, do maior para o menor percorrido. */
+  function agrupar(records, campo) {
+    const m = new Map();
+    for (const r of records) {
+      const k = r[campo] || (campo === 'recurso' ? '(sem recurso)' : campo === 'cidade' ? '(sem cidade)' : NAO_MAPEADA);
+      let g = m.get(k);
+      if (!g) m.set(k, (g = []));
+      g.push(r);
+    }
+    const out = [...m].map(([chave, recs]) => Object.assign({ chave }, summarize(recs), { frente: recs[0].frente || '' }));
+    out.sort((a, b) => b.atividades - a.atividades || a.chave.localeCompare(b.chave, 'pt-BR'));
+    return out;
   }
 
   function addMonth(ym, k) {
@@ -2164,10 +2297,300 @@ window.FRENTES_PADRAO = [
     parseDateText, parseDateValue, serialToParts, parseValor, fmtBR, isoToBR, isDateFormatCode,
     classify, recordKey,
     XmlStream, openZip, openWorkbook, readSpreadsheetFile, readRecordsSheet, makeMatcher,
-    buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate,
+    buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate, ordenarArquivos,
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
-    toCsv, csvCell,
+    toCsv, csvCell, agrupar,
   };
+});
+
+</script>
+<script>
+/*!
+ * Pós-Corte Interior — exportação para Excel (.xlsx gravado sem bibliotecas).
+ * Depende do núcleo (core.js): summarize, monthlySeries, agrupar e CSV_COLUMNS.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./core.js'));
+  else root.PosCorteExport = factory(root.PosCorte);
+})(typeof self !== 'undefined' ? self : this, function (PC) {
+  'use strict';
+
+  const { summarize, monthlySeries, agrupar, CSV_COLUMNS } = PC;
+  const pad2 = (n) => (n < 10 ? '0' + n : '' + n);
+
+  /* ------------------------------------------------------------------ */
+  /* ZIP                                                                 */
+  /* ------------------------------------------------------------------ */
+
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(u8) {
+    let c = 0xffffffff;
+    for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  async function deflateRaw(u8) {
+    if (typeof CompressionStream === 'undefined') return null;
+    const cs = new CompressionStream('deflate-raw');
+    const w = cs.writable.getWriter();
+    w.write(u8);
+    w.close();
+    return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+  }
+
+  /** Pacote ZIP: arquivos = [{ nome, dados: Uint8Array }]. */
+  async function criarZip(arquivos) {
+    const enc = new TextEncoder();
+    const partes = [];
+    const central = [];
+    let offset = 0;
+    for (const a of arquivos) {
+      const nome = enc.encode(a.nome);
+      const crc = crc32(a.dados);
+      let comp = await deflateRaw(a.dados);
+      let metodo = 8;
+      if (!comp || comp.length >= a.dados.length) { comp = a.dados; metodo = 0; }
+      const lh = new Uint8Array(30 + nome.length);
+      const lv = new DataView(lh.buffer);
+      lv.setUint32(0, 0x04034b50, true);
+      lv.setUint16(4, 20, true);
+      lv.setUint16(6, 0x0800, true); // nomes em UTF-8
+      lv.setUint16(8, metodo, true);
+      lv.setUint16(10, 0, true);
+      lv.setUint16(12, 0x21, true); // 01/01/1980
+      lv.setUint32(14, crc, true);
+      lv.setUint32(18, comp.length, true);
+      lv.setUint32(22, a.dados.length, true);
+      lv.setUint16(26, nome.length, true);
+      lh.set(nome, 30);
+      const ch = new Uint8Array(46 + nome.length);
+      const cv = new DataView(ch.buffer);
+      cv.setUint32(0, 0x02014b50, true);
+      cv.setUint16(4, 20, true);
+      cv.setUint16(6, 20, true);
+      cv.setUint16(8, 0x0800, true);
+      cv.setUint16(10, metodo, true);
+      cv.setUint16(12, 0, true);
+      cv.setUint16(14, 0x21, true);
+      cv.setUint32(16, crc, true);
+      cv.setUint32(20, comp.length, true);
+      cv.setUint32(24, a.dados.length, true);
+      cv.setUint16(28, nome.length, true);
+      cv.setUint32(42, offset, true);
+      ch.set(nome, 46);
+      partes.push(lh, comp);
+      central.push(ch);
+      offset += lh.length + comp.length;
+    }
+    const cdTam = central.reduce((n, c) => n + c.length, 0);
+    const eocd = new Uint8Array(22);
+    const ev = new DataView(eocd.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(8, arquivos.length, true);
+    ev.setUint16(10, arquivos.length, true);
+    ev.setUint32(12, cdTam, true);
+    ev.setUint32(16, offset, true);
+    const todos = partes.concat(central, [eocd]);
+    const out = new Uint8Array(todos.reduce((n, p) => n + p.length, 0));
+    let o = 0;
+    for (const p of todos) { out.set(p, o); o += p.length; }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* XLSX                                                                */
+  /* ------------------------------------------------------------------ */
+
+  const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const xmlEsc = (v) => String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // índices de estilo (cellXfs) definidos em stylesXml()
+  const ESTILO = { padrao: 0, cab: 1, int: 2, pct: 3, brl: 4, data: 5, dec: 6, titulo: 7, negrito: 8 };
+
+  function colXlsx(i) {
+    let s = '';
+    for (i += 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s;
+    return s;
+  }
+
+  function stylesXml() {
+    return (
+      XML_HEAD +
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<numFmts count="4"><numFmt numFmtId="164" formatCode="0.0%"/><numFmt numFmtId="165" formatCode="&quot;R$&quot;\\ #,##0.00"/><numFmt numFmtId="166" formatCode="dd/mm/yyyy"/><numFmt numFmtId="167" formatCode="0.0"/></numFmts>' +
+      '<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="15"/><name val="Calibri"/></font></fonts>' +
+      '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F5"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="9">' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+      '<xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+      '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+      '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+      '<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+      '<xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+      '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+      '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><\/styleSheet>'
+    );
+  }
+
+  /** Data ISO (aaaa-mm-dd) -> número de série do Excel. */
+  function isoParaSerial(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+    return m ? (Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 30)) / 86400000 : null;
+  }
+
+  /**
+   * Célula: texto, número (padrão), ou { v, f } com f em cab | int | pct | brl | data | dec | titulo | negrito.
+   * Textos são gravados como texto (nunca como fórmula), então "=..." não executa no Excel.
+   */
+  function celulaXlsx(ref, cel) {
+    if (cel == null || cel === '') return '';
+    let v = cel;
+    let f = 'padrao';
+    if (typeof cel === 'object') { v = cel.v; f = cel.f || 'padrao'; }
+    if (v == null || v === '' || (typeof v === 'number' && !isFinite(v))) return f === 'cab' ? `<c r="${ref}" s="${ESTILO.cab}"/>` : '';
+    const st = ESTILO[f] || 0;
+    if (typeof v === 'number') return `<c r="${ref}"${st ? ` s="${st}"` : ''}><v>${v}</v></c>`;
+    return `<c r="${ref}"${st ? ` s="${st}"` : ''} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`;
+  }
+
+  /** Planilha: { nome, colunas: [largura...], linhas: [[cel...]...], cabecalho?: nº da linha (1-based) a congelar/filtrar }. */
+  function sheetXml(sh) {
+    const nCols = Math.max(1, ...sh.linhas.map((l) => l.length));
+    let x = XML_HEAD + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0">';
+    if (sh.cabecalho) x += `<pane ySplit="${sh.cabecalho}" topLeftCell="A${sh.cabecalho + 1}" activePane="bottomLeft" state="frozen"/>`;
+    x += '</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>';
+    if (sh.colunas && sh.colunas.length) x += '<cols>' + sh.colunas.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols>';
+    x += '<sheetData>';
+    sh.linhas.forEach((lin, ri) => {
+      const cels = lin.map((c, ci) => celulaXlsx(colXlsx(ci) + (ri + 1), c)).join('');
+      x += `<row r="${ri + 1}">${cels}</row>`;
+    });
+    x += '</sheetData>';
+    if (sh.cabecalho) x += `<autoFilter ref="A${sh.cabecalho}:${colXlsx(nCols - 1)}${sh.linhas.length}"/>`;
+    return x + '</worksheet>';
+  }
+
+  /** Gera o arquivo .xlsx (Uint8Array) a partir de planilhas [{ nome, colunas, linhas, cabecalho }]. */
+  async function toXlsx(sheets) {
+    const enc = new TextEncoder();
+    const nomes = sheets.map((sh, i) => String(sh.nome).replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 31) || 'Planilha' + (i + 1));
+    const arqs = [];
+    arqs.push({ nome: '[Content_Types].xml', dados: enc.encode(XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>') });
+    arqs.push({ nome: '_rels/.rels', dados: enc.encode(XML_HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>') });
+    arqs.push({ nome: 'xl/workbook.xml', dados: enc.encode(XML_HEAD + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + nomes.map((n, i) => `<sheet name="${xmlEsc(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>') });
+    arqs.push({ nome: 'xl/_rels/workbook.xml.rels', dados: enc.encode(XML_HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') + `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`) });
+    arqs.push({ nome: 'xl/styles.xml', dados: enc.encode(stylesXml()) });
+    sheets.forEach((sh, i) => arqs.push({ nome: `xl/worksheets/sheet${i + 1}.xml`, dados: enc.encode(sheetXml(sh)) }));
+    return criarZip(arqs);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Conteúdo da exportação                                              */
+  /* ------------------------------------------------------------------ */
+
+  const pctCel = (v) => ({ v, f: 'pct' });
+  const intCel = (v) => ({ v, f: 'int' });
+  const decCel = (v) => ({ v, f: 'dec' });
+  const cab = (t) => ({ v: t, f: 'cab' });
+
+  /**
+   * Planilhas da exportação para Excel a partir dos registros já filtrados.
+   * `info`: { geradoEm: Date, periodo: 'texto', filtros: 'texto', fonte: 'texto' }.
+   */
+  function montarExport(records, info) {
+    info = info || {};
+    const s = summarize(records);
+    const dt = info.geradoEm instanceof Date ? info.geradoEm : new Date();
+    const dtTxt = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+    const resumo = {
+      nome: 'Resumo',
+      colunas: [38, 22, 70],
+      linhas: [
+        [{ v: 'Pós-Corte Interior', f: 'titulo' }],
+        [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
+        [{ v: 'Fonte', f: 'negrito' }, info.fonte || '—'],
+        [{ v: 'Período dos dados', f: 'negrito' }, info.periodo || '—'],
+        [{ v: 'Filtros aplicados', f: 'negrito' }, info.filtros || 'nenhum'],
+        [],
+        [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
+        ['Percorrido', intCel(s.percorrido), 'Exec + Exoc'],
+        ['Total de Exec', intCel(s.exec), 'Status da Atividade = Finalizada'],
+        ['Total de Exoc', intCel(s.exoc), 'Status da Atividade = Encerrada com Ocorrência'],
+        ['Termos aplicados', intCel(s.termos), 'Serviço adicionais resposta contém o código 110013 (Serviços) ou 310013 (VCG)'],
+        ['Assertividade', pctCel(s.assertividade), 'Termos ÷ Exec'],
+        ['Negociações', intCel(s.neg), 'Negociou O Débito? = Sim'],
+        ['Efetividade', pctCel(s.efetividade), 'Negociações ÷ Exec'],
+        ['Negociações Sem Desdobro', intCel(s.semDesdobro), 'Negociação com Serviço adicionais resposta vazio (subconjunto das negociações)'],
+        ['Débito informado nas negociações', { v: s.debito, f: 'brl' }, 'Soma de Valor Total dos Débitos das negociações; não é arrecadação nem valor pago'],
+        ['Equipes que trabalharam', intCel(s.equipes), 'Recursos distintos com ao menos uma atividade no período'],
+        ['Dias com atividade', intCel(s.dias), 'Datas distintas no período'],
+        ['Média de equipes por dia', decCel(s.equipesPorDia), 'Equipe-dias ÷ dias com atividade'],
+        ['Produtividade (visitas por equipe por dia)', decCel(s.produtividade), 'Percorrido ÷ equipe-dias (uma equipe trabalhando um dia = 1 equipe-dia)'],
+      ],
+    };
+
+    const mensal = {
+      nome: 'Mensal',
+      colunas: [12, 12, 10, 10, 10, 13, 13, 12, 13, 10, 8, 18],
+      cabecalho: 1,
+      linhas: [['Mês', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Sem Desdobro', 'Equipes', 'Dias', 'Débito informado'].map(cab)].concat(
+        monthlySeries(records).map((m) => [m.rotulo, intCel(m.sum.percorrido), intCel(m.sum.exec), intCel(m.sum.exoc), intCel(m.sum.termos), pctCel(m.sum.assertividade), intCel(m.sum.neg), pctCel(m.sum.efetividade), intCel(m.sum.semDesdobro), intCel(m.sum.equipes), intCel(m.sum.dias), { v: m.sum.debito, f: 'brl' }])
+      ),
+    };
+
+    const linhaGrupo = (g) => [g.chave, intCel(g.percorrido), intCel(g.exec), intCel(g.exoc), intCel(g.termos), pctCel(g.assertividade), intCel(g.neg), pctCel(g.efetividade), intCel(g.equipes), intCel(g.equipeDias), decCel(g.produtividade)];
+    const cidades = {
+      nome: 'Produtividade por cidade',
+      colunas: [30, 12, 10, 10, 10, 13, 13, 12, 10, 12, 16],
+      cabecalho: 1,
+      linhas: [['Cidade', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes', 'Equipe-dias', 'Produtividade (visitas por equipe-dia)'].map(cab)].concat(agrupar(records, 'cidade').map(linhaGrupo)),
+    };
+
+    const equipes = {
+      nome: 'Equipes',
+      colunas: [26, 26, 12, 10, 10, 10, 13, 16, 16],
+      cabecalho: 1,
+      linhas: [['Equipe (recurso)', 'Frente', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Negociações', 'Dias trabalhados', 'Produtividade (visitas por dia)'].map(cab)].concat(
+        agrupar(records, 'recurso').map((g) => [g.chave, g.frente, intCel(g.percorrido), intCel(g.exec), intCel(g.exoc), intCel(g.termos), intCel(g.neg), intCel(g.dias), decCel(g.dias ? g.percorrido / g.dias : null)])
+      ),
+    };
+
+    const frentes = {
+      nome: 'Frentes',
+      colunas: [30, 12, 10, 10, 10, 13, 13, 12, 10],
+      cabecalho: 1,
+      linhas: [['Frente', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes'].map(cab)].concat(
+        agrupar(records, 'frente').map((g) => [g.chave, intCel(g.percorrido), intCel(g.exec), intCel(g.exoc), intCel(g.termos), pctCel(g.assertividade), intCel(g.neg), pctCel(g.efetividade), intCel(g.equipes)])
+      ),
+    };
+
+    const colsReg = CSV_COLUMNS;
+    const registros = {
+      nome: 'Registros',
+      colunas: colsReg.map((c) => (c.header.length > 24 ? 30 : Math.max(12, c.header.length + 3))),
+      cabecalho: 1,
+      linhas: [colsReg.map((c) => cab(c.header))].concat(
+        records.map((r) => colsReg.map((c) => {
+          if (c.header === 'Data') return r.data ? { v: isoParaSerial(r.data), f: 'data' } : r.dataTxt;
+          if (c.header === 'Valor Total dos Débitos') return r.valor == null ? null : { v: r.valor, f: 'brl' };
+          return c.get(r);
+        }))
+      ),
+    };
+    return [resumo, mensal, cidades, equipes, frentes, registros];
+  }
+
+  return { toXlsx, montarExport, criarZip, crc32, isoParaSerial };
 });
 
 </script>
@@ -2293,7 +2716,10 @@ window.FRENTES_PADRAO = [
     aliases: {},
     ignoradosFormato: [],
     limiteConfirmado: false,
+    avancadoAberto: false,
+    exportando: false,
     leitura: { lidos: 0, salvos: 0, memoria: 0 },
+    complementares: new Set(),
   };
   let vm = null; // modelo de visualização calculado a partir dos filtros
   let anRows = []; // linhas do analítico (filtros + indicador + busca)
@@ -2305,6 +2731,14 @@ window.FRENTES_PADRAO = [
     state.aliases = JSON.parse(localStorage.getItem('poscorte.aliases') || '{}') || {};
   } catch (_) {
     state.aliases = {};
+  }
+  try {
+    state.complementares = new Set(JSON.parse(localStorage.getItem('poscorte.complementares') || '[]'));
+  } catch (_) {
+    state.complementares = new Set();
+  }
+  function salvarComplementares() {
+    try { localStorage.setItem('poscorte.complementares', JSON.stringify([...state.complementares])); } catch (_) { /* vale só nesta sessão */ }
   }
   function salvarAliases() {
     try { localStorage.setItem('poscorte.aliases', JSON.stringify(state.aliases)); } catch (_) { /* sem armazenamento: vale só nesta sessão */ }
@@ -2603,8 +3037,9 @@ window.FRENTES_PADRAO = [
       }
 
       state.lastSig = sig;
+      for (const r of ok) r.complementar = state.complementares.has(r.name);
       const cons = PC.consolidate(ok);
-      const ordemMod = ok.slice().sort((a, b) => a.lastModified - b.lastModified || (a.path < b.path ? -1 : 1));
+      const ordemMod = PC.ordenarArquivos(ok);
       state.frenteMap = PC.mergeFrentes(state.frenteMap, ordemMod.map((r) => ({ nome: r.name, frentes: r.frentes })));
       PC.applyFrentes(cons.records, state.frenteMap);
       state.records = cons.records;
@@ -2636,6 +3071,7 @@ window.FRENTES_PADRAO = [
         detail:
           (parcial ? fmtInt(cons.records.length) + ' atividades foram carregadas dos arquivos válidos. ' : '') +
           'Lidos do arquivo agora: ' + leitura.lidos + ' · reaproveitados (já lidos antes): ' + (leitura.salvos + leitura.memoria) + '. ' +
+          (cons.anuladas ? fmtInt(cons.anuladas) + ' ' + plural(cons.anuladas, 'atividade fora de Finalizada/Encerrada com Ocorrência', 'atividades fora de Finalizada/Encerrada com Ocorrência') + ' não contam. ' : '') +
           (cons.duplicatas ? fmtInt(cons.duplicatas) + ' ' + plural(cons.duplicatas, 'duplicata removida', 'duplicatas removidas') + '. ' : '') +
           (nAvisos ? nAvisos + ' ' + plural(nAvisos, 'aviso de leitura', 'avisos de leitura') + ' em "Base e regras". ' : ''),
         items: itens,
@@ -2711,6 +3147,15 @@ window.FRENTES_PADRAO = [
       setStatus({ kind: 'info', title: 'Selecione os arquivos novamente', detail: 'A importação manual não monitora os arquivos. Selecione-os de novo para reler.' });
       $('#inp-files').click();
     }
+  }
+
+  /** Reconsolida (ex.: arquivo marcado como complementar) sem invalidar o que já foi lido. */
+  async function reconsolidar() {
+    state.lastSig = '';
+    const s = state.source;
+    if (!s) return;
+    if (s.mode === 'handle') await lerPastaHandle(false);
+    else if (s.entries) await carregar(s.entries, {});
   }
 
   /** Reaplica as regras (ex.: novo nome alternativo de coluna) aos arquivos já selecionados. */
@@ -2893,7 +3338,7 @@ window.FRENTES_PADRAO = [
   const VIEWS = [
     { k: 'geral', t: 'Visão geral', i: 'dash' },
     { k: 'analitico', t: 'Analítico', i: 'table' },
-    { k: 'base', t: 'Base e regras', i: 'book' },
+    { k: 'base', t: 'Arquivos e regras', i: 'book' },
   ];
   function montarNav() {
     for (const [sel, cls] of [['#nav-side', ''], ['#nav-bottom', '']]) {
@@ -2926,10 +3371,90 @@ window.FRENTES_PADRAO = [
     const im = $('#btn-importar');
     im.replaceChildren(icon('upload'), h('span', { text: 'Importar Excel' }));
     im.disabled = carregando;
+    const ex = $('#btn-excel');
+    ex.replaceChildren(icon('download'), h('span', { text: 'Exportar Excel' }));
+    ex.disabled = carregando || !state.records.length || state.exportando;
+    ex.title = 'Baixa um arquivo .xlsx com o resumo, o mensal, cidades, equipes, frentes e os registros do filtro atual';
+    const pd = $('#btn-pdf');
+    pd.replaceChildren(icon('book'), h('span', { text: 'Exportar PDF' }));
+    pd.disabled = carregando || !state.records.length;
+    pd.title = 'Abre a impressão do navegador com o painel formatado; escolha "Salvar como PDF"';
   }
   $('#btn-pasta').addEventListener('click', conectarPasta);
   $('#btn-atualizar').addEventListener('click', atualizar);
   $('#btn-importar').addEventListener('click', () => $('#inp-files').click());
+  $('#btn-excel').addEventListener('click', () => exportarExcel());
+  $('#btn-pdf').addEventListener('click', () => exportarPdf());
+
+  /* ---------- Exportação: Excel e PDF ---------- */
+
+  function textoFiltros() {
+    const f = state.filters;
+    const br = PC.isoToBR;
+    const p = [];
+    if (f.from || f.to) p.push('Período: ' + (f.from ? br(f.from) : 'início') + ' a ' + (f.to ? br(f.to) : 'hoje'));
+    if (f.cidade) p.push('Cidade: ' + f.cidade);
+    if (f.frente) p.push('Frente: ' + f.frente);
+    if (f.equipe) p.push('Equipe: ' + f.equipe);
+    return p.join(' · ');
+  }
+  const nomeArquivoExport = (ext) => {
+    const d = new Date();
+    return 'pos-corte-interior_' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.' + ext;
+  };
+  function baixarBlob(blob, nome) {
+    const url = URL.createObjectURL(blob);
+    const a = h('a', { href: url, download: nome });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  /** Excel (.xlsx): resumo, mensal, produtividade por cidade, equipes, frentes e os registros do filtro atual. */
+  async function exportarExcel() {
+    if (!state.records.length || state.exportando) return;
+    state.exportando = true;
+    renderActions();
+    try {
+      const filtrados = anRowsTodos();
+      const sheets = window.PosCorteExport.montarExport(filtrados, {
+        geradoEm: new Date(),
+        fonte: state.source ? state.source.name : '',
+        periodo: vm.min ? PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max) : 'sem datas',
+        filtros: textoFiltros(),
+      });
+      const bytes = await window.PosCorteExport.toXlsx(sheets);
+      baixarBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nomeArquivoExport('xlsx'));
+    } catch (err) {
+      setStatus({ kind: 'error', title: 'Não foi possível gerar o Excel', detail: (err && err.message) || String(err) });
+    } finally {
+      state.exportando = false;
+      renderActions();
+    }
+  }
+
+  /** Registros dos filtros globais (sem indicador/busca do Analítico), do mais recente ao mais antigo. */
+  function anRowsTodos() {
+    const r = PC.filterRecords(state.records, state.filters);
+    return r.sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0) || a.recurso.localeCompare(b.recurso, 'pt-BR') || a.protocolo.localeCompare(b.protocolo, 'pt-BR'));
+  }
+
+  /** PDF: abre a impressão do navegador com o painel em página A4 paisagem (escolha "Salvar como PDF"). */
+  function exportarPdf() {
+    if (!state.records.length) return;
+    const voltar = () => { window.print(); };
+    if (state.view !== 'geral') { irPara('geral'); setTimeout(voltar, 150); } else voltar();
+  }
+  function montarCabecalhoImpressao() {
+    const d = new Date();
+    const f = textoFiltros();
+    $('#print-head').replaceChildren(
+      h('h1', { text: 'Pós-Corte Interior' }),
+      h('p', { text: 'Período dos dados: ' + (vm && vm.min ? PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max) : '—') + ' · Filtros: ' + (f || 'nenhum') + ' · Gerado em ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) })
+    );
+  }
+  window.addEventListener('beforeprint', montarCabecalhoImpressao);
 
   function renderSideFoot() {
     const s = state.source;
@@ -2947,9 +3472,9 @@ window.FRENTES_PADRAO = [
     foot.replaceChildren(...rows);
     const sub = $('#top-sub');
     if (state.records.length && state.lastRead) {
-      sub.textContent = fmtInt(state.records.length) + ' atividades · atualizado às ' + hhmmss(state.lastRead);
+      sub.textContent = fmtInt(state.records.length) + ' percorridas · atualizado às ' + hhmmss(state.lastRead);
     } else {
-      sub.textContent = 'Exec, Exoc, negociações, termos aplicados e frentes de serviço';
+      sub.textContent = 'Percorrido, Exec, Exoc, assertividade, efetividade e produtividade';
     }
   }
 
@@ -2974,30 +3499,47 @@ window.FRENTES_PADRAO = [
     return PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max);
   }
 
+  const fmtPctVal = (v) => (v == null ? '—' : (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%');
+  const fmtDec = (v) => (v == null ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+
   function renderKpis() {
     const s = vm.sum;
-    const cards = [
-      { k: 'atividades', t: 'Atividades', v: s.atividades, sub: [periodoTexto()] },
-      { k: 'exec', t: 'Finalizadas (Exec)', v: s.exec, sub: [fmtPct(s.exec, s.atividades) + ' das atividades'] },
-      { k: 'exoc', t: 'Encerradas com Ocorrência (Exoc)', v: s.exoc, sub: [fmtPct(s.exoc, s.atividades) + ' das atividades'] },
-      { k: 'neg', t: 'Negociações', v: s.neg, sub: ['Débito informado: ' + brl.format(s.debito)].concat(s.debitoNaoInformado ? [s.debitoNaoInformado + ' sem valor informado'] : []) },
-      { k: 'termos', t: 'Termos aplicados', v: s.termos, sub: ['Irregularidade identificada', '110013 Serviços: ' + fmtInt(s.t11) + ' · 310013 VCG: ' + fmtInt(s.t31)] },
-      { k: 'semDesdobro', t: 'Negociações Sem Desdobro', v: s.semDesdobro, sub: ['Parte das negociações (' + fmtPct(s.semDesdobro, s.neg) + ')'] },
-    ];
-    return h('div', { class: 'kpis' }, cards.map((c) => {
-      const indisp = (state.cobertura.indisponiveis || {})[c.k];
-      return h('button', {
-        class: 'kpi', type: 'button', style: { '--kc': COR[c.k] }, dataset: { fk: 'kpi:' + c.k },
-        'aria-label': c.t + ': ' + fmtInt(c.v) + '. Abrir no analítico.',
-        onclick: () => abrirAnalitico(c.k),
-      },
+    const mesmoDia = s.dias === 1;
+    // `ind`: indicador aberto no Analítico ao clicar; sem `ind` o cartão é só informativo.
+    const cartao = (c) => {
+      const indisp = (state.cobertura.indisponiveis || {})[c.ind || c.dep];
+      const conteudo = [
         h('span', { class: 'kpi-label', text: c.t }),
-        h('span', { class: 'kpi-value num', text: fmtInt(c.v) }),
+        h('span', { class: 'kpi-value num', text: c.v }),
         c.sub.map((t) => h('span', { class: 'kpi-sub', text: t })),
         indisp && indisp.length ? h('span', { class: 'kpi-sub', text: '⚠ indisponível em ' + indisp.length + ' ' + plural(indisp.length, 'arquivo', 'arquivos') }) : null,
-        h('span', { class: 'kpi-go', text: 'Ver no analítico →' })
-      );
-    }));
+        c.ind ? h('span', { class: 'kpi-go', text: 'Ver no analítico →' }) : null,
+      ];
+      const props = { class: 'kpi' + (c.ind ? '' : ' static'), style: { '--kc': c.cor }, dataset: { fk: 'kpi:' + c.k } };
+      return c.ind
+        ? h('button', Object.assign(props, { type: 'button', 'aria-label': c.t + ': ' + c.v + '. Abrir no analítico.', onclick: () => abrirAnalitico(c.ind) }), conteudo)
+        : h('div', Object.assign(props, { role: 'group', tabindex: 0, 'aria-label': c.t + ': ' + c.v + '. ' + c.tip, 'data-tip': c.t + '\n' + c.tip }), conteudo);
+    };
+    const resultado = [
+      { k: 'atividades', ind: 'atividades', t: 'Percorrido', v: fmtInt(s.percorrido), cor: COR.atividades, sub: ['Exec + Exoc', periodoTexto()] },
+      { k: 'exec', ind: 'exec', t: 'Total de Exec', v: fmtInt(s.exec), cor: COR.exec, sub: ['Finalizada', fmtPct(s.exec, s.percorrido) + ' do percorrido'] },
+      { k: 'exoc', ind: 'exoc', t: 'Total de Exoc', v: fmtInt(s.exoc), cor: COR.exoc, sub: ['Encerrada com Ocorrência', fmtPct(s.exoc, s.percorrido) + ' do percorrido'] },
+      {
+        k: 'equipes', t: 'Equipes que trabalharam', v: fmtInt(s.equipes), cor: COR.atividades,
+        sub: [mesmoDia ? 'no dia ' + PC.isoToBR(vm.min) : fmtDec(s.equipesPorDia) + ' por dia · ' + fmtInt(s.dias) + ' ' + plural(s.dias, 'dia', 'dias') + ' com atividade'],
+        tip: 'Equipes (Recurso) com ao menos uma atividade ' + (mesmoDia ? 'no dia' : 'no período') + ' filtrado.',
+      },
+    ];
+    const qualidade = [
+      { k: 'termos', ind: 'termos', t: 'Termos aplicados', v: fmtInt(s.termos), cor: COR.termos, sub: ['Irregularidade identificada', '110013 Serviços: ' + fmtInt(s.t11) + ' · 310013 VCG: ' + fmtInt(s.t31)] },
+      { k: 'assertividade', dep: 'termos', t: 'Assertividade', v: fmtPctVal(s.assertividade), cor: COR.termos, sub: ['Termos ÷ Exec', fmtInt(s.termos) + ' ÷ ' + fmtInt(s.exec)], tip: 'Termos aplicados divididos pelo total de Exec.' },
+      { k: 'neg', ind: 'neg', t: 'Negociações', v: fmtInt(s.neg), cor: COR.neg, sub: ['Débito informado: ' + brl.format(s.debito)].concat(s.debitoNaoInformado ? [s.debitoNaoInformado + ' sem valor informado'] : []) },
+      { k: 'efetividade', dep: 'neg', t: 'Efetividade', v: fmtPctVal(s.efetividade), cor: COR.neg, sub: ['Negociações ÷ Exec', fmtInt(s.neg) + ' ÷ ' + fmtInt(s.exec)], tip: 'Negociações divididas pelo total de Exec.' },
+      { k: 'semDesdobro', ind: 'semDesdobro', t: 'Negociações Sem Desdobro', v: fmtInt(s.semDesdobro), cor: COR.semDesdobro, sub: ['Parte das negociações (' + fmtPct(s.semDesdobro, s.neg) + ')'] },
+    ];
+    return h('div', { class: 'kpi-groups' },
+      h('div', { class: 'kpis kpis-4', role: 'group', 'aria-label': 'Resultado' }, resultado.map(cartao)),
+      h('div', { class: 'kpis kpis-5', role: 'group', 'aria-label': 'Qualidade' }, qualidade.map(cartao)));
   }
 
   function mesAtivo(mes) {
@@ -3035,7 +3577,7 @@ window.FRENTES_PADRAO = [
         ? h('button', { class: 'brow' + (mesAtivo(m.mes) ? ' is-active' : ''), type: 'button', dataset: { fk: 'mes:' + m.mes }, 'data-tip': tipText, 'aria-label': aria, 'aria-pressed': mesAtivo(m.mes) ? 'true' : 'false', onclick: () => filtrarMes(m.mes) }, conteudo)
         : h('div', { class: 'brow', 'data-tip': tipText, tabindex: 0, 'aria-label': aria }, conteudo);
     });
-    return h('section', { class: 'card', 'aria-labelledby': 'h-mensal' },
+    return h('section', { class: 'card card-mensal', 'aria-labelledby': 'h-mensal' },
       h('div', { class: 'card-head' },
         h('div', null, h('h2', { id: 'h-mensal', text: 'Produção mensal — ' + IND[ind].rotulo }), h('p', { class: 'hint', text: 'Clique em um mês para filtrar. Valores por mês também na tabela abaixo.' }))),
       empilhado ? legenda([{ cor: COR.exec, t: 'Exec' }, { cor: COR.exoc, t: 'Exoc' }].concat(temOutros ? [{ cor: COR.outros, t: 'Outros status' }] : [])) : null,
@@ -3049,7 +3591,7 @@ window.FRENTES_PADRAO = [
     const max = Math.max(1, ...vm.status.map((x) => x.value));
     const norm = PC.norm;
     const cor = (st) => (norm(st) === 'finalizada' ? COR.exec : norm(st) === 'encerrada com ocorrencia' ? COR.exoc : COR.outros);
-    return h('section', { class: 'card', 'aria-labelledby': 'h-status' },
+    return h('section', { class: 'card card-status', 'aria-labelledby': 'h-status' },
       h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-status', text: 'Distribuição dos status' }), h('p', { class: 'hint', text: 'Todos os status encontrados na base filtrada.' }))),
       h('div', { class: 'rank-list' }, vm.status.map((x) =>
         h('div', { class: 'rrow', 'data-tip': x.status + '\n' + fmtInt(x.value) + ' (' + fmtPct(x.value, total) + ')', tabindex: 0 },
@@ -3078,7 +3620,7 @@ window.FRENTES_PADRAO = [
         ? h('button', { class: 'mgroup' + (mesAtivo(m.mes) ? ' is-active' : ''), type: 'button', dataset: { fk: 'mesnt:' + m.mes }, 'data-tip': tipText, 'aria-label': aria, 'aria-pressed': mesAtivo(m.mes) ? 'true' : 'false', onclick: () => filtrarMes(m.mes) }, conteudo)
         : h('div', { class: 'mgroup', 'data-tip': tipText, tabindex: 0, 'aria-label': aria }, conteudo);
     });
-    return h('section', { class: 'card', 'aria-labelledby': 'h-nt' },
+    return h('section', { class: 'card card-negtermo', 'aria-labelledby': 'h-nt' },
       h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-nt', text: 'Negociações e termos aplicados por mês' }), h('p', { class: 'hint', text: 'Mesma escala nas duas séries. Uma atividade pode ter negociação e termo.' }))),
       legenda([{ cor: COR.neg, t: 'Negociações' }, { cor: COR.termos, t: 'Termos aplicados' }]),
       meses.length ? h('div', { class: 'stack' }, linhas) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
@@ -3088,19 +3630,48 @@ window.FRENTES_PADRAO = [
 
   function renderTabelaMensal() {
     const s = vm.sum;
-    const cab = ['Mês', 'Atividades', 'Exec', 'Exoc', 'Negociações', 'Sem Desdobro', 'Termos', 'Débito informado (negociações)'];
+    const cab = ['Mês', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Sem Desdobro', 'Equipes', 'Débito informado (negociações)'];
+    const linha = (x) => [fmtInt(x.percorrido), fmtInt(x.exec), fmtInt(x.exoc), fmtInt(x.termos), fmtPctVal(x.assertividade), fmtInt(x.neg), fmtPctVal(x.efetividade), fmtInt(x.semDesdobro), fmtInt(x.equipes), brl.format(x.debito)];
     return h('section', { class: 'card', 'aria-labelledby': 'h-tm' },
-      h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-tm', text: 'Valores mensais' }), h('p', { class: 'hint', text: 'Débito informado = soma de "Valor Total dos Débitos" das negociações. Não é arrecadação nem valor pago.' }))),
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-tm', text: 'Valores mensais' }), h('p', { class: 'hint', text: 'Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec; Equipes = recursos que trabalharam no mês. Débito informado = soma de "Valor Total dos Débitos" das negociações (não é arrecadação nem valor pago).' }))),
       h('div', { class: 'table-wrap' }, h('table', null,
         h('thead', null, h('tr', null, cab.map((c, i) => h('th', { scope: 'col', class: i ? 'n' : '', text: c })))),
         h('tbody', null, vm.months.map((m) => h('tr', null,
           h('th', { scope: 'row', text: m.rotulo }),
-          [m.sum.atividades, m.sum.exec, m.sum.exoc, m.sum.neg, m.sum.semDesdobro, m.sum.termos].map((v) => h('td', { class: 'n', text: fmtInt(v) })),
-          h('td', { class: 'n', text: brl.format(m.sum.debito) })))),
+          linha(m.sum).map((v) => h('td', { class: 'n', text: v }))))),
         h('tfoot', null, h('tr', null,
           h('td', { text: 'Total' }),
-          [s.atividades, s.exec, s.exoc, s.neg, s.semDesdobro, s.termos].map((v) => h('td', { class: 'n', text: fmtInt(v) })),
-          h('td', { class: 'n', text: brl.format(s.debito) })))))
+          linha(s).map((v) => h('td', { class: 'n', text: v }))))))
+    );
+  }
+
+  /** Produtividade por cidade: percorrido ÷ equipe-dias (visitas por equipe por dia trabalhado). */
+  function renderCidades() {
+    const linhas = PC.agrupar(vm.filtered, 'cidade');
+    const maxProd = Math.max(0.0001, ...linhas.map((g) => g.produtividade || 0));
+    const cab = ['Cidade', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes', 'Equipe-dias', 'Produtividade'];
+    return h('section', { class: 'card', 'aria-labelledby': 'h-cidades' },
+      h('div', { class: 'card-head' }, h('div', null,
+        h('h2', { id: 'h-cidades', text: 'Produtividade por cidade' }),
+        h('p', { class: 'hint', text: 'Produtividade = Percorrido ÷ equipe-dias, ou seja, visitas por equipe por dia trabalhado (uma equipe trabalhando um dia = 1 equipe-dia). Clique em uma cidade para filtrar.' }))),
+      linhas.length ? h('div', { class: 'table-wrap' }, h('table', null,
+        h('thead', null, h('tr', null, cab.map((c, i) => h('th', { scope: 'col', class: i ? 'n' : '', text: c })))),
+        h('tbody', null, linhas.map((g) => {
+          const ativo = state.filters.cidade === g.chave;
+          const filtravel = g.chave !== '(sem cidade)';
+          return h('tr', { class: ativo ? 'is-active' : '' },
+            h('th', { scope: 'row' }, filtravel
+              ? h('button', { class: 'linkbtn', type: 'button', dataset: { fk: 'cid:' + g.chave }, 'aria-pressed': ativo ? 'true' : 'false', 'aria-label': g.chave + ': ' + fmtDec(g.produtividade) + ' visitas por equipe-dia. Filtrar.', text: g.chave, onclick: () => setFiltro('cidade', g.chave) })
+              : g.chave),
+            [fmtInt(g.percorrido), fmtInt(g.exec), fmtInt(g.exoc), fmtInt(g.termos), fmtPctVal(g.assertividade), fmtInt(g.neg), fmtPctVal(g.efetividade), fmtInt(g.equipes), fmtInt(g.equipeDias)].map((v) => h('td', { class: 'n', text: v })),
+            h('td', { class: 'n', 'data-tip': g.chave + '\n' + fmtDec(g.produtividade) + ' visitas por equipe-dia\n' + fmtInt(g.percorrido) + ' percorridas em ' + fmtInt(g.equipeDias) + ' equipe-dias' },
+              h('span', { class: 'prod' }, h('span', { class: 'prodbar', style: { width: Math.max(((g.produtividade || 0) / maxProd) * 60, 2) + 'px' } }), h('strong', { text: fmtDec(g.produtividade) }))));
+        })),
+        h('tfoot', null, h('tr', null,
+          h('td', { text: 'Total' }),
+          [fmtInt(vm.sum.percorrido), fmtInt(vm.sum.exec), fmtInt(vm.sum.exoc), fmtInt(vm.sum.termos), fmtPctVal(vm.sum.assertividade), fmtInt(vm.sum.neg), fmtPctVal(vm.sum.efetividade), fmtInt(vm.sum.equipes), fmtInt(vm.sum.equipeDias)].map((v) => h('td', { class: 'n', text: v })),
+          h('td', { class: 'n', text: fmtDec(vm.sum.produtividade) }))))) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
+      h('p', { class: 'note', text: 'No total, "Equipes" conta cada equipe uma vez, mesmo que tenha trabalhado em mais de uma cidade; por isso a soma das cidades pode ser maior.' })
     );
   }
 
@@ -3128,7 +3699,7 @@ window.FRENTES_PADRAO = [
           : h('button', { class: 'rrow' + (ativo ? ' is-active' : ''), type: 'button', dataset: { fk: 'rank:' + dim + ':' + it.key }, 'data-tip': tipText, 'aria-pressed': ativo ? 'true' : 'false', 'aria-label': it.key + ': ' + fmtInt(it.value) + '. Filtrar.', onclick: () => setFiltro(filtroKey, it.key) }, cont);
       })) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
       items.length > LIMITE_RANK ? h('button', { class: 'btn small more', type: 'button', text: todos ? 'Mostrar menos' : 'Mostrar todos (' + items.length + ')', onclick: () => { state.showAll[dim] = !todos; renderGeral(); } }) : null,
-      dim === 'frente' && nMapeadas > 0 ? h('p', { class: 'note warn', text: fmtInt(nMapeadas) + ' ' + plural(nMapeadas, 'atividade sem frente mapeada', 'atividades sem frente mapeada') + ' (Recurso sem Nomenclatura na aba Frente de Serviço). Veja quais em "Base e regras".' }) : null
+      dim === 'frente' && nMapeadas > 0 ? h('p', { class: 'note warn', text: fmtInt(nMapeadas) + ' ' + plural(nMapeadas, 'atividade sem frente mapeada', 'atividades sem frente mapeada') + ' (Recurso sem Nomenclatura na aba Frente de Serviço). Veja quais em "Arquivos e regras".' }) : null
     );
   }
 
@@ -3159,10 +3730,10 @@ window.FRENTES_PADRAO = [
       renderKpis(),
       h('div', { class: 'grid-2' }, renderMensal(), renderStatusDist()),
       renderNegTermo(),
+      renderCidades(),
       renderTabelaMensal(),
       h('div', { class: 'grid-rank' },
         renderRank('Frente de serviço', 'frente', 'frente'),
-        renderRank('Cidade', 'cidade', 'cidade'),
         renderRank('Equipe (recurso)', 'recurso', 'equipe'))
     ));
   }
@@ -3312,7 +3883,7 @@ window.FRENTES_PADRAO = [
     const somaMeses = meses.reduce((a, m) => a + m.sum.atividades, 0);
     add(somaMeses === s.atividades, 'Soma dos meses = Atividades', fmtInt(somaMeses) + ' de ' + fmtInt(s.atividades));
     const cons = state.consolidado;
-    if (cons) add(cons.records.length + cons.duplicatas === cons.lidos, 'Registros lidos − duplicatas = Atividades', fmtInt(cons.lidos) + ' − ' + fmtInt(cons.duplicatas) + ' = ' + fmtInt(cons.records.length));
+    if (cons) add(cons.records.length + cons.duplicatas + cons.anuladas === cons.lidos, 'Linhas lidas − duplicatas − fora dos status = Atividades', fmtInt(cons.lidos) + ' − ' + fmtInt(cons.duplicatas) + ' − ' + fmtInt(cons.anuladas) + ' = ' + fmtInt(cons.records.length));
     const semData = recs.filter((r) => !r.data).length;
     add(semData === 0, 'Registros com data válida', semData ? fmtInt(semData) + ' sem data válida (saem de filtros de período)' : 'todos');
     const naoMap = recs.filter((r) => r.frente === PC.NAO_MAPEADA).length;
@@ -3326,17 +3897,18 @@ window.FRENTES_PADRAO = [
       .slice()
       .sort((a, b) => (a.ok && b.ok ? a.res.lastModified - b.res.lastModified : a.ok ? -1 : 1))
       .map((f) => {
-        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { class: 'n', text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
+        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
         const r = f.res;
         const conf = r.conferencia.map((c) => c.erro ? c.rotulo + ': ' + c.erro : c.rotulo + ': ' + (c.conciliado ? 'conciliado com a aba ' + c.aba + ' (' + fmtInt(c.linhas) + ')' : 'DIVERGE da aba ' + c.aba + ' (aba ' + fmtInt(c.linhas) + ' · cálculo ' + fmtInt(c.calculadoNaBase) + ' · na Base ' + fmtInt(c.naBase) + ')'));
         return h('tr', null,
           h('td', { text: r.path }), h('td', { class: 'num', text: fmtDataHora(r.lastModified) }), h('td', { class: 'num', text: fmtBytes(r.size) }),
-          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }), h('td', { class: 'n', text: r.filtroServico ? fmtInt(r.foraServico) : 'sem filtro' }),
+          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }), h('td', { class: 'n', text: (r.filtroServico ? fmtInt(r.foraServico) : 'sem filtro') + ' / ' + (r.filtroStatus ? fmtInt(r.foraStatus) : 'sem filtro') }),
+          h('td', null, h('label', { class: 'count-note' }, h('input', { type: 'checkbox', checked: state.complementares.has(r.name), 'aria-label': 'Arquivo complementar: ' + r.name, onchange: (e) => { if (e.target.checked) state.complementares.add(r.name); else state.complementares.delete(r.name); salvarComplementares(); reconsolidar(); } }), ' só completa')),
           h('td', null, tag('OK', 'exec'), ' ' + (ROTULO_ORIGEM[r.origem] || ''), r.warnings.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, r.warnings.map((w) => h('li', { text: w }))) : null,
             conf.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, conf.map((c) => h('li', { text: c }))) : null));
       });
     return h('div', { class: 'table-wrap' }, h('table', null,
-      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Atividades', 'Outros serviços ignorados', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 || i === 5 ? 'n' : '', text: c })))),
+      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Atividades', 'Ignoradas: outro serviço / outro status', 'Prioridade', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 || i === 5 ? 'n' : '', text: c })))),
       h('tbody', null, linhas)));
   }
 
@@ -3350,7 +3922,8 @@ window.FRENTES_PADRAO = [
     add('Última leitura com mudanças', state.lastRead ? fmtDataHora(state.lastRead.getTime()) : '—');
     add('Última verificação', state.lastCheck ? hhmmss(state.lastCheck) : '—');
     add('Arquivos válidos', state.files.length ? state.files.filter((f) => f.ok).length + ' de ' + state.files.length : '—');
-    add('Registros lidos / atividades', c ? fmtInt(c.lidos) + ' / ' + fmtInt(c.records.length) : '—');
+    add('Linhas lidas / atividades', c ? fmtInt(c.lidos) + ' / ' + fmtInt(c.records.length) : '—');
+    if (c) add('Fora de Finalizada e Encerrada com Ocorrência', fmtInt(c.anuladas) + ' atividades (Cancelada, Paralisada, Pendente etc. não contam)');
     add('Duplicatas removidas', c ? fmtInt(c.duplicatas) : '—');
     if (state.files.length) {
       const fora = state.files.filter((f) => f.ok).reduce((a, f) => a + (f.res.foraServico || 0), 0);
@@ -3370,7 +3943,7 @@ window.FRENTES_PADRAO = [
       state.ignoradosFormato.length ? h('p', { class: 'note warn', text: 'Ignorados (formato não suportado; salve como .xlsx): ' + state.ignoradosFormato.join(', ') }) : null,
       h('p', { class: 'note', text: 'Só arquivos novos ou modificados (nome, tamanho e data) são lidos; o resultado de cada arquivo fica gravado neste navegador, neste computador, e é reaproveitado ao recarregar a página. Nada é enviado para a internet.' }),
       h('button', { class: 'btn small', type: 'button', text: 'Limpar dados gravados', onclick: async () => { state.cache.clear(); state.lastSig = ''; try { await idb.arquivoLimpar(null); } catch (_) { /* ignora */ } setStatus({ kind: 'success', title: 'Dados gravados apagados', detail: 'Na próxima atualização todos os arquivos serão lidos de novo.' }); } }),
-      h('p', { class: 'note', text: 'A ordem dos arquivos para deduplicação é a data de modificação (do mais antigo ao mais recente). É um critério operacional, não garante que o conteúdo seja o mais atual: evite misturar versões conflitantes na pasta.' })
+      h('p', { class: 'note', text: 'Marque "só completa" no arquivo-base: ele só preenche o que não existe nos outros arquivos e, em duplicidade, é o outro que vale (descarta-se a linha do complementar), qualquer que seja a data. Sem marca, a ordem para deduplicação é a data de modificação (do mais antigo ao mais recente). É um critério operacional, não garante que o conteúdo seja o mais atual: evite misturar versões conflitantes na pasta.' })
     );
   }
 
@@ -3441,9 +4014,11 @@ window.FRENTES_PADRAO = [
     return h('section', { class: 'card rules' },
       h('div', { class: 'card-head' }, h('h2', { text: 'Regras dos indicadores' })),
       h('h3', { text: 'Atividades' }),
-      h('p', { text: 'Registros da aba Base após a deduplicação entre arquivos e os filtros escolhidos. As abas de Termos e Negociações são recortes da Base: não são somadas a ela (só conferidas).' }),
+      h('p', { text: 'Registros da aba Base dos serviços e dos status considerados (abaixo), após a deduplicação entre arquivos e os filtros escolhidos. As abas de Termos e Negociações são recortes da Base: não são somadas a ela (só conferidas).' }),
       h('h3', { text: 'Serviços considerados' }),
       h('p', null, 'Só entram atividades cujo ', h('code', { text: 'Código/Descrição' }), ' começa com um destes códigos: ', h('code', { text: PC.CODIGOS_SERVICO.join(', ') }), '. Linhas de outros serviços não são carregadas nem gravadas (o número ignorado aparece em "Fonte e arquivos lidos").'),
+      h('h3', { text: 'Status considerados' }),
+      h('p', null, 'Atividades = só as com status ', h('strong', { text: 'Finalizada' }), ' (Exec) ou ', h('strong', { text: 'Encerrada com Ocorrência' }), ' (Exoc). Cancelada, Paralisada, Pendente, Iniciada, Em Rota etc. não contam. Se a versão mais nova de uma atividade tiver outro status, ela deixa de contar, mesmo que um arquivo antigo a traga como Finalizada.'),
       h('h3', { text: 'Exec e Exoc' }),
       h('ul', null, li(h('strong', { text: 'Exec' }), ': Status da Atividade = ', h('code', { text: 'Finalizada' }), '.'), li(h('strong', { text: 'Exoc' }), ': Status da Atividade = ', h('code', { text: 'Encerrada com Ocorrência' }), '. Outros status aparecem na distribuição dos status.')),
       h('h3', { text: 'Negociações e Sem Desdobro' }),
@@ -3471,10 +4046,17 @@ window.FRENTES_PADRAO = [
     );
   }
 
+  /** Colunas reconhecidas, nomes alternativos e regras: uso ocasional, por isso ficam recolhidos. */
+  function avancado(aberto) {
+    return h('details', { class: 'card avancado', open: aberto || state.avancadoAberto, ontoggle: (e) => { state.avancadoAberto = e.target.open; } },
+      h('summary', null, h('strong', { text: 'Colunas reconhecidas, nomes alternativos e regras dos indicadores' })),
+      h('div', { class: 'stack', style: { marginTop: '12px' } }, cardColunas(), cardRegras()));
+  }
+
   function renderBase() {
     const root = $('#view-base');
     root.replaceChildren(h('div', { class: 'stack' },
-      state.records.length ? [cardFonte(), cardVerificacoes(), cardColunas(), cardFrentes(), cardRegras()] : [estadoVazio(), cardColunas(), cardRegras()]
+      state.records.length ? [cardFonte(), cardVerificacoes(), cardFrentes(), avancado()] : [estadoVazio(), avancado(true)]
     ));
   }
 

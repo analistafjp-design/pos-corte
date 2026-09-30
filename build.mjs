@@ -9,7 +9,7 @@ const ler = (f) => readFileSync(join(raiz, 'src', f), 'utf8');
 const seguro = (js) => js.replace(/<\/(script|style)/gi, '<\\/$1');
 
 let html = ler('template.html');
-const partes = { css: ler('styles.css'), frentes: ler('frentes-padrao.js'), core: ler('core.js'), app: ler('app.js') };
+const partes = { css: ler('styles.css'), frentes: ler('frentes-padrao.js'), core: ler('core.js'), exportar: ler('exportar.js'), app: ler('app.js') };
 for (const [k, v] of Object.entries(partes)) {
   const marca = `/*INLINE:${k}*/`;
   if (!html.includes(marca)) throw new Error('marcador ausente no template: ' + marca);

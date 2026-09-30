@@ -1,10 +1,10 @@
-# Prompt completo — Acompanhamento de Pós Corte
+# Prompt completo — Pós-Corte Interior
 
 Copie o texto abaixo para continuar o projeto. Anexe (ou aponte para o repositório) `Acompanhamento_Pos_Corte.html`, `Projeto_Pos_Corte.md` e, quando necessário, uma planilha de exemplo.
 
 ---
 
-Você é responsável por desenvolver e manter meu painel de **Acompanhamento de Pós Corte**, da identidade **AnalistaFJP**. Meu nome é **Fábio Passos**. Quero um sistema funcional, moderno, responsivo e fácil de utilizar, com indicadores confiáveis e atualização por arquivos Excel em uma pasta sincronizada do OneDrive. Responda sempre em português do Brasil.
+Você é responsável por desenvolver e manter meu painel **Pós-Corte Interior** (antes "Acompanhamento de Pós Corte"), da identidade **AnalistaFJP**. Meu nome é **Fábio Passos**. Quero um sistema funcional, moderno, responsivo e fácil de utilizar, com indicadores confiáveis e atualização por arquivos Excel em uma pasta sincronizada do OneDrive. Responda sempre em português do Brasil.
 
 ## Objetivo e forma de trabalho
 
@@ -69,7 +69,7 @@ A base só traz atividades cujo `Código/Descrição` começa com: 110010, 11001
 
 ## Regras obrigatórias dos indicadores
 
-- **Atividades:** registros da Base após deduplicação e filtros. Não use só a matrícula para identificar uma atividade (há matrículas com várias visitas).
+- **Atividades:** só atividades **Finalizada ou Encerrada com Ocorrência** (Cancelada, Paralisada, Pendente etc. não contam; a versão mais nova de uma atividade pode anulá-la), dos 9 serviços, após deduplicação e filtros. Não use só a matrícula para identificar uma atividade (há matrículas com várias visitas).
 - **Finalizadas — Exec:** `Status da Atividade = Finalizada`.
 - **Encerradas com Ocorrência — Exoc:** `Status da Atividade = Encerrada com Ocorrência`. Outros status devem aparecer, não ser escondidos.
 - **Negociações:** somente quando `Negociou O Débito?` for **Sim** (espaços externos e caixa normalizados). Não deduza negociação de códigos, texto livre, valor ou desdobro.
@@ -89,7 +89,7 @@ A base só traz atividades cujo `Código/Descrição` começa com: 110010, 11001
 1. Ignore arquivos `~$`.
 2. Ordene por data de modificação.
 3. Chave principal: `ID da Atividade`; sem ID: `Cód. Protocolo Origem + Matrícula + Código/Descrição + Data + Recurso` — se algum desses campos estiver vazio, a linha não é unida a nenhuma outra (e o painel avisa).
-4. Chave repetida: prevalece o arquivo modificado mais recentemente.
+4. Chave repetida: prevalece o arquivo modificado mais recentemente. Arquivos marcados como **complementares** ("só completa", normalmente a base completa de referência) têm a menor prioridade: só preenchem o que falta e são descartados em duplicidade, qualquer que seja a data.
 5. Informe as duplicatas removidas. Documente que a data de modificação é critério operacional, não garantia de atualidade.
 
 ## Atualização por OneDrive
@@ -112,6 +112,10 @@ Houve a falha `Cannot read properties of null (reading 'getElementsByTagName')`.
 
 Visual moderno e profissional, identidade AnalistaFJP; navegação Visão geral / Analítico / Base e regras; cartões de atividades, Exec, Exoc, negociações, termos e Sem Desdobro; barras horizontais com rótulos completos; produção mensal e rankings por frente, cidade e equipe; gráfico separado de negociações e termos com a mesma escala; tabela dos valores mensais; layout responsivo sem sobreposição; mouse, teclado e toque. Cores por indicador validadas para daltonismo (`validate_palette`). Não acrescente metas, previsões, arrecadação ou funcionalidades fictícias.
 
+## Indicadores em evidência e exportação
+
+Cartões: **Percorrido = Exec + Exoc**, **Total de Exec** (Finalizada), **Total de Exoc** (Encerrada com Ocorrência), **Equipes que trabalharam** (recursos distintos no dia ou período), **Assertividade = Termos ÷ Exec**, **Efetividade = Negociações ÷ Exec**, além de Termos, Negociações e Sem Desdobro. Tabela **Produtividade por cidade** (Percorrido ÷ equipe-dias; definição a confirmar comigo). Botões **Exportar Excel** (`.xlsx` gerado no navegador por `src/exportar.js`, várias planilhas, textos nunca como fórmula) e **Exportar PDF** (impressão do navegador em A4 paisagem, ~3 páginas).
+
 ## Filtros e analítico
 
 Data inicial/final, cidade, frente, equipe, seletor do indicador dos gráficos; "julho mostra só julho"; cliques em cards/meses/rankings previsíveis (clicar de novo limpa); busca por matrícula, protocolo/O.S., ID e nome; paginação de 50 sem reduzir a exportação; CSV UTF-8 com BOM, `;`, todas as linhas filtradas e proteção contra fórmulas. Mantenha todas as cidades da fonte; não aplique restrições de municípios de outros projetos.
@@ -120,7 +124,7 @@ Data inicial/final, cidade, frente, equipe, seletor do indicador dos gráficos; 
 
 Resultados de referência da amostra (calculados, não fixos): Atividades 8.136 · Exec 7.461 · Exoc 675 · Negociações 230 · Termos 389 (382 + 7) · Sem Desdobro 2 · débito informado R$ 252.027,39 · período 02/01/2026 a 28/09/2026.
 
-Rode `npm test` (28 testes no Node e 21 no Chromium) (gera planilhas sintéticas, roda o núcleo no Node e a interface no Chromium). Com a planilha real: `POSCORTE_AMOSTRA=/caminho/arquivo.xlsx npm run test:core`. Não afirme ter testado no Windows, no Edge ou no OneDrive real se isso não foi executado (até agora **não** foi).
+Rode `npm test` (34 testes no Node e 27 no Chromium) (gera planilhas sintéticas, roda o núcleo no Node e a interface no Chromium). Com a planilha real: `POSCORTE_AMOSTRA=/caminho/arquivo.xlsx npm run test:core`. Não afirme ter testado no Windows, no Edge ou no OneDrive real se isso não foi executado (até agora **não** foi).
 
 ## Entrega e continuidade
 
