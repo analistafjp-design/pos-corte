@@ -1632,6 +1632,166 @@
 
   /* ------------------------------------------------------------------ */
 
+
+  /* ------------------------------------------------------------------ */
+  /* Bases enviadas a campo: leitura, chave de cruzamento e avaliação     */
+  /* ------------------------------------------------------------------ */
+
+  const BASE_PROTOCOLO = new Set(['cod protocolo origem', 'codigo protocolo origem', 'protocolo origem', 'cod protocolo', 'codigo protocolo', 'protocolo', 'numero protocolo', 'n protocolo']);
+  const BASE_MATRICULA = new Set(['matricula', 'matricula cliente', 'matricula do cliente', 'cod matricula', 'codigo matricula', 'matr']);
+  const MAX_LINHAS_BASE = 300000;
+
+  /** Data (AAAA-MM-DD) contida no nome do arquivo, ou '' quando não há uma data reconhecível. */
+  function dataDoNome(nome) {
+    const n = String(nome || '').replace(/\.[A-Za-z0-9]+$/, '');
+    const tenta = (re, ordem) => {
+      const m = re.exec(n);
+      if (!m) return '';
+      let y, mo, d;
+      if (ordem === 'ymd') { y = +m[1]; mo = +m[2]; d = +m[3]; }
+      else { d = +m[1]; mo = +m[2]; y = +m[3]; if (y < 100) y += 2000; }
+      return validYMD(y, mo, d) ? y + '-' + pad2(mo) + '-' + pad2(d) : '';
+    };
+    return (
+      tenta(/(?:^|[^0-9])(20\d{2})[-_.\s](\d{1,2})[-_.\s](\d{1,2})(?![0-9])/, 'ymd') ||
+      tenta(/(?:^|[^0-9])(\d{1,2})[-_.\s](\d{1,2})[-_.\s](20\d{2})(?![0-9])/, 'dmy') ||
+      tenta(/(?:^|[^0-9])(\d{1,2})[-_.\s](\d{1,2})[-_.\s](\d{2})(?![0-9])/, 'dmy') ||
+      tenta(/(?:^|[^0-9])(20\d{2})(\d{2})(\d{2})(?![0-9])/, 'ymd') ||
+      tenta(/(?:^|[^0-9])(\d{2})(\d{2})(20\d{2})(?![0-9])/, 'dmy') ||
+      ''
+    );
+  }
+
+  /** Normaliza protocolo/matrícula para comparar (sem espaços, ".0" de número, zeros à esquerda e caixa). */
+  function chaveNorm(v) {
+    let t = String(v == null ? '' : v).trim().replace(/\.0+$/, '').replace(/\s+/g, '').toUpperCase();
+    if (/^\d+$/.test(t)) t = t.replace(/^0+(?=\d)/, '');
+    return t;
+  }
+
+  /**
+   * Lê uma base enviada a campo: todas as colunas da primeira aba (preferindo uma chamada "base").
+   * Devolve { aba, colunas, linhas, colProtocolo, colMatricula, dataNome }.
+   */
+  async function readBaseCampo(file, opts) {
+    opts = opts || {};
+    const wb = await openWorkbook(file);
+    const ctx = await wb.loadContext();
+    const visiveis = wb.sheets.filter((x) => x.state === 'visible');
+    const lista = visiveis.length ? visiveis : wb.sheets;
+    const sheet = lista.find((x) => /base/.test(norm(x.name))) || lista[0];
+    let cabecalho = null;
+    let colProtocolo = -1;
+    let colMatricula = -1;
+    let scanned = 0;
+    let truncado = false;
+    let candidato = null;
+    const linhas = [];
+    const fmt = (v, k) => {
+      if (k === 2) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}:\d{2}):\d{2})?$/.exec(v);
+        if (m) return m[3] + '/' + m[2] + '/' + m[1] + (m[4] && m[4] !== '00:00' ? ' ' + m[4] : '');
+      }
+      return v;
+    };
+    await scanSheet(wb, sheet, ctx, (n, cols, vals, kinds) => {
+      if (!cabecalho) {
+        scanned++;
+        const nomes = [];
+        let preenchidas = 0;
+        let achou = false;
+        for (let j = 0; j < n; j++) {
+          const t = trimStr(vals[j]);
+          if (!t) continue;
+          preenchidas++;
+          nomes[cols[j]] = t;
+          const h = normHeader(t);
+          if (BASE_PROTOCOLO.has(h) || BASE_MATRICULA.has(h)) achou = true;
+        }
+        if (!candidato && preenchidas >= 2) candidato = nomes.filter(Boolean);
+        if (achou) {
+          const usados = [];
+          for (let c = 0; c < nomes.length; c++) if (nomes[c] !== undefined) usados.push(c);
+          cabecalho = { cols: usados, nomes: usados.map((c) => nomes[c]) };
+          cabecalho.nomes.forEach((nm, i) => {
+            const h = normHeader(nm);
+            if (colProtocolo < 0 && BASE_PROTOCOLO.has(h)) colProtocolo = i;
+            if (colMatricula < 0 && BASE_MATRICULA.has(h)) colMatricula = i;
+          });
+        } else if (scanned >= MAX_HEADER_SCAN_ROWS) return true;
+        return;
+      }
+      if (linhas.length >= MAX_LINHAS_BASE) { truncado = true; return true; }
+      const porCol = new Map();
+      for (let j = 0; j < n; j++) porCol.set(cols[j], fmt(vals[j], kinds[j]));
+      const row = cabecalho.cols.map((c) => (porCol.has(c) ? porCol.get(c) : ''));
+      if (row.some((x) => trimStr(x) !== '')) linhas.push(row);
+    }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo a base', fraction: f }); });
+    if (!cabecalho && candidato) {
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
+    }
+    if (!cabecalho) {
+      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula".');
+    }
+    if (colProtocolo < 0 && colMatricula < 0) {
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
+    }
+    if (!linhas.length) throw new PcError('SEM_LINHAS', 'A aba "' + sheet.name + '" não tem linhas de dados abaixo do cabeçalho.');
+    return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name), truncado };
+  }
+
+  /**
+   * Cruza a base com as atividades realizadas (Exec/Exoc). Um item da base está percorrido quando existe atividade
+   * com o mesmo Cód. Protocolo Origem (ou, se a linha não tem protocolo, a mesma Matrícula), realizada a partir da data da base.
+   * Vale a atividade mais recente de cada item.
+   */
+  function avaliarBase(base, records, dataBase) {
+    const pos = (r) => !dataBase || (r.data && r.data >= dataBase);
+    const porProt = new Map();
+    const porMat = new Map();
+    const guarda = (mapa, k, r) => {
+      if (!k) return;
+      const a = mapa.get(k);
+      if (!a || (r.data || '') > (a.data || '')) mapa.set(k, r);
+    };
+    for (const r of records) {
+      if (!pos(r)) continue;
+      guarda(porProt, chaveNorm(r.protocolo), r);
+      guarda(porMat, chaveNorm(r.matricula), r);
+    }
+    const vistos = new Set();
+    const casadas = [];
+    const pendentes = [];
+    let duplicadas = 0;
+    let semChave = 0;
+    const cp = base.colProtocolo;
+    const cm = base.colMatricula;
+    base.linhas.forEach((row, i) => {
+      const p = cp >= 0 ? chaveNorm(row[cp]) : '';
+      const m = cm >= 0 ? chaveNorm(row[cm]) : '';
+      const item = p ? 'p:' + p : m ? 'm:' + m : '';
+      if (item) {
+        if (vistos.has(item)) { duplicadas++; return; }
+        vistos.add(item);
+      } else semChave++;
+      const r = p ? porProt.get(p) : m ? porMat.get(m) : null;
+      if (r) casadas.push(r); else pendentes.push(i);
+    });
+    const total = vistos.size + semChave;
+    const resumo = summarize(casadas);
+    return {
+      total,
+      percorridos: casadas.length,
+      faltam: pendentes.length,
+      pct: total ? casadas.length / total : null,
+      resumo,
+      pendentes,
+      duplicadas,
+      semChave,
+      chave: cp >= 0 ? 'Cód. Protocolo Origem' + (cm >= 0 ? ' (ou Matrícula quando o protocolo está vazio)' : '') : 'Matrícula',
+    };
+  }
+
   return {
     PcError, PARSER_VERSION, CODIGOS_SERVICO, codigoServico, FIELDS, INDICADORES, INDICADOR_BY_KEY, NAO_MAPEADA, SEM_DATA, CSV_COLUMNS,
     norm, normHeader, isBlank, decodeEntities, decodeText,
@@ -1641,5 +1801,6 @@
     buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate, ordenarArquivos,
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell, agrupar,
+    dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
   };
 });

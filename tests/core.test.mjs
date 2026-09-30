@@ -653,3 +653,70 @@ test('exportação para Excel: grande (8.136 linhas) gera arquivo válido e comp
   assert.ok(bytes.length < 6 * 1048576, 'compactado');
   assert.equal(EX.crc32(new TextEncoder().encode('123456789')), 0xcbf43926, 'CRC-32 padrão');
 });
+
+/* ---------- Bases de campo ---------- */
+
+test('bases de campo: data no nome do arquivo e chave normalizada', () => {
+  const d = PC.dataDoNome;
+  assert.equal(d('Base_Campo_28_09_2026.xlsx'), '2026-09-28');
+  assert.equal(d('Base 28-09-26.xlsx'), '2026-09-28');
+  assert.equal(d('base_2026-09-05.xlsx'), '2026-09-05');
+  assert.equal(d('Base_28092026.xlsx'), '2026-09-28');
+  assert.equal(d('base_20260928.xlsx'), '2026-09-28');
+  assert.equal(d('Base_31_02_2026.xlsx'), '', 'data inexistente');
+  assert.equal(d('Base sem data.xlsx'), '');
+  assert.equal(PC.chaveNorm(' 00123 '), '123');
+  assert.equal(PC.chaveNorm('123.0'), '123');
+  assert.equal(PC.chaveNorm('ab 12'), 'AB12');
+});
+
+test('bases de campo: leitura de todas as colunas e cabeçalho de chave', { skip: !fs.existsSync(fx('Base_Campo_28_09_2026.xlsx')) && 'gere as planilhas' }, async () => {
+  const b = await PC.readBaseCampo(arquivo(fx('Base_Campo_28_09_2026.xlsx')));
+  assert.deepEqual(b.colunas, ['Cód. Protocolo Origem', 'Matrícula', 'Cidade', 'Endereço', 'Data do corte']);
+  assert.equal(b.linhas.length, 5);
+  assert.equal(b.colProtocolo, 0);
+  assert.equal(b.colMatricula, 1);
+  assert.equal(b.dataNome, '2026-09-28');
+  assert.equal(b.linhas[0][4], '01/09/2026', 'datas em dd/mm/aaaa');
+  assert.equal(b.linhas[4][0], '', 'célula vazia mantém a posição da coluna');
+  await assert.rejects(PC.readBaseCampo(arquivo(fx('Base_Sem_Chave.xlsx'))), (e) => e.code === 'SEM_CHAVE');
+});
+
+test('bases de campo: cruzamento com o realizado (protocolo, matrícula, data da base, repetidas e sem chave)', () => {
+  const rec = (o) => ({ protocolo: '', matricula: '', data: '2026-09-10', recurso: 'E1', exec: true, exoc: false, neg: false, semDesdobro: false, termo: false, t11: false, t31: false, valor: null, ...o });
+  const records = [
+    rec({ protocolo: 'OS1', matricula: '1001', data: '2026-09-10' }),
+    rec({ protocolo: 'OS1', matricula: '1001', data: '2026-09-12', exec: false, exoc: true, recurso: 'E2' }), // mais recente
+    rec({ protocolo: 'OS2', matricula: '2002', data: '2026-08-01', neg: true, semDesdobro: true }),         // antes da data da base
+    rec({ protocolo: '', matricula: '4004', data: '2026-09-15', neg: true, termo: true, t11: true }),
+  ];
+  const base = {
+    colProtocolo: 0, colMatricula: 1,
+    linhas: [['OS1', '1001'], ['0OS1'.slice(1), '1001'], ['OS2', '2002'], ['', '4004'], ['OS3', '3003'], ['', '']],
+  };
+  const av = PC.avaliarBase(base, records, '2026-09-01');
+  assert.equal(av.duplicadas, 1, 'OS1 repetida');
+  assert.equal(av.semChave, 1);
+  assert.equal(av.total, 5, 'OS1, OS2, matrícula 4004, OS3 e a linha sem chave');
+  assert.equal(av.percorridos, 2, 'OS1 (atividade mais recente) e matrícula 4004; OS2 foi antes da base');
+  assert.equal(av.faltam, 3);
+  assert.deepEqual(av.pendentes, [2, 4, 5]);
+  assert.equal(av.resumo.exoc, 1, 'vale a atividade mais recente de OS1');
+  assert.equal(av.resumo.exec, 1);
+  assert.equal(av.resumo.termos, 1);
+  assert.equal(av.resumo.equipes, 2);
+  const sem = PC.avaliarBase(base, records, '');
+  assert.equal(sem.percorridos, 3, 'sem data da base, OS2 também conta');
+  assert.equal(sem.resumo.neg, 2);
+  assert.equal(sem.resumo.semDesdobro, 1);
+});
+
+test('bases de campo: Excel com o resumo e as linhas que faltam', async () => {
+  const base = { colunas: ['Cód. Protocolo Origem', 'Cidade'], linhas: [['OS1', 'A'], ['OS2', 'B']], colProtocolo: 0, colMatricula: -1 };
+  const av = PC.avaliarBase(base, [], '');
+  const sheets = EX.montarExportBase(base, av, { nome: 'b.xlsx', enviadoEm: '30/09/2026 10:00', dataBase: '28/09/2026' });
+  assert.equal(sheets[1].nome, 'Faltam percorrer');
+  assert.equal(sheets[1].linhas.length, 3, 'cabeçalho + 2 linhas');
+  const bytes = await EX.toXlsx(sheets);
+  assert.ok(bytes.length > 500);
+});

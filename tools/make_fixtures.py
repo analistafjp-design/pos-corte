@@ -419,11 +419,43 @@ def montar_pequeno(out):
     return names, rows
 
 
+
+def montar_bases(out):
+    """Bases enviadas a campo (páginas "Bases de campo"): protocolo/matrícula + colunas livres."""
+    import xlsxwriter
+    cab_ = ["Cód. Protocolo Origem", "Matrícula", "Cidade", "Endereço", "Data do corte"]
+    linhas = [
+        ["OS1", "1001", "Cidade Norte", "Rua A, 10", date(2026, 9, 1)],
+        ["OS2", "2002", "Cidade Norte", "Rua B, 20", date(2026, 9, 1)],
+        ["OS3", "3003", "Cidade Sul", "Rua C, 30", date(2026, 9, 2)],
+        ["OS2", "2002", "Cidade Norte", "Rua B, 20", date(2026, 9, 1)],  # repetida
+        ["", "", "Cidade Sul", "Sem chave", date(2026, 9, 2)],
+    ]
+    wb = xlsxwriter.Workbook(str(out / "Base_Campo_28_09_2026.xlsx"))
+    fmt = wb.add_format({"num_format": "dd/mm/yyyy"})
+    ws = wb.add_worksheet("Base")
+    for c, n in enumerate(cab_):
+        ws.write(0, c, n)
+    for r, l in enumerate(linhas, start=1):
+        for c, v in enumerate(l):
+            if isinstance(v, date):
+                ws.write_datetime(r, c, datetime(v.year, v.month, v.day), fmt)
+            elif v != "":
+                ws.write(r, c, v)
+    wb.close()
+    wb = xlsxwriter.Workbook(str(out / "Base_Sem_Chave.xlsx"))
+    ws = wb.add_worksheet("Base")
+    for c, n in enumerate(["Cidade", "Endereço"]):
+        ws.write(0, c, n)
+    ws.write(1, 0, "X"); ws.write(1, 1, "Y")
+    wb.close()
+
 def main():
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "tests/fixtures")
     out.mkdir(parents=True, exist_ok=True)
     small_only = "--small-only" in sys.argv
 
+    montar_bases(out)
     # ---- pequeno (casos-limite) ----
     names, rows = montar_pequeno(out)
     rec = recortes(rows)

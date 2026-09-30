@@ -283,5 +283,48 @@
     return [resumo, mensal, cidades, equipes, frentes, registros];
   }
 
-  return { toXlsx, montarExport, criarZip, crc32, isoParaSerial };
+
+  /**
+   * Excel de uma base enviada a campo: resumo dos indicadores e as linhas que ainda faltam percorrer.
+   * `meta`: { nome, enviadoEm: 'texto', dataBase: 'texto', geradoEm: Date }.
+   */
+  function montarExportBase(base, av, meta) {
+    meta = meta || {};
+    const r = av.resumo;
+    const dt = meta.geradoEm instanceof Date ? meta.geradoEm : new Date();
+    const dtTxt = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+    const resumo = {
+      nome: 'Resumo da base',
+      colunas: [34, 22, 70],
+      linhas: [
+        [{ v: 'Pós-Corte Interior — Base enviada a campo', f: 'titulo' }],
+        [{ v: 'Base', f: 'negrito' }, meta.nome || '—'],
+        [{ v: 'Enviada (subida) em', f: 'negrito' }, meta.enviadoEm || '—'],
+        [{ v: 'Data da base', f: 'negrito' }, meta.dataBase || 'não informada'],
+        [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
+        [],
+        [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
+        ['Total da base', intCel(av.total), 'Itens distintos da base (' + av.chave + ')'],
+        ['Percorrido da base', intCel(av.percorridos), 'Itens da base com atividade Exec ou Exoc' + (meta.dataBase ? ' realizada a partir de ' + meta.dataBase : '')],
+        ['Faltam percorrer', intCel(av.faltam), 'Total da base − percorrido (linhas na aba "Faltam percorrer")'],
+        ['% percorrido', pctCel(av.pct), 'Percorrido ÷ total da base'],
+        ['Total de Exec', intCel(r.exec), 'Status da Atividade = Finalizada'],
+        ['Total de Exoc', intCel(r.exoc), 'Status da Atividade = Encerrada com Ocorrência'],
+        ['Termos aplicados', intCel(r.termos), 'Serviço adicionais resposta contém o código 110013 (Serviços) ou 310013 (VCG)'],
+        ['Assertividade', pctCel(r.assertividade), 'Termos ÷ Exec'],
+        ['Negociações', intCel(r.neg), 'Negociou O Débito? = Sim'],
+        ['Efetividade', pctCel(r.efetividade), 'Negociações ÷ Exec'],
+        ['Negociações Sem Desdobro', intCel(r.semDesdobro), 'Negociação com Serviço adicionais resposta vazio'],
+        ['Equipes que trabalharam', intCel(r.equipes), 'Recursos distintos nas atividades desta base'],
+      ],
+    };
+    const faltam = {
+      nome: 'Faltam percorrer',
+      colunas: base.colunas.map((c) => (c.length > 24 ? 30 : Math.max(14, c.length + 3))),
+      cabecalho: 1,
+      linhas: [base.colunas.map(cab)].concat(av.pendentes.map((i) => base.linhas[i])),
+    };
+    return [resumo, faltam];
+  }
+  return { toXlsx, montarExport, montarExportBase, criarZip, crc32, isoParaSerial };
 });

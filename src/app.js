@@ -56,6 +56,9 @@
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const ICONS = {
+    trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    chevron: '<path d="m9 18 6-6-6-6"/>',
+    layers: '<path d="m12 2 10 5-10 5L2 7l10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
     arrow: '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>',
     folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
     refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
@@ -124,6 +127,10 @@
     exportando: false,
     leitura: { lidos: 0, salvos: 0, memoria: 0 },
     complementares: new Set(),
+    bases: [],
+    basesUI: { abertos: new Set(), inicial: true, lendo: false },
+    baseEval: new Map(),
+    baseEvalRecords: null,
   };
   let vm = null; // modelo de visualização calculado a partir dos filtros
   let anRows = []; // linhas do analítico (filtros + indicador + busca)
@@ -226,11 +233,12 @@
   const idb = {
     open() {
       return new Promise((res, rej) => {
-        const r = indexedDB.open('poscorte', 2);
+        const r = indexedDB.open('poscorte', 3);
         r.onupgradeneeded = () => {
           const db = r.result;
           if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
           if (!db.objectStoreNames.contains('arquivos')) db.createObjectStore('arquivos');
+          if (!db.objectStoreNames.contains('bases')) db.createObjectStore('bases');
         };
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
@@ -253,6 +261,10 @@
     get(k) { return this.op('kv', 'readonly', (st) => st.get(k)); },
     set(k, v) { return this.op('kv', 'readwrite', (st) => { st.put(v, k); }); },
     // resultado já lido de cada arquivo (só os campos usados); a chave inclui caminho, tamanho e data
+    // bases enviadas a campo (páginas "Bases de campo"): não são apagadas por "Limpar dados gravados"
+    baseLista() { return this.op('bases', 'readonly', (st) => st.getAll()); },
+    basePut(k, v) { return this.op('bases', 'readwrite', (st) => { st.put(v, k); }); },
+    baseDel(k) { return this.op('bases', 'readwrite', (st) => { st.delete(k); }); },
     arquivoTem(k) { return this.op('arquivos', 'readonly', (st) => st.count(k)).then((n) => n > 0); },
     arquivoGet(k) { return this.op('arquivos', 'readonly', (st) => st.get(k)); },
     arquivoPut(k, v) { return this.op('arquivos', 'readwrite', (st) => { st.put(v, k); }); },
@@ -742,6 +754,7 @@
   const VIEWS = [
     { k: 'geral', t: 'Visão geral', i: 'dash' },
     { k: 'analitico', t: 'Analítico', i: 'table' },
+    { k: 'bases', t: 'Bases de campo', i: 'layers' },
     { k: 'base', t: 'Arquivos e regras', i: 'book' },
   ];
   function montarNav() {
@@ -1463,6 +1476,219 @@
     ));
   }
 
+
+  /* ------------------------------------------------------------------ */
+  /* Bases de campo: bases geradas pela estratégia e enviadas às equipes  */
+  /* ------------------------------------------------------------------ */
+
+  const MESES_LONGOS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const ymdLocal = (ms) => { const d = new Date(ms); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
+  const dataBR = (iso) => (iso ? PC.isoToBR(iso) : '');
+
+  async function carregarBases() {
+    if (!window.indexedDB) return;
+    try {
+      const lista = await idb.baseLista();
+      const ids = new Set(state.bases.map((b) => b.id));
+      for (const b of lista || []) if (b && b.id && !ids.has(b.id)) state.bases.push(b);
+    } catch (_) { /* sem armazenamento: as bases valem só nesta sessão */ }
+    if (state.view === 'bases') renderTudo();
+  }
+
+  function avaliacaoDaBase(b) {
+    if (state.baseEvalRecords !== state.records) { state.baseEval.clear(); state.baseEvalRecords = state.records; }
+    const k = b.id + '|' + (b.dataBase || '');
+    let av = state.baseEval.get(k);
+    if (!av) { av = PC.avaliarBase(b, state.records, b.dataBase || ''); state.baseEval.set(k, av); }
+    return av;
+  }
+
+  async function subirBases(files) {
+    const lista = [...files].filter((f) => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
+    const rejeitados = [...files].filter((f) => !lista.includes(f)).map((f) => f.name);
+    if (!lista.length) {
+      setStatus({ kind: 'warning', title: 'Nenhum arquivo .xlsx selecionado', detail: 'A base precisa estar em .xlsx.' + (rejeitados.length ? ' Ignorado(s): ' + rejeitados.join(', ') + '.' : '') });
+      return;
+    }
+    state.basesUI.lendo = true;
+    const ok = [];
+    const erros = rejeitados.map((n) => n + ' — formato não suportado (use .xlsx)');
+    for (let i = 0; i < lista.length; i++) {
+      const f = lista[i];
+      try {
+        setStatus({ kind: 'info', title: 'Lendo a base…', detail: 'Arquivo ' + (i + 1) + ' de ' + lista.length + ': ' + f.name, progress: i / lista.length });
+        const r = await PC.readBaseCampo(f, { onProgress: (p) => setStatus({ kind: 'info', title: 'Lendo a base…', detail: 'Arquivo ' + (i + 1) + ' de ' + lista.length + ': ' + f.name + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / lista.length }) });
+        const agora = Date.now();
+        const b = {
+          id: agora.toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+          nome: f.name,
+          tamanho: f.size,
+          enviadoEm: agora,
+          dataBase: r.dataNome || '',
+          dataNome: r.dataNome || '',
+          aba: r.aba,
+          colunas: r.colunas,
+          linhas: r.linhas,
+          colProtocolo: r.colProtocolo,
+          colMatricula: r.colMatricula,
+          truncado: !!r.truncado,
+        };
+        state.bases.push(b);
+        try { await idb.basePut(b.id, b); } catch (_) { b.semGravar = true; }
+        ok.push(b);
+      } catch (err) {
+        erros.push(f.name + ' — ' + friendly(err));
+      }
+    }
+    state.basesUI.lendo = false;
+    if (ok.length) {
+      const ultima = ok[ok.length - 1];
+      state.basesUI.abertos.add('m:' + ymdLocal(ultima.enviadoEm).slice(0, 7));
+      state.basesUI.abertos.add('d:' + ymdLocal(ultima.enviadoEm));
+    }
+    const semData = ok.filter((b) => !b.dataBase).length;
+    const semGravar = ok.filter((b) => b.semGravar).length;
+    const avisos = [];
+    if (semData) avisos.push(semData + ' ' + plural(semData, 'base sem data reconhecida no nome', 'bases sem data reconhecida no nome') + ': o cruzamento considera todas as atividades carregadas. Informe a "Data da base" no cartão para contar só o que foi feito depois dela.');
+    if (semGravar) avisos.push('Não foi possível gravar ' + semGravar + ' no navegador: ficam só nesta sessão.');
+    if (ok.some((b) => b.truncado)) avisos.push('Base com muitas linhas: só as primeiras 300.000 foram lidas.');
+    setStatus({
+      kind: erros.length || avisos.length ? 'warning' : 'success',
+      title: ok.length ? (ok.length === 1 ? 'Base enviada: ' + ok[0].nome : ok.length + ' bases enviadas') : 'Nenhuma base foi enviada',
+      detail: ok.length ? ok.map((b) => b.nome + ' — ' + fmtInt(b.linhas.length) + ' linhas').join('; ') : 'Verifique os arquivos abaixo.',
+      items: erros.map((e) => 'Não enviado: ' + e).concat(avisos),
+    });
+    renderTudo();
+  }
+
+  async function excluirBase(b) {
+    if (!window.confirm('Excluir a base "' + b.nome + '"? Ela some desta lista (o arquivo original não é apagado).')) return;
+    state.bases = state.bases.filter((x) => x.id !== b.id);
+    state.baseEval.clear();
+    try { await idb.baseDel(b.id); } catch (_) { /* ignora */ }
+    renderTudo();
+  }
+
+  async function mudarDataBase(b, iso) {
+    b.dataBase = iso || '';
+    state.baseEval.clear();
+    try { await idb.basePut(b.id, b); } catch (_) { /* ignora */ }
+    renderTudo();
+  }
+
+  async function baixarFaltantes(b) {
+    const av = avaliacaoDaBase(b);
+    try {
+      const sheets = window.PosCorteExport.montarExportBase(b, av, { nome: b.nome, enviadoEm: fmtDataHora(b.enviadoEm), dataBase: dataBR(b.dataBase), geradoEm: new Date() });
+      const bytes = await window.PosCorteExport.toXlsx(sheets);
+      const nome = 'faltam-percorrer_' + b.nome.replace(/\.xlsx$/i, '').replace(/[^\w.-]+/g, '_') + '_' + ymdLocal(Date.now()).replace(/-/g, '') + '.xlsx';
+      baixarBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nome);
+    } catch (err) {
+      setStatus({ kind: 'error', title: 'Não foi possível gerar o Excel', detail: (err && err.message) || String(err) });
+    }
+  }
+
+  function miniKpi(chave, rotulo, valor, sub, cor) {
+    return h('div', { class: 'mini', dataset: { bk: chave }, style: { '--kc': cor || COR.atividades } },
+      h('span', { class: 'mini-label' }, h('i', { class: 'kdot' }), rotulo),
+      h('span', { class: 'mini-value num', text: valor }),
+      sub ? h('span', { class: 'mini-sub', text: sub }) : null);
+  }
+
+  function cartaoBase(b) {
+    const av = avaliacaoDaBase(b);
+    const r = av.resumo;
+    const pctTxt = av.pct == null ? '—' : (av.pct * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    const notas = [];
+    if (av.duplicadas) notas.push(fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'linha repetida', 'linhas repetidas') + ' na base (contadas uma vez).');
+    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' protocolo e matrícula (contam como faltantes).');
+    if (!state.records.length) notas.push('As atividades realizadas ainda não foram carregadas: conecte a pasta para calcular o percorrido.');
+    const campoData = h('input', { type: 'date', value: b.dataBase || '', 'aria-label': 'Data da base ' + b.nome, onchange: (e) => mudarDataBase(b, e.target.value) });
+    return h('article', { class: 'basecard', dataset: { baseId: b.id }, 'aria-label': 'Base ' + b.nome },
+      h('div', { class: 'basehead' },
+        h('div', { class: 'basetitle' },
+          h('h3', { text: b.nome }),
+          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento por ' + av.chave })),
+        h('div', { class: 'basetools' },
+          h('label', { class: 'datefield' }, h('span', { text: 'Data da base' }), campoData),
+          h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar' }, disabled: av.faltam === 0, onclick: () => baixarFaltantes(b) }, icon('download', 16), h('span', { text: 'Baixar o que falta (Excel)' })),
+          h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Excluir a base ' + b.nome, title: 'Excluir esta base da lista', onclick: () => excluirBase(b) }, icon('trash', 16)))),
+      h('div', { class: 'progresso' },
+        h('div', { class: 'progresso-bar', role: 'img', 'aria-label': pctTxt + ' da base percorrido' }, h('span', { style: { width: Math.min(100, (av.pct || 0) * 100) + '%' } })),
+        h('span', { class: 'progresso-txt num', text: pctTxt + ' percorrido' })),
+      h('div', { class: 'minis minis-base' },
+        miniKpi('total', 'Total da base', fmtInt(av.total), 'itens distintos', COR.atividades),
+        miniKpi('percorrido', 'Percorrido', fmtInt(av.percorridos), 'Exec + Exoc desta base', COR.exec),
+        miniKpi('faltam', 'Faltam percorrer', fmtInt(av.faltam), 'sobra da base', COR.exoc),
+        miniKpi('subiu', 'Data que subiu', dataBR(ymdLocal(b.enviadoEm)), b.dataBase ? 'data da base: ' + dataBR(b.dataBase) : 'sem data da base', COR.atividades)),
+      h('div', { class: 'minis minis-res' },
+        miniKpi('exec', 'Total de Exec', fmtInt(r.exec), null, COR.exec),
+        miniKpi('exoc', 'Total de Exoc', fmtInt(r.exoc), null, COR.exoc),
+        miniKpi('termos', 'Termos aplicados', fmtInt(r.termos), null, COR.termos),
+        miniKpi('assertividade', 'Assertividade', fmtPctVal(r.assertividade), 'Termos ÷ Exec', COR.termos),
+        miniKpi('neg', 'Negociações', fmtInt(r.neg), null, COR.neg),
+        miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), 'Negociações ÷ Exec', COR.neg),
+        miniKpi('semDesdobro', 'Sem Desdobro', fmtInt(r.semDesdobro), null, COR.semDesdobro),
+        miniKpi('equipes', 'Total de equipes', fmtInt(r.equipes), null, COR.atividades)),
+      notas.length ? h('p', { class: 'note', text: notas.join(' ') }) : null);
+  }
+
+  function pastaDetalhes(chave, titulo, contagem, filhos, nivel) {
+    const aberta = state.basesUI.abertos.has(chave);
+    const d = h('details', { class: 'pasta pasta-' + nivel, dataset: { pasta: chave } },
+      h('summary', null, icon('chevron', 16), icon('folder', 18), h('span', { class: 'pasta-nome', text: titulo }), h('span', { class: 'pasta-cont', text: contagem })),
+      h('div', { class: 'pasta-corpo' }, filhos));
+    if (aberta) d.open = true;
+    d.addEventListener('toggle', () => { if (d.open) state.basesUI.abertos.add(chave); else state.basesUI.abertos.delete(chave); });
+    return d;
+  }
+
+  function renderBases() {
+    const root = $('#view-bases');
+    if (!root.dataset.pronto) {
+      root.dataset.pronto = '1';
+      const inp = h('input', { type: 'file', id: 'inp-bases', accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', multiple: true, hidden: true });
+      inp.addEventListener('change', () => { const fs = [...inp.files]; inp.value = ''; if (fs.length) subirBases(fs); });
+      document.body.append(inp);
+    }
+    const subir = h('button', { class: 'btn primary', type: 'button', id: 'btn-subir-base', disabled: state.basesUI.lendo, onclick: () => $('#inp-bases').click() }, icon('upload'), h('span', { text: 'Subir base' }));
+    const topo = h('section', { class: 'card' },
+      h('div', { class: 'card-head' },
+        h('div', null,
+          h('h2', { text: 'Bases de campo' }),
+          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (o nome do arquivo deve ter a data). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
+        subir),
+      h('p', { class: 'note', text: 'Cruzamento: um item da base está percorrido quando há atividade Exec ou Exoc com o mesmo Cód. Protocolo Origem (ou a mesma Matrícula, se a linha não tiver protocolo) realizada a partir da data da base; vale a atividade mais recente. Total da base = itens distintos.' }));
+    if (!state.bases.length) {
+      root.replaceChildren(h('div', { class: 'stack' }, topo, h('section', { class: 'card empty' },
+        h('h2', { text: 'Nenhuma base enviada ainda' }),
+        h('p', { text: 'Clique em "Subir base" e escolha o arquivo .xlsx que foi para campo. Os indicadores aparecem automaticamente.' }))));
+      return;
+    }
+    const meses = new Map();
+    for (const b of [...state.bases].sort((a, c) => c.enviadoEm - a.enviadoEm)) {
+      const dia = ymdLocal(b.enviadoEm);
+      const mes = dia.slice(0, 7);
+      if (!meses.has(mes)) meses.set(mes, new Map());
+      const dias = meses.get(mes);
+      if (!dias.has(dia)) dias.set(dia, []);
+      dias.get(dia).push(b);
+    }
+    if (state.basesUI.inicial) {
+      state.basesUI.inicial = false;
+      const m0 = [...meses.keys()][0];
+      state.basesUI.abertos.add('m:' + m0);
+      state.basesUI.abertos.add('d:' + [...meses.get(m0).keys()][0]);
+    }
+    const pastas = [...meses.entries()].map(([mes, dias]) => {
+      const total = [...dias.values()].reduce((a, l) => a + l.length, 0);
+      const nomeMes = MESES_LONGOS[+mes.slice(5, 7) - 1] + ' de ' + mes.slice(0, 4);
+      return pastaDetalhes('m:' + mes, nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1), total + ' ' + plural(total, 'base', 'bases'),
+        [...dias.entries()].map(([dia, lista]) => pastaDetalhes('d:' + dia, 'Subiu em ' + dataBR(dia), lista.length + ' ' + plural(lista.length, 'base', 'bases'), lista.map(cartaoBase), 'dia')), 'mes');
+    });
+    root.replaceChildren(h('div', { class: 'stack' }, topo, pastas));
+  }
+
   /* ------------------------------------------------------------------ */
   /* Renderização geral                                                  */
   /* ------------------------------------------------------------------ */
@@ -1470,11 +1696,13 @@
   function renderTudo() {
     const ativo = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : '';
     const tem = state.records.length > 0;
-    $('#filters').hidden = !tem;
+    $('#filters').hidden = !tem || state.view === 'bases';
+    $('#chips').hidden = state.view === 'bases';
     calcular();
     renderChips();
     if (state.view === 'geral') renderGeral();
     else if (state.view === 'analitico') renderAnalitico();
+    else if (state.view === 'bases') renderBases();
     else renderBase();
     renderSideFoot();
     if (ativo) {
@@ -1508,6 +1736,7 @@
       setStatus({ kind: 'info', title: 'Seleção manual de pasta', detail: 'Este navegador não permite acesso contínuo à pasta. Use "Conectar pasta" para escolhê-la e selecione-a de novo quando quiser atualizar. Para leitura automática a cada 60 s, abra o painel no Chrome ou no Edge.' });
     }
     restaurarPasta();
+    carregarBases();
   }
   window.__poscorte = { state, PC, carregar, get vm() { return vm; }, get anRows() { return anRows; } }; // gancho para testes e diagnóstico
   init();
