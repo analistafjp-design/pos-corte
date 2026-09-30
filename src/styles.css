@@ -425,3 +425,15 @@ button.cc-col { cursor: pointer; }
 .cc-pt { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #334155; transform: translate(-50%, 50%); }
 .cc-val { position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -4px); font-size: 12.5px; font-weight: 700; white-space: nowrap; color: var(--ink); background: rgba(255, 255, 255, 0.85); border-radius: 4px; padding: 0 3px; }
 @media print { .cc-area { height: 210px; } .cc-wrap { overflow: visible; } .colchart { min-width: 0 !important; } }
+
+/* ---------- Recortes da base ---------- */
+.recorte { display: grid; gap: 14px 24px; grid-template-columns: minmax(0, 1fr); background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.recorte-res { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.recorte-tipos { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.rc-row { display: grid; grid-template-columns: minmax(110px, 190px) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13.5px; }
+.rc-nome { font-weight: 600; overflow-wrap: anywhere; }
+.rc-track { height: 10px; border-radius: 999px; background: #e9edf3; overflow: hidden; }
+.rc-track > span { display: block; height: 100%; background: var(--exoc); border-radius: 999px; }
+.rc-val { font-weight: 700; white-space: nowrap; }
+@media (min-width: 720px) { .recorte { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); } }
+@media (max-width: 480px) { .rc-row { grid-template-columns: minmax(0, 1fr) auto; } .rc-track { grid-column: 1 / -1; grid-row: 2; } }

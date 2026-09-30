@@ -434,6 +434,18 @@ button.cc-col { cursor: pointer; }
 .cc-val { position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -4px); font-size: 12.5px; font-weight: 700; white-space: nowrap; color: var(--ink); background: rgba(255, 255, 255, 0.85); border-radius: 4px; padding: 0 3px; }
 @media print { .cc-area { height: 210px; } .cc-wrap { overflow: visible; } .colchart { min-width: 0 !important; } }
 
+/* ---------- Recortes da base ---------- */
+.recorte { display: grid; gap: 14px 24px; grid-template-columns: minmax(0, 1fr); background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.recorte-res { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.recorte-tipos { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.rc-row { display: grid; grid-template-columns: minmax(110px, 190px) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13.5px; }
+.rc-nome { font-weight: 600; overflow-wrap: anywhere; }
+.rc-track { height: 10px; border-radius: 999px; background: #e9edf3; overflow: hidden; }
+.rc-track > span { display: block; height: 100%; background: var(--exoc); border-radius: 999px; }
+.rc-val { font-weight: 700; white-space: nowrap; }
+@media (min-width: 720px) { .recorte { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); } }
+@media (max-width: 480px) { .rc-row { grid-template-columns: minmax(0, 1fr) auto; } .rc-track { grid-column: 1 / -1; grid-row: 2; } }
+
 </style>
 </head>
 <body>
@@ -733,7 +745,7 @@ window.FRENTES_PADRAO = [
   const isBlank = (v) => v == null || String(v).trim() === '';
 
   /** Versão das regras de leitura; muda quando o resultado gravado deixa de valer. */
-  const PARSER_VERSION = 3;
+  const PARSER_VERSION = 4;
 
   /** Serviços considerados (início de "Código/Descrição"); os demais não são carregados. */
   const CODIGOS_SERVICO = ['110010', '110011', '110012', '210010', '210011', '210012', '310010', '310011', '310012'];
@@ -771,6 +783,9 @@ window.FRENTES_PADRAO = [
     { key: 'categoria', header: 'Categoria' },
     { key: 'situacaoImovel', header: 'Situação Do Imóvel' },
     { key: 'servAdic', header: 'Serviço adicionais resposta', aliases: ['Serviços adicionais resposta'], critical: true },
+    // recorte (corte refeito): opcionais; sem elas o recorte só não é calculado
+    { key: 'recorteFez', header: 'Fez o corte novamente', optional: true },
+    { key: 'recorteOnde', header: 'Onde Foi Feito O Corte?', optional: true },
   ];
   const FIELD_INDEX = {};
   FIELDS.forEach((f, i) => (FIELD_INDEX[f.key] = i));
@@ -1618,6 +1633,10 @@ window.FRENTES_PADRAO = [
       }
 
       const c = classify(status, negociou, servAdic, hasServ);
+      // recorte = "Fez o corte novamente" = Sim; o tipo vem de "Onde Foi Feito O Corte?"
+      const recorte = norm(get(FIELD_INDEX.recorteFez)) === 'sim';
+      const ondeTxt = get(FIELD_INDEX.recorteOnde).replace(/\s+/g, ' ').toUpperCase();
+      const recorteTipo = recorte ? ondeTxt || 'NÃO INFORMADO' : '';
       return {
         recurso: get(FIELD_INDEX.recurso),
         protocolo: get(FIELD_INDEX.protocolo),
@@ -1640,6 +1659,8 @@ window.FRENTES_PADRAO = [
         categoria: get(FIELD_INDEX.categoria),
         situacaoImovel: get(FIELD_INDEX.situacaoImovel),
         servAdic,
+        recorte,
+        recorteTipo,
         exec: c.exec,
         exoc: c.exoc,
         neg: c.neg,
@@ -1734,7 +1755,7 @@ window.FRENTES_PADRAO = [
     if (!has('data')) aviso('data', 'Coluna "Data" não encontrada: os registros ficam "Sem data" e saem de qualquer filtro de período.');
     if (!has('recurso')) aviso('recurso', 'Coluna "Recurso" não encontrada: a equipe fica vazia e a frente aparece como "Não mapeada".');
     const missing = FIELDS.filter((f, i) => !header.found.has(i));
-    const outras = missing.filter((f) => !tratadas.has(f.key));
+    const outras = missing.filter((f) => !tratadas.has(f.key) && !f.optional);
     if (outras.length) {
       warnings.push(`Colunas não encontradas em "${sheet.name}" (esses campos ficam vazios): ${outras.map((f) => f.header).join(', ')}.`);
     }
@@ -1782,6 +1803,7 @@ window.FRENTES_PADRAO = [
         semData: !has('data'),
         semRecurso: !has('recurso'),
         semChaveId: !has('id'),
+        semRecorte: !has('recorteFez'),
       },
     };
   }
@@ -2148,7 +2170,7 @@ window.FRENTES_PADRAO = [
    * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
    */
   function summarize(records) {
-    const s = { atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0 };
     const equipes = new Set();
     const dias = new Set();
     const equipeDias = new Set();
@@ -2169,6 +2191,10 @@ window.FRENTES_PADRAO = [
         if (r.t31) s.t31++;
         if (r.neg) s.negETermo++;
       }
+      if (r.recorte) {
+        s.recortes++;
+        s.recorteTipos[r.recorteTipo] = (s.recorteTipos[r.recorteTipo] || 0) + 1;
+      }
       if (r.recurso) {
         equipes.add(r.recurso);
         if (r.data) equipeDias.add(r.recurso + '|' + r.data);
@@ -2181,6 +2207,7 @@ window.FRENTES_PADRAO = [
     s.equipeDias = equipeDias.size;
     s.assertividade = s.exec ? s.termos / s.exec : null;
     s.efetividade = s.exec ? s.neg / s.exec : null;
+    s.recorteSobreExec = s.exec ? s.recortes / s.exec : null;
     s.produtividade = s.equipeDias ? s.atividades / s.equipeDias : null;
     s.equipesPorDia = s.dias ? s.equipeDias / s.dias : null;
     return s;
@@ -2346,7 +2373,7 @@ window.FRENTES_PADRAO = [
   const MAX_LINHAS_BASE = 300000;
 
   /** Data (AAAA-MM-DD) contida no nome do arquivo, ou '' quando não há uma data reconhecível. */
-  function dataDoNome(nome) {
+  function dataDoNome(nome, ref) {
     const n = String(nome || '').replace(/\.[A-Za-z0-9]+$/, '');
     const tenta = (re, ordem) => {
       const m = re.exec(n);
@@ -2362,8 +2389,20 @@ window.FRENTES_PADRAO = [
       tenta(/(?:^|[^0-9])(\d{1,2})[-_.\s](\d{1,2})[-_.\s](\d{2})(?![0-9])/, 'dmy') ||
       tenta(/(?:^|[^0-9])(20\d{2})(\d{2})(\d{2})(?![0-9])/, 'ymd') ||
       tenta(/(?:^|[^0-9])(\d{2})(\d{2})(20\d{2})(?![0-9])/, 'dmy') ||
-      ''
+      semAno(n, ref)
     );
+  }
+
+  /** Dia e mês sem ano no nome (ex.: "Base 18.09"): o ano é o da referência (hoje), ou o anterior se a data ficaria no futuro. */
+  function semAno(n, ref) {
+    const m = /(?:^|[^0-9])(\d{2})[-_.](\d{2})(?![0-9])/.exec(n);
+    if (!m) return '';
+    const d = +m[1], mo = +m[2];
+    const hoje = ref instanceof Date ? ref : new Date();
+    let y = hoje.getFullYear();
+    if (!validYMD(y, mo, d)) return '';
+    if (new Date(y, mo - 1, d).getTime() > hoje.getTime() + 86400000) y -= 1;
+    return validYMD(y, mo, d) ? y + '-' + pad2(mo) + '-' + pad2(d) : '';
   }
 
   /** Normaliza protocolo/matrícula para comparar (sem espaços, ".0" de número, zeros à esquerda e caixa). */
@@ -2410,7 +2449,7 @@ window.FRENTES_PADRAO = [
           preenchidas++;
           nomes[cols[j]] = t;
           const h = normHeader(t);
-          if (BASE_PROTOCOLO.has(h) || BASE_MATRICULA.has(h)) achou = true;
+          if (BASE_PROTOCOLO.has(h)) achou = true;
         }
         if (!candidato && preenchidas >= 2) candidato = nomes.filter(Boolean);
         if (achou) {
@@ -2432,67 +2471,66 @@ window.FRENTES_PADRAO = [
       if (row.some((x) => trimStr(x) !== '')) linhas.push(row);
     }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo a base', fraction: f }); });
     if (!cabecalho && candidato) {
-      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
     }
     if (!cabecalho) {
-      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula".');
+      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Cód. Protocolo Origem".');
     }
-    if (colProtocolo < 0 && colMatricula < 0) {
-      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
+    if (colProtocolo < 0) {
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
     }
     if (!linhas.length) throw new PcError('SEM_LINHAS', 'A aba "' + sheet.name + '" não tem linhas de dados abaixo do cabeçalho.');
-    return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name), truncado };
+    return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name, opts.ref), truncado, nomeProtocolo: colProtocolo >= 0 ? cabecalho.nomes[colProtocolo] : '', nomeMatricula: colMatricula >= 0 ? cabecalho.nomes[colMatricula] : '' };
   }
 
   /**
-   * Cruza a base com as atividades realizadas (Exec/Exoc). Um item da base está percorrido quando existe atividade
-   * com o mesmo Cód. Protocolo Origem (ou, se a linha não tem protocolo, a mesma Matrícula), realizada a partir da data da base.
-   * Vale a atividade mais recente de cada item.
+   * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pelo
+   * Cód. Protocolo Origem (igual, ou só a parte antes da "/" quando a base não traz o sufixo), em qualquer data.
+   * De cada item vale a atividade mais recente. Linhas sem protocolo contam como faltantes.
    */
-  function avaliarBase(base, records, dataBase) {
-    const pos = (r) => !dataBase || (r.data && r.data >= dataBase);
+  function avaliarBase(base, records) {
     const porProt = new Map();
-    const porMat = new Map();
+    const porPref = new Map();
     const guarda = (mapa, k, r) => {
       if (!k) return;
       const a = mapa.get(k);
       if (!a || (r.data || '') > (a.data || '')) mapa.set(k, r);
     };
     for (const r of records) {
-      if (!pos(r)) continue;
-      guarda(porProt, chaveNorm(r.protocolo), r);
-      guarda(porMat, chaveNorm(r.matricula), r);
+      const p = chaveNorm(r.protocolo);
+      guarda(porProt, p, r);
+      if (p.includes('/')) guarda(porPref, p.split('/')[0], r);
     }
     const vistos = new Set();
     const casadas = [];
     const pendentes = [];
     let duplicadas = 0;
     let semChave = 0;
+    let exemploBase = '';
     const cp = base.colProtocolo;
-    const cm = base.colMatricula;
     base.linhas.forEach((row, i) => {
       const p = cp >= 0 ? chaveNorm(row[cp]) : '';
-      const m = cm >= 0 ? chaveNorm(row[cm]) : '';
-      const item = p ? 'p:' + p : m ? 'm:' + m : '';
-      if (item) {
-        if (vistos.has(item)) { duplicadas++; return; }
-        vistos.add(item);
+      if (p) {
+        if (vistos.has(p)) { duplicadas++; return; }
+        vistos.add(p);
+        if (!exemploBase) exemploBase = p;
       } else semChave++;
-      const r = p ? porProt.get(p) : m ? porMat.get(m) : null;
+      const r = p ? porProt.get(p) || (!p.includes('/') ? porPref.get(p) : null) || null : null;
       if (r) casadas.push(r); else pendentes.push(i);
     });
     const total = vistos.size + semChave;
-    const resumo = summarize(casadas);
     return {
       total,
       percorridos: casadas.length,
       faltam: pendentes.length,
       pct: total ? casadas.length / total : null,
-      resumo,
+      resumo: summarize(casadas),
       pendentes,
       duplicadas,
       semChave,
-      chave: cp >= 0 ? 'Cód. Protocolo Origem' + (cm >= 0 ? ' (ou Matrícula quando o protocolo está vazio)' : '') : 'Matrícula',
+      exemploBase,
+      exemploRealizado: records.length ? records[0].protocolo || '' : '',
+      chave: 'Cód. Protocolo Origem',
     };
   }
 
@@ -2817,8 +2855,8 @@ window.FRENTES_PADRAO = [
         [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
         [],
         [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
-        ['Total da base', intCel(av.total), 'Itens distintos da base (' + av.chave + ')'],
-        ['Percorrido da base', intCel(av.percorridos), 'Itens da base com atividade Exec ou Exoc' + (meta.dataBase ? ' realizada a partir de ' + meta.dataBase : '')],
+        ['Total da base', intCel(av.total), 'Protocolos distintos da base (' + av.chave + ')'],
+        ['Percorrido da base', intCel(av.percorridos), 'Protocolos da base com atividade Exec ou Exoc no histórico da base principal'],
         ['Faltam percorrer', intCel(av.faltam), 'Total da base − percorrido (linhas na aba "Faltam percorrer")'],
         ['% percorrido', pctCel(av.pct), 'Percorrido ÷ total da base'],
         ['Total de Exec', intCel(r.exec), 'Status da Atividade = Finalizada'],
@@ -2829,7 +2867,9 @@ window.FRENTES_PADRAO = [
         ['Efetividade', pctCel(r.efetividade), 'Negociações ÷ Exec'],
         ['Negociações Sem Desdobro', intCel(r.semDesdobro), 'Negociação com Serviço adicionais resposta vazio'],
         ['Equipes que trabalharam', intCel(r.equipes), 'Recursos distintos nas atividades desta base'],
-      ],
+        ['Recortes realizados', intCel(r.recortes), 'Fez o corte novamente = Sim'],
+        ['Recortes ÷ Exec', pctCel(r.recorteSobreExec), 'Total de recortes ÷ total de Exec'],
+      ].concat(Object.entries(r.recorteTipos || {}).sort((a, b) => b[1] - a[1]).map(([t, n]) => ['Recorte: ' + t, intCel(n), (r.recortes ? (n / r.recortes * 100).toFixed(1).replace('.', ',') : '0') + '% dos recortes (Onde Foi Feito O Corte?)'])),
     };
     const faltam = {
       nome: 'Faltam percorrer',
@@ -3352,7 +3392,8 @@ window.FRENTES_PADRAO = [
     for (const r of ok) {
       for (const k of r.cobertura.indisponiveis) (indisponiveis[k] = indisponiveis[k] || []).push(r.name);
     }
-    state.cobertura = { indisponiveis };
+    const semRecorte = ok.filter((r) => r.cobertura.semRecorte).map((r) => r.name);
+    state.cobertura = { indisponiveis, semRecorte };
   }
 
   async function lerPastaHandle(auto) {
@@ -4239,7 +4280,7 @@ window.FRENTES_PADRAO = [
     };
     const listaAl = Object.entries(state.aliases).flatMap(([k, ns]) => ns.map((n) => ({ k, n })));
     return h('section', { class: 'card' },
-      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Colunas reconhecidas' }), h('p', { class: 'hint', text: 'O painel lê e grava só estas 19 colunas; as demais nem são carregadas. A comparação ignora maiúsculas, acentos e pontuação.' }))),
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Colunas reconhecidas' }), h('p', { class: 'hint', text: 'O painel lê e grava só estas 21 colunas (as duas últimas, de recorte, são opcionais); as demais nem são carregadas. A comparação ignora maiúsculas, acentos e pontuação.' }))),
       okFiles.length ? okFiles.map((r) => h('details', { style: { marginBottom: '8px' } },
         h('summary', { text: r.name + ' — ' + r.cobertura.reconhecidas.length + ' de ' + campos.length + ' colunas reconhecidas' + (r.cobertura.ausentes.length ? ' (' + r.cobertura.ausentes.length + ' ausentes)' : '') }),
         h('div', { class: 'table-wrap', style: { marginTop: '8px' } }, h('table', null,
@@ -4344,15 +4385,21 @@ window.FRENTES_PADRAO = [
       const lista = await idb.baseLista();
       const ids = new Set(state.bases.map((b) => b.id));
       for (const b of lista || []) if (b && b.id && !ids.has(b.id)) state.bases.push(b);
+      // bases gravadas antes do reconhecimento de datas sem ano no nome ("Base 18.09"): completa a data, uma vez
+      for (const b of state.bases) {
+        if (b.dataBase) continue;
+        const d = PC.dataDoNome(b.nome, new Date(b.enviadoEm));
+        if (d) { b.dataBase = b.dataNome = d; idb.basePut(b.id, b).catch(() => {}); }
+      }
     } catch (_) { /* sem armazenamento: as bases valem só nesta sessão */ }
     if (state.view === 'bases') renderTudo();
   }
 
   function avaliacaoDaBase(b) {
     if (state.baseEvalRecords !== state.records) { state.baseEval.clear(); state.baseEvalRecords = state.records; }
-    const k = b.id + '|' + (b.dataBase || '');
+    const k = b.id;
     let av = state.baseEval.get(k);
-    if (!av) { av = PC.avaliarBase(b, state.records, b.dataBase || ''); state.baseEval.set(k, av); }
+    if (!av) { av = PC.avaliarBase(b, state.records); state.baseEval.set(k, av); }
     return av;
   }
 
@@ -4422,13 +4469,6 @@ window.FRENTES_PADRAO = [
     renderTudo();
   }
 
-  async function mudarDataBase(b, iso) {
-    b.dataBase = iso || '';
-    state.baseEval.clear();
-    try { await idb.basePut(b.id, b); } catch (_) { /* ignora */ }
-    renderTudo();
-  }
-
   async function baixarFaltantes(b) {
     const av = avaliacaoDaBase(b);
     try {
@@ -4448,22 +4488,46 @@ window.FRENTES_PADRAO = [
       sub ? h('span', { class: 'mini-sub', text: sub }) : null);
   }
 
+  /** Nome do tipo de recorte ("RAMAL" -> "Corte no Ramal"). */
+  function rotuloRecorte(t) {
+    if (t === 'NÃO INFORMADO') return 'Tipo não informado';
+    return (/^(REDE|LIGA)/.test(t) ? 'Corte na ' : 'Corte no ') + t.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+  }
+
+  function cartaoRecorte(r) {
+    const tipos = Object.entries(r.recorteTipos).sort((a, c) => c[1] - a[1]);
+    const semCol = (state.cobertura.semRecorte || []).length;
+    return h('section', { class: 'recorte', dataset: { bk: 'recorte' }, 'aria-label': 'Recortes realizados' },
+      h('div', { class: 'recorte-res' },
+        h('span', { class: 'mini-label' }, h('i', { class: 'kdot', style: { '--kc': COR.exoc } }), 'Recortes realizados'),
+        h('span', { class: 'mini-value num', dataset: { rk: 'total' }, text: fmtInt(r.recortes) }),
+        h('span', { class: 'mini-sub', dataset: { rk: 'pct' }, text: fmtPctVal(r.recorteSobreExec) + ' do Exec (Total recorte ÷ Exec)' }),
+        h('span', { class: 'mini-sub', text: '"Fez o corte novamente" = Sim' })),
+      h('div', { class: 'recorte-tipos' },
+        tipos.length
+          ? tipos.map(([t, n]) => h('div', { class: 'rc-row', dataset: { tipo: t } },
+            h('span', { class: 'rc-nome', text: rotuloRecorte(t) }),
+            h('span', { class: 'rc-track' }, h('span', { style: { width: Math.max((n / r.recortes) * 100, 1.5) + '%' } })),
+            h('span', { class: 'rc-val num', text: fmtPctVal(n / r.recortes) + ' · ' + fmtInt(n) })))
+          : h('p', { class: 'note', text: 'Nenhum recorte nesta base.' }),
+        semCol ? h('p', { class: 'note warn', text: '⚠ Coluna "Fez o corte novamente" ausente em ' + semCol + ' ' + plural(semCol, 'arquivo', 'arquivos') + ' da base principal: o recorte deles não foi contado.' }) : null));
+  }
+
   function cartaoBase(b) {
     const av = avaliacaoDaBase(b);
     const r = av.resumo;
     const pctTxt = av.pct == null ? '—' : (av.pct * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
     const notas = [];
     if (av.duplicadas) notas.push(fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'linha repetida', 'linhas repetidas') + ' na base (contadas uma vez).');
-    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' protocolo e matrícula (contam como faltantes).');
+    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' protocolo (contam como faltantes).');
     if (!state.records.length) notas.push('As atividades realizadas ainda não foram carregadas: conecte a pasta para calcular o percorrido.');
-    const campoData = h('input', { type: 'date', value: b.dataBase || '', 'aria-label': 'Data da base ' + b.nome, onchange: (e) => mudarDataBase(b, e.target.value) });
+    else if (av.percorridos === 0 && av.exemploBase) notas.push('Nenhum item achou atividade. Exemplo de protocolo na base: "' + av.exemploBase + '"; exemplo no realizado: "' + av.exemploRealizado + '". Se os formatos forem diferentes, me avise.');
     return h('article', { class: 'basecard', dataset: { baseId: b.id }, 'aria-label': 'Base ' + b.nome },
       h('div', { class: 'basehead' },
         h('div', { class: 'basetitle' },
           h('h3', { text: b.nome }),
-          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento por ' + av.chave })),
+          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento pelo ' + av.chave })),
         h('div', { class: 'basetools' },
-          h('label', { class: 'datefield' }, h('span', { text: 'Data da base' }), campoData),
           h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar' }, disabled: av.faltam === 0, onclick: () => baixarFaltantes(b) }, icon('download', 16), h('span', { text: 'Baixar o que falta (Excel)' })),
           h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Excluir a base ' + b.nome, title: 'Excluir esta base da lista', onclick: () => excluirBase(b) }, icon('trash', 16)))),
       h('div', { class: 'progresso' },
@@ -4483,6 +4547,7 @@ window.FRENTES_PADRAO = [
         miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), 'Negociações ÷ Exec', COR.neg),
         miniKpi('semDesdobro', 'Sem Desdobro', fmtInt(r.semDesdobro), null, COR.semDesdobro),
         miniKpi('equipes', 'Total de equipes', fmtInt(r.equipes), null, COR.atividades)),
+      cartaoRecorte(r),
       notas.length ? h('p', { class: 'note', text: notas.join(' ') }) : null);
   }
 
@@ -4509,9 +4574,9 @@ window.FRENTES_PADRAO = [
       h('div', { class: 'card-head' },
         h('div', null,
           h('h2', { text: 'Bases de campo' }),
-          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (o nome do arquivo deve ter a data). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
+          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (precisam ter a coluna Cód. Protocolo Origem). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
         subir),
-      h('p', { class: 'note', text: 'Cruzamento: um item da base está percorrido quando há atividade Exec ou Exoc com o mesmo Cód. Protocolo Origem (ou a mesma Matrícula, se a linha não tiver protocolo) realizada a partir da data da base; vale a atividade mais recente. Total da base = itens distintos.' }));
+      h('p', { class: 'note', text: 'Cruzamento sempre pelo Cód. Protocolo Origem, com o histórico da base principal em qualquer data: o item está percorrido quando há atividade Exec ou Exoc com o mesmo protocolo (vale a mais recente). Linhas sem protocolo contam como faltantes. Total da base = protocolos distintos.' }));
     if (!state.bases.length) {
       root.replaceChildren(h('div', { class: 'stack' }, topo, h('section', { class: 'card empty' },
         h('h2', { text: 'Nenhuma base enviada ainda' }),

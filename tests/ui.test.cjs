@@ -748,7 +748,7 @@ test('Base e regras: fonte, conferências, colunas, frentes e regras em portugu�
   for (const trecho of [
     'Fonte e arquivos lidos', 'Conferências automáticas', 'Colunas reconhecidas', 'Frentes de serviço',
     'Regras dos indicadores', '110013', '310013', 'Sem Desdobro', 'débito informado', 'Não é arrecadação',
-    'pequeno_xlsxwriter.xlsx', '19 de 19 colunas reconhecidas', 'Termos: conciliado com a aba Pós Corte com Termo (7)',
+    'pequeno_xlsxwriter.xlsx', '21 de 21 colunas reconhecidas', 'Termos: conciliado com a aba Pós Corte com Termo (7)',
   ]) assert.ok(t.includes(trecho), trecho);
   assert.match(t, /1 atividades em "Não mapeada"|1 atividade em "Não mapeada"|Recursos sem Nomenclatura correspondente: QQ-01 \(1\)/);
   semErros(page);
@@ -760,7 +760,7 @@ const BASE_CAMPO = fx('Base_Campo_28_09_2026.xlsx');
 const BASE_SEM_CHAVE = fx('Base_Sem_Chave.xlsx');
 const miniTxt = (page, k) => page.textContent(`.basecard [data-bk="${k}"] .mini-value`);
 
-test('bases de campo: subir base, indicadores, pastas por mês/data, Excel do que falta e persistência', { timeout: 120000 }, async () => {
+test('bases de campo: subir base, cruzamento por protocolo, recortes, pastas por mês/data, Excel do que falta e persistência', { timeout: 120000 }, async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
   await page.click('#nav-tabs button[data-view=bases]');
@@ -769,9 +769,9 @@ test('bases de campo: subir base, indicadores, pastas por mês/data, Excel do qu
   // base sem coluna de chave é recusada com mensagem clara
   await page.setInputFiles('#inp-bases', BASE_SEM_CHAVE);
   await page.waitForFunction(() => /Nenhuma base foi enviada/.test(document.querySelector('#status').textContent));
-  assert.match(await statusTexto(page), /Cód\. Protocolo Origem.*Matrícula/);
+  assert.match(await statusTexto(page), /precisa ter a coluna "Cód\. Protocolo Origem"/);
   assert.equal(await page.locator('.basecard').count(), 0);
-  // base válida: data 28/09/2026 (do nome) => só conta o realizado a partir dela (ID 17, protocolo OS1)
+  // base válida: cruza pelo Cód. Protocolo Origem com o histórico (no realizado todas as atividades têm protocolo OS1)
   await page.setInputFiles('#inp-bases', BASE_CAMPO);
   await page.waitForSelector('.basecard');
   assert.equal(await page.textContent('.basecard h3'), 'Base_Campo_28_09_2026.xlsx');
@@ -791,12 +791,19 @@ test('bases de campo: subir base, indicadores, pastas por mês/data, Excel do qu
   assert.equal(await page.locator('details.pasta-mes').count(), 1);
   assert.equal(await page.locator('details.pasta-mes details.pasta-dia').count(), 1);
   assert.match(await page.textContent('details.pasta-dia > summary'), new RegExp('Subiu em ' + hoje.replace(/\//g, '\\/')));
-  // trocar a data da base recalcula: a partir de 29/09 nada foi percorrido
-  await page.fill('.basecard input[type=date]', '2026-09-29');
-  await page.waitForFunction(() => document.querySelector('.basecard [data-bk="percorrido"] .mini-value').textContent === '0');
-  assert.equal(await miniTxt(page, 'faltam'), '4');
-  await page.fill('.basecard input[type=date]', '2026-09-28');
-  await page.waitForFunction(() => document.querySelector('.basecard [data-bk="percorrido"] .mini-value').textContent === '1');
+  // card de recortes: sem recorte no histórico de OS1 => zero; depois marca um recorte no ramal e confere % e tipos
+  assert.equal(await page.textContent('.basecard [data-rk=total]'), '0');
+  assert.match(await page.textContent('.basecard [data-rk=pct]'), /0,0% do Exec/);
+  await page.evaluate(() => {
+    const st = window.__poscorte.state;
+    const ultimo = st.records.reduce((a, r) => (!a || r.data > a.data ? r : a), null);
+    st.records = st.records.map((r) => (r === ultimo ? { ...r, recorte: true, recorteTipo: 'RAMAL' } : r));
+  });
+  await page.click('#nav-tabs button[data-view=geral]');
+  await page.click('#nav-tabs button[data-view=bases]');
+  assert.equal(await page.textContent('.basecard [data-rk=total]'), '1');
+  assert.match(await page.textContent('.basecard [data-rk=pct]'), /100,0% do Exec \(Total recorte ÷ Exec\)/);
+  assert.match(await page.textContent('.basecard .rc-row[data-tipo=RAMAL]'), /Corte no Ramal.*100,0% · 1/);
   // Excel do que falta: aba com as 3 linhas pendentes e o cabeçalho da base
   const [download] = await Promise.all([page.waitForEvent('download'), page.click('.basecard [data-act=baixar]')]);
   assert.match(download.suggestedFilename(), /^faltam-percorrer_Base_Campo_28_09_2026_\d{8}\.xlsx$/);

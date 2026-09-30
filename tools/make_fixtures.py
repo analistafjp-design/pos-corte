@@ -373,7 +373,9 @@ def montar_pequeno(out):
     for i in range(30):
         if names[i] is None:
             names[i] = f"{EXTRA_PREFIX} {i}"
+    names[26], names[27] = "Fez o corte novamente", "Onde Foi Feito O Corte?"
     base = {
+        "Fez o corte novamente": "NÃO", "Onde Foi Feito O Corte?": "",
         "Recurso": "AL-01", "Cód. Protocolo Origem": "OS1", "ID da Atividade": 1, "Matrícula": "1001",
         "Código/Descrição": "110010-VISTORIA PÓS CORTE", "Data": date(2026, 7, 3), "Status da Atividade": "Finalizada",
         "Nome do Solicitante": "Ana & <Souza>", "Cidade": "Cidade Norte", "Início do SLA": datetime(2026, 7, 3, 8),
@@ -410,10 +412,15 @@ def montar_pequeno(out):
         dict(**{"ID da Atividade": 24, "Status da Atividade": "Cancelada"}),
         dict(**{"ID da Atividade": 25, "Status da Atividade": "Paralisada", "Negociou O Débito?": "Sim", "Serviço adicionais resposta": "110013"}),  # código seguido de vírgula e dígito: 5 é dígito -> conta? (110013 seguido de ',') sim conta
     ]
+    # recorte (corte refeito): só SIM conta; o tipo vem de "Onde Foi Feito O Corte?"
+    recorte_por_id = {2: ("SIM", "RAMAL"), 3: ("SIM", "CAVALETE SIMPLES"), 4: ("SIM", "RAMAL"), 5: ("NÃO", "RAMAL"),
+                      6: ("SIM", ""), 7: ("sim", "Ramal")}
     rows = []
     for i, c in enumerate(casos):
         r = dict(base)
         r.update(c)
+        if r["ID da Atividade"] in recorte_por_id:
+            r["Fez o corte novamente"], r["Onde Foi Feito O Corte?"] = recorte_por_id[r["ID da Atividade"]]
         r["_idx"] = i
         rows.append(r)
     return names, rows

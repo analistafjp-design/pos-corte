@@ -29,7 +29,7 @@
   const isBlank = (v) => v == null || String(v).trim() === '';
 
   /** Versão das regras de leitura; muda quando o resultado gravado deixa de valer. */
-  const PARSER_VERSION = 3;
+  const PARSER_VERSION = 4;
 
   /** Serviços considerados (início de "Código/Descrição"); os demais não são carregados. */
   const CODIGOS_SERVICO = ['110010', '110011', '110012', '210010', '210011', '210012', '310010', '310011', '310012'];
@@ -67,6 +67,9 @@
     { key: 'categoria', header: 'Categoria' },
     { key: 'situacaoImovel', header: 'Situação Do Imóvel' },
     { key: 'servAdic', header: 'Serviço adicionais resposta', aliases: ['Serviços adicionais resposta'], critical: true },
+    // recorte (corte refeito): opcionais; sem elas o recorte só não é calculado
+    { key: 'recorteFez', header: 'Fez o corte novamente', optional: true },
+    { key: 'recorteOnde', header: 'Onde Foi Feito O Corte?', optional: true },
   ];
   const FIELD_INDEX = {};
   FIELDS.forEach((f, i) => (FIELD_INDEX[f.key] = i));
@@ -914,6 +917,10 @@
       }
 
       const c = classify(status, negociou, servAdic, hasServ);
+      // recorte = "Fez o corte novamente" = Sim; o tipo vem de "Onde Foi Feito O Corte?"
+      const recorte = norm(get(FIELD_INDEX.recorteFez)) === 'sim';
+      const ondeTxt = get(FIELD_INDEX.recorteOnde).replace(/\s+/g, ' ').toUpperCase();
+      const recorteTipo = recorte ? ondeTxt || 'NÃO INFORMADO' : '';
       return {
         recurso: get(FIELD_INDEX.recurso),
         protocolo: get(FIELD_INDEX.protocolo),
@@ -936,6 +943,8 @@
         categoria: get(FIELD_INDEX.categoria),
         situacaoImovel: get(FIELD_INDEX.situacaoImovel),
         servAdic,
+        recorte,
+        recorteTipo,
         exec: c.exec,
         exoc: c.exoc,
         neg: c.neg,
@@ -1030,7 +1039,7 @@
     if (!has('data')) aviso('data', 'Coluna "Data" não encontrada: os registros ficam "Sem data" e saem de qualquer filtro de período.');
     if (!has('recurso')) aviso('recurso', 'Coluna "Recurso" não encontrada: a equipe fica vazia e a frente aparece como "Não mapeada".');
     const missing = FIELDS.filter((f, i) => !header.found.has(i));
-    const outras = missing.filter((f) => !tratadas.has(f.key));
+    const outras = missing.filter((f) => !tratadas.has(f.key) && !f.optional);
     if (outras.length) {
       warnings.push(`Colunas não encontradas em "${sheet.name}" (esses campos ficam vazios): ${outras.map((f) => f.header).join(', ')}.`);
     }
@@ -1078,6 +1087,7 @@
         semData: !has('data'),
         semRecurso: !has('recurso'),
         semChaveId: !has('id'),
+        semRecorte: !has('recorteFez'),
       },
     };
   }
@@ -1444,7 +1454,7 @@
    * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
    */
   function summarize(records) {
-    const s = { atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0 };
     const equipes = new Set();
     const dias = new Set();
     const equipeDias = new Set();
@@ -1465,6 +1475,10 @@
         if (r.t31) s.t31++;
         if (r.neg) s.negETermo++;
       }
+      if (r.recorte) {
+        s.recortes++;
+        s.recorteTipos[r.recorteTipo] = (s.recorteTipos[r.recorteTipo] || 0) + 1;
+      }
       if (r.recurso) {
         equipes.add(r.recurso);
         if (r.data) equipeDias.add(r.recurso + '|' + r.data);
@@ -1477,6 +1491,7 @@
     s.equipeDias = equipeDias.size;
     s.assertividade = s.exec ? s.termos / s.exec : null;
     s.efetividade = s.exec ? s.neg / s.exec : null;
+    s.recorteSobreExec = s.exec ? s.recortes / s.exec : null;
     s.produtividade = s.equipeDias ? s.atividades / s.equipeDias : null;
     s.equipesPorDia = s.dias ? s.equipeDias / s.dias : null;
     return s;
@@ -1642,7 +1657,7 @@
   const MAX_LINHAS_BASE = 300000;
 
   /** Data (AAAA-MM-DD) contida no nome do arquivo, ou '' quando não há uma data reconhecível. */
-  function dataDoNome(nome) {
+  function dataDoNome(nome, ref) {
     const n = String(nome || '').replace(/\.[A-Za-z0-9]+$/, '');
     const tenta = (re, ordem) => {
       const m = re.exec(n);
@@ -1658,8 +1673,20 @@
       tenta(/(?:^|[^0-9])(\d{1,2})[-_.\s](\d{1,2})[-_.\s](\d{2})(?![0-9])/, 'dmy') ||
       tenta(/(?:^|[^0-9])(20\d{2})(\d{2})(\d{2})(?![0-9])/, 'ymd') ||
       tenta(/(?:^|[^0-9])(\d{2})(\d{2})(20\d{2})(?![0-9])/, 'dmy') ||
-      ''
+      semAno(n, ref)
     );
+  }
+
+  /** Dia e mês sem ano no nome (ex.: "Base 18.09"): o ano é o da referência (hoje), ou o anterior se a data ficaria no futuro. */
+  function semAno(n, ref) {
+    const m = /(?:^|[^0-9])(\d{2})[-_.](\d{2})(?![0-9])/.exec(n);
+    if (!m) return '';
+    const d = +m[1], mo = +m[2];
+    const hoje = ref instanceof Date ? ref : new Date();
+    let y = hoje.getFullYear();
+    if (!validYMD(y, mo, d)) return '';
+    if (new Date(y, mo - 1, d).getTime() > hoje.getTime() + 86400000) y -= 1;
+    return validYMD(y, mo, d) ? y + '-' + pad2(mo) + '-' + pad2(d) : '';
   }
 
   /** Normaliza protocolo/matrícula para comparar (sem espaços, ".0" de número, zeros à esquerda e caixa). */
@@ -1706,7 +1733,7 @@
           preenchidas++;
           nomes[cols[j]] = t;
           const h = normHeader(t);
-          if (BASE_PROTOCOLO.has(h) || BASE_MATRICULA.has(h)) achou = true;
+          if (BASE_PROTOCOLO.has(h)) achou = true;
         }
         if (!candidato && preenchidas >= 2) candidato = nomes.filter(Boolean);
         if (achou) {
@@ -1728,67 +1755,66 @@
       if (row.some((x) => trimStr(x) !== '')) linhas.push(row);
     }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo a base', fraction: f }); });
     if (!cabecalho && candidato) {
-      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" para ser cruzada com o realizado. Colunas encontradas: ' + candidato.join(', ') + '.');
     }
     if (!cabecalho) {
-      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula".');
+      throw new PcError('SEM_CABECALHO', 'Não encontrei a linha de cabeçalho na aba "' + sheet.name + '". A base precisa ter a coluna "Cód. Protocolo Origem".');
     }
-    if (colProtocolo < 0 && colMatricula < 0) {
-      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" ou "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
+    if (colProtocolo < 0) {
+      throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Cód. Protocolo Origem" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
     }
     if (!linhas.length) throw new PcError('SEM_LINHAS', 'A aba "' + sheet.name + '" não tem linhas de dados abaixo do cabeçalho.');
-    return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name), truncado };
+    return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name, opts.ref), truncado, nomeProtocolo: colProtocolo >= 0 ? cabecalho.nomes[colProtocolo] : '', nomeMatricula: colMatricula >= 0 ? cabecalho.nomes[colMatricula] : '' };
   }
 
   /**
-   * Cruza a base com as atividades realizadas (Exec/Exoc). Um item da base está percorrido quando existe atividade
-   * com o mesmo Cód. Protocolo Origem (ou, se a linha não tem protocolo, a mesma Matrícula), realizada a partir da data da base.
-   * Vale a atividade mais recente de cada item.
+   * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pelo
+   * Cód. Protocolo Origem (igual, ou só a parte antes da "/" quando a base não traz o sufixo), em qualquer data.
+   * De cada item vale a atividade mais recente. Linhas sem protocolo contam como faltantes.
    */
-  function avaliarBase(base, records, dataBase) {
-    const pos = (r) => !dataBase || (r.data && r.data >= dataBase);
+  function avaliarBase(base, records) {
     const porProt = new Map();
-    const porMat = new Map();
+    const porPref = new Map();
     const guarda = (mapa, k, r) => {
       if (!k) return;
       const a = mapa.get(k);
       if (!a || (r.data || '') > (a.data || '')) mapa.set(k, r);
     };
     for (const r of records) {
-      if (!pos(r)) continue;
-      guarda(porProt, chaveNorm(r.protocolo), r);
-      guarda(porMat, chaveNorm(r.matricula), r);
+      const p = chaveNorm(r.protocolo);
+      guarda(porProt, p, r);
+      if (p.includes('/')) guarda(porPref, p.split('/')[0], r);
     }
     const vistos = new Set();
     const casadas = [];
     const pendentes = [];
     let duplicadas = 0;
     let semChave = 0;
+    let exemploBase = '';
     const cp = base.colProtocolo;
-    const cm = base.colMatricula;
     base.linhas.forEach((row, i) => {
       const p = cp >= 0 ? chaveNorm(row[cp]) : '';
-      const m = cm >= 0 ? chaveNorm(row[cm]) : '';
-      const item = p ? 'p:' + p : m ? 'm:' + m : '';
-      if (item) {
-        if (vistos.has(item)) { duplicadas++; return; }
-        vistos.add(item);
+      if (p) {
+        if (vistos.has(p)) { duplicadas++; return; }
+        vistos.add(p);
+        if (!exemploBase) exemploBase = p;
       } else semChave++;
-      const r = p ? porProt.get(p) : m ? porMat.get(m) : null;
+      const r = p ? porProt.get(p) || (!p.includes('/') ? porPref.get(p) : null) || null : null;
       if (r) casadas.push(r); else pendentes.push(i);
     });
     const total = vistos.size + semChave;
-    const resumo = summarize(casadas);
     return {
       total,
       percorridos: casadas.length,
       faltam: pendentes.length,
       pct: total ? casadas.length / total : null,
-      resumo,
+      resumo: summarize(casadas),
       pendentes,
       duplicadas,
       semChave,
-      chave: cp >= 0 ? 'Cód. Protocolo Origem' + (cm >= 0 ? ' (ou Matrícula quando o protocolo está vazio)' : '') : 'Matrícula',
+      exemploBase,
+      exemploRealizado: records.length ? records[0].protocolo || '' : '',
+      chave: 'Cód. Protocolo Origem',
     };
   }
 
