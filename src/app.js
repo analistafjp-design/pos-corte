@@ -938,13 +938,12 @@
       { k: 'assertividade', dep: 'termos', t: 'Assertividade', v: fmtPctVal(s.assertividade), cor: COR.termos, sub: ['Termos ÷ Exec', fmtInt(s.termos) + ' ÷ ' + fmtInt(s.exec)], tip: 'Termos aplicados divididos pelo total de Exec.' },
       { k: 'neg', ind: 'neg', t: 'Negociações', v: fmtInt(s.neg), cor: COR.neg, sub: ['Débito informado: ' + brl.format(s.debito)].concat(s.debitoNaoInformado ? [s.debitoNaoInformado + ' sem valor informado'] : []) },
       { k: 'efetividade', dep: 'neg', t: 'Efetividade', v: fmtPctVal(s.efetividade), cor: COR.neg, sub: ['Negociações ÷ Exec', fmtInt(s.neg) + ' ÷ ' + fmtInt(s.exec)], tip: 'Negociações divididas pelo total de Exec.' },
-      { k: 'semDesdobro', ind: 'semDesdobro', t: 'Negociações Sem Desdobro', v: fmtInt(s.semDesdobro), cor: COR.semDesdobro, sub: ['Parte das negociações (' + fmtPct(s.semDesdobro, s.neg) + ')'] },
     ];
     return h('div', { class: 'kpi-groups' },
       h('div', { class: 'grp-title', text: 'Resultado', 'aria-hidden': 'true' }),
       h('div', { class: 'kpis kpis-4', role: 'group', 'aria-label': 'Resultado' }, resultado.map(cartao)),
       h('div', { class: 'grp-title', text: 'Qualidade', 'aria-hidden': 'true' }),
-      h('div', { class: 'kpis kpis-5', role: 'group', 'aria-label': 'Qualidade' }, qualidade.map(cartao)));
+      h('div', { class: 'kpis kpis-4', role: 'group', 'aria-label': 'Qualidade' }, qualidade.map(cartao)));
   }
 
   function mesAtivo(mes) {

@@ -50,7 +50,7 @@ async function abrir(opts) {
 }
 const semErros = (page) => assert.deepEqual(page.errosPagina, [], 'erros no console/página');
 // valores dos cartões na ordem antiga: percorrido, exec, exoc, negociações, termos, sem desdobro
-const kpis = (page) => page.evaluate(() => ['atividades', 'exec', 'exoc', 'neg', 'termos', 'semDesdobro'].map((k) => document.querySelector(`[data-fk="kpi:${k}"] .kpi-value`).textContent));
+const kpis = (page) => page.evaluate(() => ['atividades', 'exec', 'exoc', 'neg', 'termos'].map((k) => document.querySelector(`[data-fk="kpi:${k}"] .kpi-value`).textContent));
 const kpiTexto = (page, k) => page.textContent(`[data-fk="kpi:${k}"]`);
 async function importar(page, arquivos, esperaKpis = true) {
   await page.setInputFiles('#inp-files', arquivos);
@@ -59,7 +59,7 @@ async function importar(page, arquivos, esperaKpis = true) {
 const statusTitulo = (page) => page.textContent('#status .st-title');
 const statusTexto = (page) => page.textContent('#status');
 const PEQUENO = fx('pequeno_xlsxwriter.xlsx');
-const KPIS_PEQUENO = ['19', '18', '1', '5', '7', '2'];
+const KPIS_PEQUENO = ['19', '18', '1', '5', '7'];
 
 /* ------------------------------------------------------------------ */
 test('estado inicial: sem dados incorporados, com instruções e sem erros', async () => {
@@ -83,7 +83,7 @@ test('importar Excel: cartões, gráficos e tabela mensal calculados a partir do
   // sub-textos
   assert.match(await kpiTexto(page, 'neg'), /Débito informado: R\$\s2\.535,06/);
   assert.match(await kpiTexto(page, 'termos'), /110013 Serviços: 6 · 310013 VCG: 2/);
-  assert.match(await kpiTexto(page, 'semDesdobro'), /Parte das negociações/);
+  assert.equal(await page.locator('[data-fk="kpi:semDesdobro"]').count(), 0, 'sem card de desdobro na visão geral');
   // tabela mensal
   const linhas = await page.$$eval('section[aria-labelledby=h-tm] .table-wrap tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
   assert.deepEqual(linhas.map((l) => l[0]), ['jul/2026', 'ago/2026', 'set/2026']);
@@ -119,7 +119,7 @@ test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   // agosto mostra somente agosto
   await page.fill('#f-from', '2026-08-01');
   await page.fill('#f-to', '2026-08-31');
-  assert.deepEqual(await kpis(page), ['1', '1', '0', '0', '0', '0']);
+  assert.deepEqual(await kpis(page), ['1', '1', '0', '0', '0']);
   assert.equal(await page.locator('.cc-col[data-fk^="mes:"]').count(), 1);
   await page.click('#chips button.ghost');
   assert.deepEqual(await kpis(page), KPIS_PEQUENO);
@@ -201,7 +201,7 @@ test('cartão abre o analítico; busca, detalhes e exportação CSV filtrada', a
 test('paginação de 50 linhas e exportação completa com 8.136 registros', { timeout: 120000 }, async () => {
   const page = await abrir();
   await importar(page, fx('grande_sintetico.xlsx'));
-  assert.deepEqual(await kpis(page), ['8.136', '7.461', '675', '230', '389', '2']);
+  assert.deepEqual(await kpis(page), ['8.136', '7.461', '675', '230', '389']);
   await page.click('#nav-tabs button[data-view=analitico]');
   await page.waitForSelector('#an-tabela table');
   assert.equal(await page.locator('#an-tabela tbody tr').count(), 50);
@@ -253,9 +253,7 @@ test('arquivos enxutos: outra aba, título antes do cabeçalho e colunas ausente
   await page.waitForFunction(() => /indisponível em 1 arquivo/.test(document.querySelector('.kpi-groups').textContent));
   assert.match(await kpiTexto(page, 'termos'), /indisponível em 1 arquivo/);
   assert.match(await kpiTexto(page, 'assertividade'), /indisponível em 1 arquivo/);
-  assert.match(await kpiTexto(page, 'semDesdobro'), /indisponível em 1 arquivo/);
   assert.doesNotMatch(await kpiTexto(page, 'neg'), /indisponível/);
-  assert.equal((await kpis(page))[5], '0', 'sem a coluna ninguém vira Sem Desdobro');
   assert.match(await statusTexto(page), /Termos não pôde ser calculado em: sem_coluna_servadic\.xlsx/);
   await page.context().close();
 });
