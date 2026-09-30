@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mensal Comercial — Painel de decisão</title>
+<meta name="description" content="Corte, religação, pós-corte e negociações: execução, valores negociados, metas e conferência dos números.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1544'/%3E%3Crect x='7' y='16' width='4' height='9' rx='1' fill='%2386b6ef'/%3E%3Crect x='14' y='10' width='4' height='15' rx='1' fill='%233987e5'/%3E%3Crect x='21' y='6' width='4' height='19' rx='1' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+:root{
+  color-scheme: light;
+  --page:#f2f3f7; --surface:#fcfcfb; --surface-2:#f5f5f2; --ink:#0b0b0b; --ink-2:#4a4944; --ink-3:#66655f;
+  --grid:#e1e0d9; --axis:#c3c2b7; --hair:rgba(11,11,11,.10); --shadow:0 1px 2px rgba(13,21,68,.06),0 4px 16px rgba(13,21,68,.05);
+  --brand:#0d1544; --brand-2:#18227a; --on-brand:#fff; --on-brand-2:#c9d2ff;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --t1:#1c5cab; --t2:#3987e5; --t3:#86b6ef; --on-t1:#fff; --on-t2:#0b0b0b; --on-t3:#0b0b0b;
+  --track:#e6eefb;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --info:#2a78d6;
+  --chip-bg:#eef0f6; --sel:#e8f0fd; --focus:#2a78d6;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#222221; --ink:#fff; --ink-2:#c3c2b7; --ink-3:#a19f96;
+    --grid:#2c2c2a; --axis:#383835; --hair:rgba(255,255,255,.10); --shadow:none;
+    --brand:#0a0f33; --brand-2:#131b5c;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --t1:#86b6ef; --t2:#3987e5; --t3:#1c5cab; --on-t1:#0b0b0b; --on-t2:#0b0b0b; --on-t3:#fff;
+    --track:#22304a; --chip-bg:#262625; --sel:#1f2b40; --focus:#6da7ec;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --surface-2:#222221; --ink:#fff; --ink-2:#c3c2b7; --ink-3:#a19f96;
+  --grid:#2c2c2a; --axis:#383835; --hair:rgba(255,255,255,.10); --shadow:none;
+  --brand:#0a0f33; --brand-2:#131b5c;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --t1:#86b6ef; --t2:#3987e5; --t3:#1c5cab; --on-t1:#0b0b0b; --on-t2:#0b0b0b; --on-t3:#fff;
+  --track:#22304a; --chip-bg:#262625; --sel:#1f2b40; --focus:#6da7ec;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.wrap{max-width:1360px;margin:0 auto;padding:0 16px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- cabeçalho ---------- */
+header.top{background:linear-gradient(180deg,var(--brand),var(--brand-2));color:var(--on-brand);position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.18)}
+.top .row1{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:12px 0 6px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;gap:2px;min-width:0}
+.brand h1{font-size:20px;line-height:1.15;margin:0;font-weight:650;letter-spacing:.1px}
+.brand p{margin:0;color:var(--on-brand-2);font-size:12.5px}
+.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip-top{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--on-brand);white-space:nowrap}
+.chip-top b{font-weight:650}
+.btn{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);color:var(--on-brand);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{background:rgba(255,255,255,.2)}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;padding-top:4px}
+nav.tabs::-webkit-scrollbar{display:none}
+.tab{appearance:none;background:transparent;border:0;color:var(--on-brand-2);padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:3px solid transparent;white-space:nowrap;display:flex;gap:7px;align-items:center}
+.tab:hover{color:#fff}
+.tab[aria-selected="true"]{color:#fff;border-bottom-color:#fff;font-weight:650}
+.badge{background:var(--serious);color:#0b0b0b;border-radius:999px;font-size:11.5px;font-weight:700;padding:0 7px;line-height:18px;min-width:18px;text-align:center}
+
+/* ---------- filtros ---------- */
+.filters{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:14px 0 4px}
+.filters label{display:flex;gap:8px;align-items:center;color:var(--ink-2);font-size:13px}
+.filters select,.filters input[type=number]{background:var(--surface);border:1px solid var(--hair);border-radius:8px;padding:6px 10px;min-height:34px}
+.filters .spacer{flex:1}
+.pill{display:inline-flex;gap:6px;align-items:center;background:var(--sel);border:1px solid var(--hair);border-radius:999px;padding:3px 6px 3px 12px;font-size:13px}
+.pill button{border:0;background:transparent;cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;border-radius:999px;color:var(--ink-2)}
+.pill button:hover{background:var(--hair)}
+
+/* ---------- layout ---------- */
+main{padding:6px 0 48px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
+.gk{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.mt{margin-top:14px}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:14px;box-shadow:var(--shadow);padding:16px;min-width:0}
+.card h2{font-size:15px;margin:0;font-weight:650}
+.card .sub{margin:2px 0 0;color:var(--ink-3);font-size:12.5px}
+.card-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap}
+.sec-title{margin:22px 0 8px;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:650}
+
+/* ---------- indicadores ---------- */
+.kpi{background:var(--surface);border:1px solid var(--hair);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;position:relative;min-width:0}
+.kpi .l{color:var(--ink-2);font-size:13px}
+.kpi .v{font-size:30px;font-weight:650;line-height:1.15;margin:4px 0 2px;letter-spacing:-.3px}
+.kpi .s{color:var(--ink-3);font-size:12.5px}
+.kpi.tone-atencao{border-left:4px solid var(--warn)}
+.kpi.tone-critico{border-left:4px solid var(--crit)}
+.kpi.tone-bom{border-left:4px solid var(--good)}
+.hero{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border:0;border-radius:16px;padding:20px 22px;box-shadow:var(--shadow);display:flex;flex-direction:column;justify-content:center;min-width:0}
+.hero .l{color:var(--on-brand-2);font-size:13.5px}
+.hero .v{font-size:56px;font-weight:650;line-height:1.05;margin:6px 0;letter-spacing:-1px}
+.hero .s{color:#e4e9ff;font-size:13.5px}
+.meter{position:relative;height:10px;border-radius:999px;background:rgba(255,255,255,.22);margin:12px 0 4px}
+.meter i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:#fff}
+.meter u{position:absolute;top:-4px;bottom:-4px;width:2px;background:rgba(255,255,255,.75);text-decoration:none}
+.meter-l{position:relative;height:16px;color:#c9d2ff;font-size:11.5px}
+.meter-l span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.top-grid{display:grid;gap:14px;grid-template-columns:minmax(260px,1fr) 2fr}
+@media (max-width:900px){.top-grid{grid-template-columns:1fr}}
+
+/* ---------- situação (ícone + texto, nunca só cor) ---------- */
+.st{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;white-space:nowrap}
+.st i{font-style:normal;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:800;color:#0b0b0b;flex:none}
+.st.bom i{background:var(--good)} .st.atencao i{background:var(--warn)} .st.critico i{background:var(--crit);color:#fff}
+.st.info i{background:var(--info);color:#fff} .st.sem i{background:var(--axis)} .st.alerta i{background:var(--serious)}
+
+/* ---------- destaques ---------- */
+.dest{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.dest li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:10px 12px;background:var(--surface-2);border-radius:10px;border:1px solid var(--hair)}
+.dest .t{font-weight:600}
+.dest .d{color:var(--ink-2);font-size:13px}
+.dest button.go{border:1px solid var(--hair);background:var(--surface);border-radius:8px;padding:4px 9px;cursor:pointer;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.dest button.go:hover{background:var(--sel)}
+
+/* ---------- tabelas ---------- */
+.tw{overflow-x:auto;background:linear-gradient(to right,var(--surface) 30%,transparent),linear-gradient(to left,var(--surface) 30%,transparent) right,radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.16),transparent),radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.16),transparent) right;background-repeat:no-repeat;background-size:36px 100%,36px 100%,12px 100%,12px 100%;background-attachment:local,local,scroll,scroll}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 9px;text-align:left;border-bottom:1px solid var(--grid);vertical-align:middle;white-space:nowrap}
+td.w{white-space:normal;min-width:150px}
+thead th{color:var(--ink-3);font-weight:600;font-size:12px;white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+th button:hover{color:var(--ink)}
+th button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+tbody tr.clic{cursor:pointer}
+tbody tr:hover td{background:var(--surface-2)}
+tbody tr.sel td{background:var(--sel)}
+tfoot td{font-weight:650;border-top:2px solid var(--axis);border-bottom:0}
+td .nome{font-weight:500}
+td.dim{color:var(--ink-3)}
+.bar-wrap{display:flex;align-items:center;gap:8px;min-width:96px}
+.bar.lt{opacity:.62}
+table.compacta .bar-track{flex:0 0 56px;min-width:56px}
+.bar-track{flex:1;display:flex;gap:2px;height:12px;min-width:40px}
+.bar{height:12px;border-radius:0 4px 4px 0;min-width:2px}
+.seg{height:12px;min-width:2px}
+.seg:first-child{border-radius:0}
+.seg:last-child{border-radius:0 4px 4px 0}
+.bar-wrap .val{min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+.c1{background:var(--s1)} .c2{background:var(--s2)} .c3{background:var(--s3)} .ct1{background:var(--t1);color:var(--on-t1)} .ct2{background:var(--t2);color:var(--on-t2)} .ct3{background:var(--t3);color:var(--on-t3)} .cg{background:var(--axis)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin:2px 0 8px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.stack{display:flex;gap:2px;height:26px;margin:6px 0}
+.stack div{display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;min-width:2px;overflow:hidden}
+.stack div:first-child{border-radius:6px 0 0 6px}.stack div:last-child{border-radius:0 6px 6px 0}
+.note{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--hair);border-radius:10px;padding:9px 12px;margin-top:10px}
+.note b{font-weight:650}
+.seg-ctl{display:inline-flex;border:1px solid var(--hair);border-radius:9px;overflow:hidden}
+.seg-ctl button{background:var(--surface);border:0;padding:5px 12px;cursor:pointer;font-size:13px;color:var(--ink-2)}
+.seg-ctl button[aria-pressed="true"]{background:var(--sel);color:var(--ink);font-weight:650}
+.seg-ctl button+button{border-left:1px solid var(--hair)}
+.exp{all:unset;cursor:pointer;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:5px;border:1px solid var(--hair);margin-right:6px;font-size:13px;line-height:1}
+.exp:focus-visible{outline:2px solid var(--focus)}
+tr.filho td:first-child{padding-left:38px}
+tr.filho td{color:var(--ink-2)}
+
+/* ---------- conferência / dicionário ---------- */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--hair);background:var(--chip-bg);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--sel);font-weight:650;border-color:var(--focus)}
+.conf{display:grid;gap:8px;margin-top:10px}
+.conf details{background:var(--surface-2);border:1px solid var(--hair);border-radius:10px;padding:0}
+.conf summary{list-style:none;cursor:pointer;padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+.conf summary::-webkit-details-marker{display:none}
+.conf summary .t{font-weight:600}
+.conf .corpo{padding:0 14px 12px 40px;color:var(--ink-2);font-size:13px;display:grid;gap:6px}
+.conf .eq{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.conf .eq div{background:var(--surface);border:1px solid var(--hair);border-radius:8px;padding:6px 10px}
+.conf .eq small{display:block;color:var(--ink-3);font-size:11.5px}
+.search{width:min(100%,360px);background:var(--surface);border:1px solid var(--hair);border-radius:8px;padding:7px 10px}
+.dic td:first-child{font-weight:600;min-width:170px}
+.dic td{vertical-align:top;white-space:normal}
+.dic th{white-space:nowrap}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.small{font-size:12.5px;color:var(--ink-3)}
+.vazio{padding:18px;text-align:center;color:var(--ink-3)}
+.erro{background:color-mix(in srgb,var(--crit) 14%,var(--surface));border:1px solid var(--crit);border-radius:10px;padding:10px 12px;margin:12px 0}
+
+/* ---------- dica ---------- */
+#tip{position:fixed;z-index:60;pointer-events:none;background:var(--ink);color:var(--surface);padding:7px 10px;border-radius:8px;font-size:12.5px;line-height:1.35;max-width:300px;white-space:pre-line;box-shadow:0 6px 20px rgba(0,0,0,.28);opacity:0;transition:opacity .08s}
+#tip.on{opacity:1}
+#tip b{font-size:14px}
+
+footer.pe{color:var(--ink-3);font-size:12.5px;padding:8px 0 36px}
+[hidden]{display:none!important}
+
+@media (max-width:640px){
+  .lbl{display:none}
+  .btn{padding:7px 11px;font-size:15px}
+  .top .row1{padding:10px 0 4px;gap:8px}
+  .filters .hint{display:none}
+  .gk{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{padding:12px}
+  .kpi .v{font-size:23px}
+  .bar-wrap{min-width:0;gap:6px}
+  .bar-track{flex:0 0 44px;min-width:44px}
+  th,td{padding:7px 7px}
+  .brand h1{font-size:18px}
+  .hero .v{font-size:46px}
+  .kpi .v{font-size:26px}
+  .card{padding:13px}
+  .dest li{grid-template-columns:auto 1fr}
+  .dest button.go{grid-column:2;justify-self:start}
+}
+@media print{
+  header.top{position:static;background:none;color:#000;box-shadow:none}
+  .top-actions,nav.tabs,.filters .spacer,#tip,.btn,.seg-ctl,.exp,.go{display:none!important}
+  body{background:#fff}
+  .card,.kpi{box-shadow:none;break-inside:avoid}
+  .hero{background:#fff;color:#000;border:1px solid #999}.hero .l,.hero .s,.meter-l{color:#333}.meter{background:#ddd}.meter i{background:#333}
+  .brand p{color:#333}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="row1">
+      <div class="brand">
+        <h1>Mensal Comercial</h1>
+        <p>Corte · Religação · Pós-corte · Negociações</p>
+      </div>
+      <div class="top-actions">
+        <span class="chip-top" id="chipData"></span>
+        <button class="btn" id="btnImportar" type="button" title="Carregar outro dia (arquivo JSON no mesmo formato)" aria-label="Importar dados"><span class="ic" aria-hidden="true">⭳</span><span class="lbl">Importar dados</span></button>
+        <button class="btn" id="btnCopiar" type="button" title="Copia um resumo em texto para colar em e-mail ou mensagem" aria-label="Copiar resumo"><span class="ic" aria-hidden="true">⧉</span><span class="lbl">Copiar resumo</span></button>
+        <button class="btn" id="btnImprimir" type="button" title="Imprimir ou salvar em PDF" aria-label="Imprimir ou salvar em PDF"><span class="ic" aria-hidden="true">⎙</span><span class="lbl">Imprimir / PDF</span></button>
+        <button class="btn" id="btnTema" type="button" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro"><span class="ic" aria-hidden="true">◐</span><span class="lbl">Tema</span></button>
+        <input id="arquivo" type="file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Seções do painel" id="tabs"></nav>
+  </div>
+</header>
+<div class="wrap">
+  <div class="filters" id="filtros"></div>
+  <div id="aviso"></div>
+  <main id="main" tabindex="-1"></main>
+  <footer class="pe" id="rodape"></footer>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script type="application/json" id="dados-embutidos">__DADOS__</script>
+<script>
+(function(){
+'use strict';
+
+/* =====================================================================
+   1. Utilitários
+   ===================================================================== */
+const NF_INT = new Intl.NumberFormat('pt-BR',{maximumFractionDigits:0});
+const NF_BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const fInt = v => v==null ? '—' : NF_INT.format(v);
+const fDec = (v,d=1) => v==null||!isFinite(v) ? '—' : v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fPct = (v,d=1) => v==null||!isFinite(v) ? '—' : (v*100).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
+const fBRL = v => v==null ? '—' : NF_BRL.format(v);
+const fBRLc = v => v==null ? '—' : Math.abs(v)>=1e6 ? 'R$ '+fDec(v/1e6,2)+' mi' : Math.abs(v)>=1e4 ? 'R$ '+fDec(v/1e3,1)+' mil' : NF_BRL.format(v);
+const div = (a,b) => (a==null||b==null||b===0) ? null : a/b;
+const sum = (arr,f) => arr.reduce((t,x)=>t+(f(x)||0),0);
+const plural = (n,s,p) => n===1?s:p;
+const dataBR = iso => { const [a,m,d]=iso.split('-'); return d+'/'+m+'/'+a; };
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const mesBR = ym => { const [a,m]=ym.split('-'); return MESES[+m-1]+'/'+a; };
+const diaSemana = iso => new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long'});
+function diasUteisDoMes(ym){ const [a,m]=ym.split('-').map(Number); const n=new Date(a,m,0).getDate(); let c=0; for(let d=1;d<=n;d++){const w=new Date(a,m-1,d).getDay(); if(w>0&&w<6)c++;} return c; }
+
+/* Nomes: tudo que vem dos dados entra por textContent (nunca innerHTML). */
+function bonito(s){
+  if(!s) return '';
+  const pequenas=new Set(['de','da','do','das','dos','e','no','na','nos','nas','a','o','as','os','em','ao','com','sem','para','por','ou']);
+  let out = s.toLocaleLowerCase('pt-BR').split(/(\s+)/).map((p,i)=> /^\s+$/.test(p)?p : (i>0&&pequenas.has(p))?p : p.replace(/(^|[\/(])(\p{L})/gu,(m,a,b)=>a+b.toLocaleUpperCase('pt-BR'))).join('');
+  return out.replace(/\blisc\b/gi,'LISC').replace(/\bO\.s\b/g,'O.S.').replace(/\bVcg\b/g,'VCG');
+}
+function add(el,kids){ for(const k of kids){ if(k==null||k===false) continue; if(Array.isArray(k)) add(el,k); else if(k instanceof Node) el.appendChild(k); else el.appendChild(document.createTextNode(String(k))); } }
+function h(tag,props,...kids){
+  const el=document.createElement(tag);
+  if(props) for(const [k,v] of Object.entries(props)){
+    if(v==null||v===false) continue;
+    if(k==='class') el.className=v;
+    else if(k==='on'){ for(const [ev,fn] of Object.entries(v)) el.addEventListener(ev,fn); }
+    else if(k==='data'){ for(const [dk,dv] of Object.entries(v)) el.dataset[dk]=dv; }
+    else el.setAttribute(k, v===true?'':String(v));
+  }
+  add(el,kids); return el;
+}
+const frag = (...kids) => { const f=document.createDocumentFragment(); add(f,kids); return f; };
+
+/* Dica flutuante (hover e foco). Todo valor mostrado aqui também está visível na tabela. */
+const tip = document.getElementById('tip');
+function mostrarDica(el,x,y){
+  const t=el.getAttribute('data-tip'); if(!t) return;
+  tip.textContent=t; tip.classList.add('on');
+  const r=tip.getBoundingClientRect(); const W=innerWidth,H=innerHeight;
+  tip.style.left=Math.max(8,Math.min(W-r.width-8,x+14))+'px';
+  tip.style.top=Math.max(8,Math.min(H-r.height-8,y+16))+'px';
+}
+document.addEventListener('pointermove',e=>{ const el=e.target.closest&&e.target.closest('[data-tip]'); if(el) mostrarDica(el,e.clientX,e.clientY); else tip.classList.remove('on'); });
+document.addEventListener('pointerleave',()=>tip.classList.remove('on'));
+document.addEventListener('focusin',e=>{ const el=e.target.closest&&e.target.closest('[data-tip]'); if(el){ const b=el.getBoundingClientRect(); mostrarDica(el,b.left,b.bottom-16); } });
+document.addEventListener('focusout',()=>tip.classList.remove('on'));
+
+/* =====================================================================
+   2. Dados e validação
+   ===================================================================== */
+const ARR = ['metas','servicos','categorias','motivos_nao_execucao','corte_por_tipo','religacao_por_tipo'];
+function validar(d){
+  const e=[];
+  if(!d||typeof d!=='object') return ['O arquivo não contém um objeto JSON.'];
+  if(d.esquema!==1) e.push('Campo "esquema" deve ser 1 (formato deste painel).');
+  if(!d.referencia||!/^\d{4}-\d{2}-\d{2}$/.test(d.referencia.data||'')) e.push('"referencia.data" deve estar no formato AAAA-MM-DD.');
+  for(const k of ARR) if(!Array.isArray(d[k])) e.push('Falta a lista "'+k+'".');
+  for(const k of ['servicos_total','frentes','corte_por_cidade','ranking_corte','negociacoes','outros_indicadores','totais_relatorio']) if(!d[k]||typeof d[k]!=='object') e.push('Falta o bloco "'+k+'".');
+  if(d.negociacoes){ for(const k of ['kpis','valores','resumo_report','por_tipo_os','por_cidade','top_equipes','perfis','perfis_total']) if(!d.negociacoes[k]) e.push('Falta "negociacoes.'+k+'".'); }
+  if(Array.isArray(d.servicos)) d.servicos.forEach((s,i)=>{ if(typeof s.nome!=='string'||!Number.isFinite(s.exec)||!Number.isFinite(s.exoc)) e.push('Serviço #'+(i+1)+' precisa de nome, exec e exoc numéricos.'); });
+  return e;
+}
+
+/* =====================================================================
+   3. Cálculos derivados (tudo sai dos dados; nada fixo no código)
+   ===================================================================== */
+function calcular(D, diasUteis){
+  const lim = (D.premissas&&D.premissas.limiares) || {taxa_execucao:{bom:.9,atencao:.8},meta:{bom:1,atencao:.8}};
+  const S = D.servicos.map(s=>({...s, perc:s.exec+s.exoc, taxa:div(s.exec,s.exec+s.exoc)}));
+  const tot = {exec:sum(S,s=>s.exec), exoc:sum(S,s=>s.exoc)}; tot.perc=tot.exec+tot.exoc; tot.taxa=div(tot.exec,tot.perc); tot.eq=D.servicos_total.eq;
+  const N = D.negociacoes;
+  const cidades = N.por_cidade.linhas.map(c=>({...c, nome:D.cidades_nomes&&D.cidades_nomes[c.cidade]||bonito(c.cidade), ticket:div(c.valor,c.qtd)}));
+  const negQtd = sum(cidades,c=>c.qtd), negVal = sum(cidades,c=>c.valor);
+  const cidadesCorte = D.corte_por_cidade.linhas.map(c=>({...c, nome:D.cidades_nomes&&D.cidades_nomes[c.cidade]||bonito(c.cidade), perc:c.exec+c.exoc, taxa:div(c.exec,c.exec+c.exoc)}));
+  const equipes = N.top_equipes.linhas.map(e=>({...e, ticket:div(e.valor,e.qtd), parte:div(e.valor,N.resumo_report.valor)}));
+  const perfis = N.perfis.map(p=>({...p, nome:p.perfil||'(Sem perfil)', ticket:div(p.valor,p.qtd), parteVal:div(p.valor,N.perfis_total.valor), parteQtd:div(p.qtd,N.perfis_total.qtd), filhos:p.frentes.map(f=>({...f, ticket:div(f.valor,f.qtd)}))}));
+  const dias = diasUteis||1;
+  const metas = D.metas.map(m=>{ const diaria=m.orcado/dias; const ating=(m.real==null)?null:div(m.real,diaria); return {...m, diaria, ating, dif:(m.real==null)?null:m.real-diaria}; });
+  const frentePorNome={}; // Frente que negociou, somando perfis
+  for(const p of perfis) for(const f of p.filhos){ const o=frentePorNome[f.frente]||(frentePorNome[f.frente]={frente:f.frente,qtd:0,valor:0}); o.qtd+=f.qtd||0; o.valor+=f.valor||0; }
+  const frentesNeg = Object.values(frentePorNome).map(f=>({...f,ticket:div(f.valor,f.qtd),parteVal:div(f.valor,N.perfis_total.valor),parteQtd:div(f.qtd,N.perfis_total.qtd)})).sort((a,b)=>b.valor-a.valor);
+  return {D,lim,S,tot,N,cidades,negQtd,negVal,cidadesCorte,equipes,perfis,metas,frentesNeg,dias};
+}
+function tomTaxa(C,t){ const l=C.lim.taxa_execucao; return t==null?'sem': t>=l.bom?'bom': t>=l.atencao?'atencao':'critico'; }
+function tomMeta(C,a){ const l=C.lim.meta; return a==null?'sem': a>=l.bom?'bom': a>=l.atencao?'atencao':'critico'; }
+const ROT = {bom:['✔','Bom'],atencao:['▲','Atenção'],critico:['✖','Crítico'],sem:['–','Sem dado'],info:['i','Informativo'],alerta:['!','Alerta'],ok:['✔','Confere']};
+function situacao(tom,rotulo){ const r=ROT[tom]||ROT.sem; return h('span',{class:'st '+(tom==='ok'?'bom':tom)},h('i',{'aria-hidden':'true'},r[0]),rotulo||r[1]); }
+
+/* =====================================================================
+   4. Conferência automática: cada linha nasce de uma conta sobre os dados
+   ===================================================================== */
+function conferencias(C){
+  const {D,S,tot,N}=C, L=[];
+  const F = (id,grupo,titulo,esperado,encontrado,status,significa,acao)=>L.push({id,grupo,titulo,esperado,encontrado,status,significa,acao});
+  const eq=(a,b,tol=0)=>a!=null&&b!=null&&Math.abs(a-b)<=tol;
+  const st=(ok)=>ok?'ok':'alerta';
+  const TR=D.totais_relatorio, ST=D.servicos_total;
+
+  // ---- Operação
+  F('exec','Operação','Soma das executadas por serviço = total do relatório',fInt(ST.exec),fInt(tot.exec),st(eq(tot.exec,ST.exec)),'A soma das 9 linhas de serviço bate com o total exibido.','Nada a fazer.');
+  F('exoc','Operação','Soma das ocorrências por serviço = total do relatório',fInt(ST.exoc),fInt(tot.exoc),st(eq(tot.exoc,ST.exoc)),'A soma das 9 linhas de serviço bate com o total exibido.','Nada a fazer.');
+  F('perc','Operação','Percorridas = executadas + com ocorrência',fInt(ST.perc),fInt(tot.perc),st(eq(tot.perc,ST.perc)),'"Perc" é sempre Exec + Exoc.','Nada a fazer.');
+  F('taxa','Operação','Taxa de execução do total (Exec ÷ Perc)',fPct(ST.taxa_relatorio),fPct(tot.taxa),st(eq(Math.round(tot.taxa*1000),Math.round(ST.taxa_relatorio*1000))),'A coluna "% Asser" do relatório é, no total, Exec ÷ (Exec + Exoc).','Nada a fazer.');
+  const cM=sum(D.metas.filter(m=>m.grupo==='Corte'),m=>m.orcado), rM=sum(D.metas.filter(m=>m.grupo==='Religação'),m=>m.orcado);
+  F('meta_corte','Operação','Meta de corte = cavalete + LISC + ramal',TR.corte_meta.exibido+' (≈ '+fInt(TR.corte_meta.valor)+')',fInt(cM),st(eq(cM,TR.corte_meta.valor,5)),'O card "Corte Meta" é a soma das três metas de corte. O relatório mostra valores arredondados (1,2 Mil; 1,55 Mil).','Nada a fazer.');
+  F('meta_relig','Operação','Meta de religação = cavalete + LISC + ramal',TR.relig_meta.exibido+' (≈ '+fInt(TR.relig_meta.valor)+')',fInt(rM),st(eq(rM,TR.relig_meta.valor,5)),'O card "Relig. Meta" é a soma das três metas de religação.','Nada a fazer.');
+  const cR=sum(D.metas.filter(m=>m.grupo==='Corte'),m=>m.real), rR=sum(D.metas.filter(m=>m.grupo==='Religação'),m=>m.real);
+  F('real_corte','Operação','Corte realizado: cards × serviços',fInt(TR.corte_real.valor),fInt(cR),st(eq(cR,TR.corte_real.valor)),'29 (cavalete) + 13 (LISC) + ramal sem realizado.','Nada a fazer.');
+  F('real_relig','Operação','Religação realizada: cards × serviços',fInt(TR.relig_real.valor),fInt(rR),st(eq(rR,TR.relig_real.valor)),'58 + 3 + 12.','Nada a fazer.');
+  const fc=D.frentes.corte.total.exec, cc=D.corte_por_cidade.total.exec, rc=D.ranking_corte.total.os_corte, sc=sum(S.filter(s=>s.familia==='Corte'),s=>s.exec);
+  F('corte_visoes','Operação','Corte: quatro visões chegam ao mesmo total',fInt(TR.corte_real.valor)+' em todas',`frentes ${fInt(fc)} · cidades ${fInt(cc)} · equipes ${fInt(rc)} · serviços ${fInt(sc)}`,st([fc,cc,rc,sc].every(v=>v===TR.corte_real.valor)),'Frente, cidade, equipe e tipo de serviço somam o mesmo número de cortes.','Nada a fazer.');
+  const fr=D.frentes.religacao.total.exec;
+  F('relig_frentes','Operação','Religação por frente = religação realizada',fInt(TR.relig_real.valor),fInt(fr),st(eq(fr,TR.relig_real.valor)),'A tabela de frentes de religação fecha com o card.','Nada a fazer.');
+  const pcF=D.frentes.pos_corte.total.exec, pcD=D.dia_a_dia.pos_corte;
+  F('pos_corte','Operação','Pós-corte: frentes × O.S. de vistoria pós-corte',fInt(pcD)+' (O.S. "Vistoria Pós Corte")',fInt(pcF)+' (frentes de pós-corte)',st(eq(pcF,pcD)),'São duas contagens diferentes: por tipo de O.S. (78) e por frente que executou (61). Ambas aparecem no relatório com o mesmo rótulo "Pós Corte".','Padronizar os nomes: "O.S. de pós-corte" (por serviço) × "Frente pós-corte" (por equipe).');
+  const eqCid=sum(D.corte_por_cidade.linhas,c=>c.eq);
+  F('equipes','Operação','Equipes: o número muda de visual para visual',`Report ${fInt(ST.eq)}`,`Corte por frente ${fInt(D.frentes.corte.total.eq)} · Corte por cidade ${fInt(D.corte_por_cidade.total.eq)} (linhas somam ${fInt(eqCid)})`,'alerta','"Eq" não tem a mesma definição em todo lugar. Em Corte por cidade, Rio Bonito mostra 23 equipes para 1 corte, o que indica que a coluna conta equipes de todos os serviços, não só de corte.','Definir uma única regra ("equipes distintas que executaram o serviço no dia") e não somar equipes entre linhas.');
+  // % Ass. recalculado
+  const ex=D.frentes.corte.linhas[0], taxaTotCorte=div(D.frentes.corte.total.exec,D.frentes.corte.total.exec+D.frentes.corte.total.exoc);
+  const reproduz=D.frentes.corte.linhas.every(l=>Math.abs(div(taxaTotCorte,div(l.exec,l.exec+l.exoc))-l.ass_relatorio)<0.006);
+  F('ass','Operação','"% Ass." de Corte/Religação passa de 100% e repete 91,30%',`Máximo 100% (é uma taxa)`,`Relatório: ${fPct(ex.ass_relatorio,0)} para "${ex.frente}" · Recalculado Exec ÷ (Exec+Exoc): ${fPct(div(ex.exec,ex.exec+ex.exoc))}`,'alerta',`A coluna parece dividir a taxa do total pela taxa da linha (${reproduz?'a conta reproduz exatamente os valores 99%, 107%, 91,30%, 109,57% e 112,37%':'padrão verificado só em parte'}). Por isso 5 cidades aparecem com o mesmo 91,30% e outras passam de 100%. Em Religação, "123,7%" = 73 ÷ 59 (total ÷ linha).`,'Trocar a medida por Exec ÷ (Exec + Exoc) por linha. Este painel já usa essa conta.');
+  F('prog','Operação','Coluna "Prog" (programado) vazia em todo o relatório','Valores de programação','Nenhum valor em nenhuma tabela','alerta','Sem programado não dá para medir cumprimento da programação nem produtividade por equipe.','Verificar se a tabela de programação está carregando para a data.');
+  const difsNaoZero=D.metas.filter(m=>m.dif_relatorio!=null&&m.dif_relatorio!==0).length, difsZero=D.metas.filter(m=>m.dif_relatorio===0).length;
+  F('dif','Operação','Linha "Dif" dos cards de meta é sempre 0',`Orçado − Real (ex.: corte no cavalete ${fInt(D.metas[0].orcado)} − ${fInt(D.metas[0].real)})`,`${difsZero} cards com Dif = 0 e ${difsNaoZero} diferentes de 0`,st(difsNaoZero>0),'Com orçado de 1,2 Mil e realizado de 29, "Dif" = 0 não pode ser "orçado − realizado". Pode ser "realizado − programado do dia", mas a coluna "Prog" está vazia. Em qualquer caso, a linha não informa nada.','Redefinir "Dif". Este painel mostra o atingimento da meta diária de referência.');
+  const mot=sum(D.motivos_nao_execucao,m=>m.qtd);
+  F('motivos','Operação','Motivos de não execução somam o total de ocorrências',fInt(tot.exoc)+' (Exoc)',fInt(mot)+` (${fInt(mot-tot.exoc)} a mais)`,st(mot===tot.exoc),'O gráfico soma mais que as ocorrências. Provável: inclui O.S. com negociação (que o rodapé manda tirar de Exoc) ou outros serviços.','Ligar o gráfico à mesma regra de Exoc.');
+  const catT=D.categorias_total.termos, catS=sum(D.categorias,c=>c.termos), kT=D.metas.find(m=>m.id==='termos').real;
+  F('termos','Operação','Termos: card × tabela de categorias',fInt(kT)+' (card "Termos Meta/Real")',`Tabela: total ${fInt(catT)} · linhas somam ${fInt(catS)}`,st(kT===catT&&catS===catT),'Três números diferentes para termos no mesmo dia (29, 19 e 20).','Confirmar a regra de "termo" e usar uma só medida.');
+  const percPC=S.find(s=>s.nome==='VISTORIA PÓS CORTE').perc, percIR=S.find(s=>s.nome==='VISTORIA DE IRREGULARIDADE').perc, percCO=sum(S.filter(s=>s.familia==='Corte'),s=>s.perc);
+  const negAssCalc=div(D.categorias_total.neg,percPC+percIR+percCO);
+  F('neg_ass','Operação','Assertividade de negociação do total (2,49%)',fPct(D.categorias_total.neg_ass,2),fPct(negAssCalc,2),st(eq(Math.round(negAssCalc*1e4),Math.round(D.categorias_total.neg_ass*1e4))),`Confere: ${fInt(D.categorias_total.neg)} negociações ÷ ${fInt(percPC+percIR+percCO)} percorridas (pós-corte ${fInt(percPC)} + irregularidade ${fInt(percIR)} + corte ${fInt(percCO)}).`,'Nada a fazer.');
+
+  // ---- Negociações
+  const K=N.kpis, V=N.valores, R=N.resumo_report;
+  F('neg_qtd','Negociações','Negociações: soma das cidades × total exibido',`${fInt(K.total)} ("Total Negociações")`,`${fInt(C.negQtd)} (soma das cidades) · card "Negociação tot" = ${fInt(R.qtd)}`,st(C.negQtd===K.total),'Há 131 em uns lugares e 132 em outros. A diferença é de 1 negociação.','Usar uma só medida de total em todas as páginas.');
+  F('neg_val','Negociações','Valor negociado: soma das cidades × total exibido',fBRL(V.total),fBRL(C.negVal)+` (diferença ${fBRL(V.total-C.negVal)})`,st(eq(C.negVal,V.total,0.01)),'A soma das cidades fecha exatamente com R$ 58.104,64 (card). A diferença de R$ 322,83 é 1 negociação que está no total de R$ 58.427,47, mas em nenhuma cidade (provavelmente sem cidade cadastrada).','Incluir "(Sem cidade)" na tabela para o total fechar.');
+  F('neg_comp','Negociações','Principal + pós-corte = total',`${fInt(K.total)} · ${fBRL(V.total)}`,`${fInt(K.principal+K.pos_corte)} · ${fBRL(V.principal+V.desdobro_pos_corte)} (valores em R$ inteiros no relatório)`,st(eq(K.principal+K.pos_corte,K.total)&&eq(V.principal+V.desdobro_pos_corte,V.total,1)),'A quebra Principal (124) + Pós-corte (8) fecha em 132. Em R$, 40.382 + 18.046 = 58.428 (arredondamento).','Nada a fazer. Padronizar os rótulos: contagem "Pós Corte" × valor "Desdobro Pós Corte".');
+  F('ticket','Negociações','Ticket médio = valor ÷ negociações',fBRL(R.ticket_medio),fBRL(div(R.valor,R.qtd)),st(eq(Math.round(R.ticket_medio*100),Math.round(div(R.valor,R.qtd)*100))),`Usa 131 e R$ 58.104,64. Com 132 e R$ 58.427,47 daria ${fBRL(div(V.total,K.total))}.`,'Nada a fazer.');
+  F('perfis','Negociações','Perfis do cliente somam o total',`${fInt(R.qtd)} · ${fBRL(R.valor)}`,`${fInt(sum(C.perfis,p=>p.qtd))} · ${fBRL(sum(C.perfis,p=>p.valor))}`,st(sum(C.perfis,p=>p.qtd)===R.qtd&&eq(sum(C.perfis,p=>p.valor),R.valor,0.01)),'Adimplente + Inadimplente + Nunca Pagou + sem perfil = 131.','Nada a fazer.');
+  const sp=C.perfis.find(p=>!p.perfil);
+  if(sp) F('sem_perfil','Negociações','Negociações sem perfil de cliente',`0`,`${fInt(sp.qtd)} negociações (${fPct(sp.parteQtd)}) · ${fBRL(sp.valor)}`,'alerta','Linha em branco na hierarquia de perfis. Entram no total, mas não podem ser analisadas por perfil.','Corrigir o cadastro de origem ou criar o perfil "Não classificado".');
+  const tos=sum(N.por_tipo_os,t=>t.qtd);
+  F('tipo_os','Negociações','Negociação por tipo de O.S. soma o total',`${fInt(R.qtd)} ou ${fInt(K.total)}`,`${fInt(tos)} (Cobrança ${fInt(N.por_tipo_os[0].qtd)} + Vistoria pós-corte ${fInt(N.por_tipo_os[1].qtd)} + Religação ${fInt(N.por_tipo_os[2].qtd)}*)`,st(tos===R.qtd||tos===K.total),'O gráfico de rosca soma 136. A fatia "Religação" não tem valor escrito no PDF; foi deduzida pelos percentuais (91,18% e 5,15%).','Confirmar o valor no Power BI e ver por que passa de 131/132.');
+  const pcs=[['perfil (frente Pós Corte)',sum(C.perfis,p=>p.filhos.filter(f=>f.frente==='Pós Corte').reduce((t,f)=>t+f.qtd,0))],['tabela de categorias',D.categorias[0].neg],['rosca por tipo de O.S.',N.por_tipo_os[1].qtd],['card "Negociação Pós Corte"',K.pos_corte]];
+  F('neg_pc','Negociações','"Negociação de pós-corte" tem quatro números',`1 número`,pcs.map(p=>p[1]+' '+p[0]).join(' · '),'alerta','Cada visual usa um recorte diferente (frente que negociou × tipo da O.S.). Os rótulos iguais escondem definições diferentes.','Nomear separadamente: "frente que negociou" e "tipo de O.S. onde negociou".');
+  F('neg_corte','Negociações','Negociação do corte: card "--" × ranking de equipes',`--`,`${fInt(D.ranking_corte.total.neg)} negociações no ranking de equipes de corte`,'alerta','O card de negociação do corte está vazio, mas 3 equipes de corte aparecem com negociações no ranking.','Definir se "negociação do corte" é por equipe que negociou ou por O.S. de origem.');
+  F('top10','Negociações','Top 10 mostra 11 equipes',`10 linhas`,`${C.equipes.length} linhas (empate na posição 5) · soma ${fInt(sum(C.equipes,e=>e.qtd))} e ${fBRL(sum(C.equipes,e=>e.valor))}`,'info','A soma fecha com o total exibido (106 e R$ 35.446). O empate no 5º lugar traz uma linha a mais, e a coluna "Top" mostra 3 antes de 2 porque o desempate usa outro critério.','Definir o desempate (por valor).');
+
+  // ---- Dados e premissas
+  const trunc=D.motivos_nao_execucao.filter(m=>m.motivo.includes('…')).length;
+  F('trunc','Dados','Nomes cortados no PDF',`Nomes completos`,`${trunc} de ${D.motivos_nao_execucao.length} motivos e ${D.metas.filter(m=>m.rotulo_inferido).length} metas com nome truncado`,'info','O PDF corta textos longos ("CLIENTE A…", "Instalação de H"). Os motivos aparecem como no PDF; os rótulos de meta "Instalação/Substituição de hidrômetro" foram completados por dedução.','Ao usar o modelo completo, os nomes virão inteiros.');
+  F('orcado','Dados','Orçado é meta do mês?',`Confirmação`,`Suposição: orçado = meta do mês; realizado = 1 dia (ex.: ${fInt(cR)} cortes no dia × meta de ${fInt(cM)})`,'info','O relatório mostra realizado de um único dia ao lado de um orçado que só faz sentido no mês. Este painel divide o orçado por dias úteis (ajustável na aba Metas).','Confirmar no modelo se "Orçado" é mensal.');
+  F('serie','Dados','Falta série diária e acumulado do mês',`Realizado do mês até hoje`,`Só o dia ${dataBR(D.referencia.data)}`,'info','Sem o acumulado, não dá para medir atingimento, ritmo necessário nem projeção de fechamento. O PDF traz um dia por vez.','Fase 2: carregar a série diária (ver prompt do projeto).');
+  const v=D.outros_indicadores;
+  F('vendas','Dados','"Vendas ALL" sem definição',`Definição`,`Vendas ${fInt(v.vendas)} · meta ${fInt(v.vendas_meta)} · ALL ${fInt(v.vendas_all)}`,'info','A página 4 do PDF só traz "Vendas Meta 244" e "Vendas ALL 2261". Não dá para saber se ALL é do mês, da empresa ou histórico.','Confirmar a medida no modelo.');
+  return L;
+}
+
+/* =====================================================================
+   5. Destaques (frases geradas dos dados)
+   ===================================================================== */
+function destaques(C,conf){
+  const {D,S,tot,N}=C, L=[]; const P=(tom,aba,titulo,texto)=>L.push({tom,aba,titulo,texto});
+  P(tomTaxa(C,tot.taxa),'resumo',`Taxa de execução de ${fPct(tot.taxa)} no dia`,`${fInt(tot.exec)} de ${fInt(tot.perc)} O.S. percorridas foram executadas; ${fInt(tot.exoc)} terminaram com ocorrência (${fPct(div(tot.exoc,tot.perc))}).`);
+  const pior=[...S].filter(s=>s.perc>=20).sort((a,b)=>a.taxa-b.taxa)[0];
+  if(pior){ const parte=div(pior.exoc,tot.exoc); P(tomTaxa(C,pior.taxa),'resumo',`${bonito(pior.nome)} tem a menor taxa: ${fPct(pior.taxa)}`,`Concentra ${fInt(pior.exoc)} das ${fInt(tot.exoc)} ocorrências do dia (${fPct(parte,0)}). É onde mais se perde execução.`); }
+  const mot=[...D.motivos_nao_execucao].sort((a,b)=>b.qtd-a.qtd), mt=sum(mot,m=>m.qtd), top4=sum(mot.slice(0,4),m=>m.qtd);
+  P('atencao','resumo',`4 motivos respondem por ${fPct(div(top4,mt),0)} das não execuções`,mot.slice(0,4).map(m=>bonito(m.motivo.replace('…','')).trim()+'… ('+m.qtd+')').join(', ')+'. Atacar esses motivos reduz mais ocorrências.');
+  const cid=[...C.cidades].sort((a,b)=>b.valor-a.valor), top3=cid.slice(0,3), p3=div(sum(top3,c=>c.valor),C.negVal);
+  P('info','negociacoes',`3 cidades concentram ${fPct(p3,0)} do valor negociado`,top3.map(c=>`${c.nome} (${fBRLc(c.valor)})`).join(', ')+`. Restante: ${fBRLc(C.negVal-sum(top3,c=>c.valor))} em ${cid.length-3} cidades.`);
+  const maiorTk=[...C.cidades].sort((a,b)=>b.ticket-a.ticket)[0], tkMed=div(C.negVal,C.negQtd);
+  P('info','negociacoes',`${maiorTk.nome}: ${fInt(maiorTk.qtd)} negociações, mas o maior valor por negociação`,`Ticket de ${fBRL(maiorTk.ticket)}, ${fDec(maiorTk.ticket/tkMed,1)} vezes o ticket médio (${fBRL(tkMed)}). Já ${C.cidades.slice().sort((a,b)=>b.qtd-a.qtd)[0].nome} lidera em quantidade (${fInt(C.cidades.slice().sort((a,b)=>b.qtd-a.qtd)[0].qtd)}) com ticket de ${fBRL(C.cidades.slice().sort((a,b)=>b.qtd-a.qtd)[0].ticket)}.`);
+  const fr=C.frentesNeg.find(f=>/corte/i.test(f.frente));
+  if(fr) P('atencao','negociacoes',`${fr.frente}: ${fPct(fr.parteQtd,0)} das negociações, ${fPct(fr.parteVal,0)} do valor`,`${fInt(fr.qtd)} negociações somam ${fBRLc(fr.valor)} (ticket ${fBRL(fr.ticket)}). A frente Leitura tem ${fPct(C.frentesNeg.find(f=>/leitura/i.test(f.frente)).parteQtd,0)} das negociações, com ticket bem menor.`);
+  const eq2=C.equipes.slice().sort((a,b)=>b.valor-a.valor).slice(0,2);
+  P('info','negociacoes',`2 equipes geram ${fPct(div(sum(eq2,e=>e.valor),N.resumo_report.valor),0)} do valor negociado`,eq2.map(e=>`${e.recurso} (${fInt(e.qtd)} negociações, ${fBRLc(e.valor)})`).join(' e ')+'. Vale entender o que essas equipes fazem diferente.');
+  const abaixo=C.metas.filter(m=>m.real!=null&&m.ating<C.lim.meta.atencao&&m.grupo!=='Negociação');
+  const acima=C.metas.filter(m=>m.real!=null&&m.ating>=C.lim.meta.bom);
+  if(abaixo.length) P('atencao','metas',`${abaixo.length} ${plural(abaixo.length,'meta está','metas estão')} abaixo do ritmo diário de referência`,abaixo.map(m=>`${m.rotulo} (${fPct(m.ating,0)})`).join('; ')+`. Referência = orçado ÷ ${C.dias} dias úteis; confirmar se o orçado é mensal.`);
+  if(acima.length) P('bom','metas',`${acima.length} ${plural(acima.length,'meta acima','metas acima')} do ritmo diário de referência`,acima.map(m=>`${m.rotulo} (${fPct(m.ating,0)})`).join('; ')+'.');
+  const comMeta=new Set(D.metas.map(m=>m.servico).filter(Boolean)), sem=S.filter(s=>!comMeta.has(s.nome));
+  P('info','metas',`${fPct(div(sum(sem,s=>s.exec),tot.exec),0)} das execuções estão em serviços sem meta no relatório`,sem.map(s=>bonito(s.nome)).join(', ')+`: ${fInt(sum(sem,s=>s.exec))} de ${fInt(tot.exec)} execuções.`);
+  const al=conf.filter(c=>c.status==='alerta').length;
+  P(al?'alerta':'bom','conferencia',`${al} ${plural(al,'divergência','divergências')} entre os números do relatório original`,'Alguns totais mudam de uma página para outra (ex.: 131 × 132 negociações; 66 motivos × 45 ocorrências). Veja a aba Conferência antes de usar esses números em decisões.');
+  return L;
+}
+
+/* =====================================================================
+   6. Componentes
+   ===================================================================== */
+function card(titulo,{sub,acoes,classe}={},...kids){
+  return h('section',{class:'card '+(classe||'')},
+    (titulo||acoes)&&h('div',{class:'card-h'},h('div',null,titulo&&h('h2',null,titulo),sub&&h('p',{class:'sub'},sub)),acoes),
+    ...kids);
+}
+function kpi(rotulo,valor,sub,tom,dica){ return h('div',{class:'kpi'+(tom&&tom!=='sem'?' tone-'+tom:''),'data-tip':dica||null,tabindex:dica?'0':null},h('div',{class:'l'},rotulo),h('div',{class:'v'},valor),sub&&h('div',{class:'s'},sub)); }
+function nota(...k){ return h('div',{class:'note'},...k); }
+
+/* Tabela genérica: colunas clicáveis para ordenar, barras nas células, rodapé e linha em foco */
+function tabela(cfg){
+  let ord=cfg.ordem?{...cfg.ordem}:null; const cols=cfg.colunas;
+  const tw=h('div',{class:'tw'}); const tb=h('tbody'); const thead=h('thead'); const tr0=h('tr');
+  const setas=()=>{ tr0.querySelectorAll('th').forEach((th,i)=>{ const c=cols[i]; th.setAttribute('aria-sort', ord&&ord.k===c.k?(ord.dir>0?'ascending':'descending'):'none'); const sp=th.querySelector('.seta'); if(sp) sp.textContent=ord&&ord.k===c.k?(ord.dir>0?'▲':'▼'):''; }); };
+  cols.forEach(c=>{ const th=h('th',{class:c.tipo==='num'?'n':'','data-tip':c.dica||null,scope:'col'});
+    if(c.ordenar===false||!cfg.linhas.length) th.appendChild(document.createTextNode(c.rotulo));
+    else th.appendChild(h('button',{type:'button',on:{click:()=>{ ord=ord&&ord.k===c.k?{k:c.k,dir:-ord.dir}:{k:c.k,dir:c.tipo==='num'?-1:1}; corpo(); }}},c.rotulo,h('span',{class:'seta','aria-hidden':'true'})));
+    tr0.appendChild(th); });
+  thead.appendChild(tr0);
+  const maxes={}; cols.forEach(c=>{ if(c.barra||c.pilha) maxes[c.k]=c.max!=null?c.max:Math.max(1,...cfg.linhas.map(r=>c.pilha?c.pilha.total(r):(c.get?c.get(r):r[c.k])||0)); });
+  function celula(c,r,rodape){
+    const v=c.get?c.get(r):r[c.k];
+    if(c.render) return c.render(r,rodape);
+    if(c.pilha&&!rodape){ const tot=c.pilha.total(r); const w=maxes[c.k]?tot/maxes[c.k]*100:0;
+      return h('div',{class:'bar-wrap'},h('div',{class:'bar-track'},h('div',{style:'display:flex;gap:2px;width:'+w.toFixed(2)+'%'},c.pilha.segs.map(s=>{ const q=s.get(r); return q>0?h('div',{class:'seg '+s.cor,style:'flex:'+q,'data-tip':(cfg.nomeLinha?cfg.nomeLinha(r):'')+'\n'+s.rot+': '+fInt(q)}):null;}))),h('span',{class:'val'},fInt(tot))); }
+    if(c.barra&&!rodape){ const w=maxes[c.k]?Math.max(0,(v||0))/maxes[c.k]*100:0;
+      return h('div',{class:'bar-wrap'},h('div',{class:'bar-track'},v?h('div',{class:'bar '+(c.barra.cor||'c1'),style:'width:'+w.toFixed(2)+'%','data-tip':(cfg.nomeLinha?cfg.nomeLinha(r)+'\n':'')+c.rotulo+': '+(c.fmt?c.fmt(v,r):v)}):null),h('span',{class:'val'},c.fmt?c.fmt(v,r):v)); }
+    const t=c.fmt?c.fmt(v,r):(v==null?'—':v); return t;
+  }
+  function corpo(){
+    let rows=cfg.linhas.slice();
+    if(ord){ const c=cols.find(x=>x.k===ord.k); const g=c.get||(r=>r[c.k]); rows.sort((a,b)=>{ const x=g(a),y=g(b); if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (typeof x==='string'?x.localeCompare(y,'pt-BR'):x-y)*ord.dir; }); }
+    tb.replaceChildren(); rows.forEach(r=>{
+      const chave=cfg.chave?cfg.chave(r):null, sel=cfg.foco&&chave!=null&&cfg.foco()===chave;
+      const tr=h('tr',{class:(cfg.aoClicar?'clic ':'')+(sel?'sel':''),tabindex:cfg.aoClicar?'0':null,'aria-selected':cfg.aoClicar?String(!!sel):null,on:cfg.aoClicar?{click:()=>cfg.aoClicar(r),keydown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();cfg.aoClicar(r);}}}:null});
+      cols.forEach(c=>{ const td=h('td',{class:(c.tipo==='num'?'n ':'')+(c.dim?'dim ':'')+(c.quebra?'w':'')}); add(td,[celula(c,r,false)]); tr.appendChild(td); }); tb.appendChild(tr); });
+    if(!rows.length){ const tr=h('tr'); tr.appendChild(h('td',{colspan:cols.length,class:'vazio'},'Sem dados.')); tb.appendChild(tr); }
+    setas();
+  }
+  const t=h('table',{class:cfg.classe||''},cfg.legenda&&h('caption',{class:'sr'},cfg.legenda),thead,tb);
+  if(cfg.rodape){ const tf=h('tfoot'),tr=h('tr'); cols.forEach(c=>{ const td=h('td',{class:c.tipo==='num'?'n':''}); let v; if(c.rodape!==undefined) v=c.rodape; else if(typeof cfg.rodape[c.k]==='string') v=cfg.rodape[c.k]; else if(c.render) v=c.render(cfg.rodape,true); else v=c.get?c.get(cfg.rodape):cfg.rodape[c.k]; add(td,[typeof v==='function'?v(cfg.rodape):(c.fmt&&v!=null&&typeof v==='number'?c.fmt(v,cfg.rodape):(v==null?'':v))]); tr.appendChild(td); }); tf.appendChild(tr); t.appendChild(tf); }
+  corpo(); tw.appendChild(t); return tw;
+}
+function legenda(itens){ return h('div',{class:'legend'},itens.map(i=>h('span',null,h('i',{class:i.cor}),i.rot))); }
+function pilhaHorizontal(segs,{total}={}){ // barra única de partes de um todo, com rótulo dentro só quando cabe
+  const T=total||sum(segs,s=>s.qtd);
+  return h('div',null,h('div',{class:'stack',role:'img','aria-label':segs.map(s=>s.rot+' '+fInt(s.qtd)).join(', ')},segs.map(s=>{ const p=div(s.qtd,T); return h('div',{class:s.cor,style:'flex:'+s.qtd,'data-tip':s.rot+'\n'+fInt(s.qtd)+' ('+fPct(p)+')'},p>=.12?fPct(p,0):''); })),
+    h('div',{class:'legend'},segs.map(s=>h('span',null,h('i',{class:s.cor}),s.rot+' — '+fInt(s.qtd)+' ('+fPct(div(s.qtd,T))+')'))));
+}
+function statusTaxa(C,t){ const tom=tomTaxa(C,t); return h('span',{class:'st '+tom},h('i',{'aria-hidden':'true'},ROT[tom][0]),fPct(t)); }
+
+/* =====================================================================
+   7. Estado e visões
+   ===================================================================== */
+const S = {snapshots:{}, dia:null, aba:'resumo', cidade:'', metricaCidade:'valor', diasUteis:null, expandidos:new Set(['Inadimplente']), confFiltro:'todas', busca:''};
+let C=null, CONF=[];
+function recalcular(){ const D=S.snapshots[S.dia]; if(S.diasUteis==null) S.diasUteis=(D.premissas&&D.premissas.orcado_e_mensal===false)?1:(D.premissas&&D.premissas.dias_uteis)||diasUteisDoMes(D.referencia.mes); C=calcular(D,S.diasUteis); CONF=conferencias(C); }
+const foco = () => S.cidade;
+function focar(c){ S.cidade = S.cidade===c ? '' : c; renderTudo(); }
+const nomeCidade = k => (C.D.cidades_nomes&&C.D.cidades_nomes[k])||bonito(k);
+
+function vFicha(){
+  const cc=C.cidadesCorte.find(c=>c.cidade===S.cidade), nc=C.cidades.find(c=>c.cidade===S.cidade);
+  const partes=[]; if(cc) partes.push(kpi('Cortes executados',fInt(cc.exec),cc.exoc?fInt(cc.exoc)+' com ocorrência · taxa '+fPct(cc.taxa):'sem ocorrências'));
+  if(nc){ partes.push(kpi('Negociações',fInt(nc.qtd),fPct(div(nc.qtd,C.negQtd))+' do total')); partes.push(kpi('Valor negociado',fBRLc(nc.valor),fPct(div(nc.valor,C.negVal))+' do valor total')); partes.push(kpi('Ticket médio',fBRL(nc.ticket),'média geral '+fBRL(div(C.negVal,C.negQtd)))); }
+  return card('Ficha de '+nomeCidade(S.cidade),{sub:'Cidade em foco. As tabelas de cidade mostram a linha destacada. Clique de novo na cidade, ou em × acima, para limpar.'},partes.length?h('div',{class:'grid gk'},partes):h('div',{class:'vazio'},'Esta cidade não aparece nos dados do dia.'));
+}
+
+function vResumo(){
+  const t=C.tot, neg=C.D.negociacoes.resumo_report, tom=tomTaxa(C,t.taxa), lim=C.lim.taxa_execucao;
+  const hero=h('div',{class:'hero'},h('div',{class:'l'},'Taxa de execução do dia'),h('div',{class:'v'},fPct(t.taxa)),
+    h('div',{class:'s'},fInt(t.exec)+' executadas de '+fInt(t.perc)+' O.S. percorridas'),
+    h('div',{class:'meter',role:'img','aria-label':'Taxa de execução '+fPct(t.taxa)+'. Marcas em '+fPct(lim.atencao,0)+' e '+fPct(lim.bom,0)},h('i',{style:'width:'+(t.taxa*100).toFixed(1)+'%'}),h('u',{style:'left:'+lim.atencao*100+'%'}),h('u',{style:'left:'+lim.bom*100+'%'})),
+    h('div',{class:'meter-l','aria-hidden':'true'},h('span',{style:'left:'+lim.atencao*100+'%;transform:translateX(-90%)'},fPct(lim.atencao,0)),h('span',{style:'left:'+lim.bom*100+'%;transform:translateX(-10%)'},fPct(lim.bom,0))),
+    h('div',{class:'s',style:'font-size:12px;margin-top:6px'},'Marcas na barra: atenção a partir de '+fPct(lim.atencao,0)+' · bom a partir de '+fPct(lim.bom,0)),
+    h('div',{style:'margin-top:10px'},h('span',{class:'st '+tom,style:'color:#fff'},h('i',{'aria-hidden':'true'},ROT[tom][0]),ROT[tom][1]+' pelo limiar do painel')));
+  const kpis=h('div',{class:'grid gk'},
+    kpi('O.S. percorridas',fInt(t.perc),'Exec + Exoc (vistorias realizadas)',null,'Visitas com resultado registrado: executadas + com ocorrência.'),
+    kpi('Executadas (Exec)',fInt(t.exec),'serviço concluído'),
+    kpi('Com ocorrência (Exoc)',fInt(t.exoc),fPct(div(t.exoc,t.perc))+' das percorridas · serviço não executado',t.exoc/t.perc>0.08?'atencao':null),
+    kpi('Equipes em campo',fInt(t.eq),'equipes distintas (não é soma das linhas)'),
+    kpi('Cortes realizados',fInt(C.D.totais_relatorio.corte_real.valor),'meta do mês '+fInt(sum(C.metas.filter(x=>x.grupo==='Corte'),x=>x.orcado))),
+    kpi('Religações realizadas',fInt(C.D.totais_relatorio.relig_real.valor),'meta do mês '+fInt(sum(C.metas.filter(x=>x.grupo==='Religação'),x=>x.orcado))),
+    kpi('Negociações',fInt(neg.qtd),fBRLc(neg.valor)+' · ticket '+fBRL(neg.ticket_medio),null,'131 no card; o total exibido em outra página é 132. Veja a aba Conferência.'),
+    kpi('Termos aplicados',fInt(C.D.metas.find(m=>m.id==='termos').real),'meta do mês: '+fInt(C.D.metas.find(m=>m.id==='termos').orcado)));
+  const dest=card('Destaques e alertas',{sub:'Frases geradas a partir dos números do dia. Cada uma leva à aba com o detalhe.'},
+    h('ul',{class:'dest'},destaques(C,CONF).map(d=>h('li',null,situacao(d.tom==='alerta'?'alerta':d.tom==='bom'?'bom':d.tom==='atencao'?'atencao':'info',d.tom==='alerta'?'Alerta':d.tom==='bom'?'Bom':d.tom==='atencao'?'Atenção':'Info'),h('div',null,h('div',{class:'t'},d.titulo),h('div',{class:'d'},d.texto)),h('button',{class:'go',type:'button',on:{click:()=>irPara(d.aba)}},'Ver detalhe ›')))));
+  const serv=card('Execução por serviço',{sub:'Cada barra soma executadas + com ocorrência. A taxa é Exec ÷ (Exec + Exoc). Clique nos títulos para ordenar.'},
+    legenda([{cor:'c1',rot:'Executadas'},{cor:'c2',rot:'Com ocorrência'}]),
+    tabela({legenda:'Execução por serviço',nomeLinha:r=>bonito(r.nome),linhas:C.S,ordem:{k:'perc',dir:-1},
+      colunas:[{k:'nome',rotulo:'Serviço',quebra:true,render:r=>h('span',{class:'nome'},bonito(r.nome))},
+        {k:'eq',rotulo:'Equipes',tipo:'num',fmt:fInt,dim:true,dica:'Equipes distintas que fizeram o serviço no dia.',rodape:fInt(t.eq)},
+        {k:'perc',rotulo:'O.S. percorridas',pilha:{total:r=>r.perc,segs:[{k:'exec',cor:'c1',rot:'Executadas',get:r=>r.exec},{k:'exoc',cor:'c2',rot:'Com ocorrência',get:r=>r.exoc}]},rodape:fInt(t.perc)},
+        {k:'taxa',rotulo:'Taxa de execução',tipo:'num',render:r=>statusTaxa(C,r.taxa),rodape:r=>statusTaxa(C,t.taxa),dica:'Exec ÷ (Exec + Exoc). Bom ≥ '+fPct(C.lim.taxa_execucao.bom,0)+' · Atenção ≥ '+fPct(C.lim.taxa_execucao.atencao,0)}],
+      rodape:{nome:'Total'}}));
+  const M=[...C.D.motivos_nao_execucao].sort((a,b)=>b.qtd-a.qtd), mt=sum(M,m=>m.qtd); let ac=0; const Mr=M.map(m=>{ac+=m.qtd; return {...m,pct:div(m.qtd,mt),acum:div(ac,mt)};});
+  const mot=card('Por que o serviço não foi executado',{sub:'Motivos de não execução do dia (nomes cortados como no PDF), do mais para o menos frequente.'},
+    tabela({legenda:'Motivos de não execução',nomeLinha:r=>bonito(r.motivo),linhas:Mr,ordem:{k:'qtd',dir:-1},
+      colunas:[{k:'motivo',rotulo:'Motivo',quebra:true,render:r=>h('span',{class:'nome'},bonito(r.motivo))},{k:'qtd',rotulo:'Ocorrências',barra:{cor:'c2'},fmt:fInt,tipo:'num'},{k:'pct',rotulo:'% do total',tipo:'num',fmt:v=>fPct(v)},{k:'acum',rotulo:'% acumulado',tipo:'num',fmt:v=>fPct(v,0),dica:'Soma dos motivos até esta linha (Pareto).'}],
+      rodape:{motivo:'Total dos motivos',qtd:mt}}),
+    nota(h('b',null,'Atenção: '),'os motivos somam '+fInt(mt)+', mas o total de ocorrências (Exoc) é '+fInt(t.exoc)+'. O relatório original mistura regras; veja a aba Conferência.'));
+  return frag(S.cidade&&vFicha()&&h('div',{class:'mt'},vFicha()), h('div',{class:'top-grid mt'},hero,kpis), h('div',{class:'mt'},dest), h('div',{class:'grid g2 mt'},serv,mot));
+}
+
+function tabelaFrente(titulo,bloco,sub){
+  return card(titulo,{sub},tabela({legenda:titulo,nomeLinha:r=>r.frente,linhas:bloco.linhas.map(l=>({...l,perc:l.exec+l.exoc,taxa:div(l.exec,l.exec+l.exoc)})),ordem:{k:'exec',dir:-1},
+    colunas:[{k:'frente',rotulo:'Frente',quebra:true},{k:'eq',rotulo:'Equipes',tipo:'num',fmt:fInt,dim:true},{k:'exec',rotulo:'Exec',tipo:'num',barra:{cor:'c1'},fmt:fInt},{k:'exoc',rotulo:'Exoc',tipo:'num',fmt:v=>v?fInt(v):'—',dim:true},{k:'taxa',rotulo:'Taxa',tipo:'num',render:r=>r.perc?statusTaxa(C,r.taxa):h('span',{class:'dim'},'—'),dica:'Exec ÷ (Exec + Exoc)'}],
+    rodape:{frente:'Total',eq:bloco.total.eq,exec:bloco.total.exec,exoc:bloco.total.exoc,perc:bloco.total.exec+bloco.total.exoc,taxa:div(bloco.total.exec,bloco.total.exec+bloco.total.exoc)}}));
+}
+function vOperacao(){
+  const D=C.D, TR=D.totais_relatorio, m=id=>C.metas.find(x=>x.id===id);
+  const cM=sum(C.metas.filter(x=>x.grupo==='Corte'),x=>x.orcado), rM=sum(C.metas.filter(x=>x.grupo==='Religação'),x=>x.orcado);
+  const kp=h('div',{class:'grid gk'},
+    kpi('Cortes realizados',fInt(TR.corte_real.valor),'no dia · meta do mês '+fInt(cM)+' ('+fPct(div(TR.corte_real.valor,cM))+' em 1 dia)'),
+    kpi('Religações realizadas',fInt(TR.relig_real.valor),'no dia · meta do mês '+fInt(rM)+' ('+fPct(div(TR.relig_real.valor,rM))+' em 1 dia)'),
+    kpi('O.S. de vistoria pós-corte',fInt(D.dia_a_dia.pos_corte),'pelas frentes de pós-corte: '+fInt(D.frentes.pos_corte.total.exec),'atencao','78 = O.S. do tipo "Vistoria pós corte"; 61 = O.S. feitas pelas equipes da frente Pós Corte. Duas contagens diferentes com o mesmo nome.'),
+    kpi('Recuperação de cortados',fInt(D.outros_indicadores.rec_cavalete+D.outros_indicadores.rec_ramal),'cavalete '+fInt(D.outros_indicadores.rec_cavalete)+' · ramal '+fInt(D.outros_indicadores.rec_ramal)));
+  const tipos=(dados,nomeCor)=>pilhaHorizontal(dados.map((d,i)=>({rot:d.tipo,qtd:d.qtd,cor:['ct1','ct2','ct3'][i]})));
+  const cortePorTipo=card('Corte por tipo',{sub:'Como os '+fInt(TR.corte_real.valor)+' cortes do dia se dividem.'},tipos(D.corte_por_tipo),nota('Ramal: sem cortes no dia (meta do mês: '+fInt(m('corte_ramal').orcado)+').'));
+  const religPorTipo=card('Religação por tipo',{sub:'Como as '+fInt(TR.relig_real.valor)+' religações do dia se dividem.'},tipos(D.religacao_por_tipo));
+  const frentes=h('div',{class:'grid g3 mt'},tabelaFrente('Corte por frente',D.frentes.corte,'Quem fez os cortes.'),tabelaFrente('Religação por frente',D.frentes.religacao,'Quem fez as religações.'),tabelaFrente('Pós-corte por frente',D.frentes.pos_corte,'Frentes que atuaram em pós-corte.'));
+  const cidades=card('Corte por cidade',{sub:'Clique em uma cidade para colocá-la em foco em todo o painel.'},
+    tabela({legenda:'Corte por cidade',nomeLinha:r=>r.nome,linhas:C.cidadesCorte,ordem:{k:'exec',dir:-1},chave:r=>r.cidade,foco,aoClicar:r=>focar(r.cidade),
+      colunas:[{k:'nome',rotulo:'Cidade'},{k:'exec',rotulo:'Executados',tipo:'num',barra:{cor:'c1'},fmt:fInt,dica:'Cortes executados (Exec).'},{k:'exoc',rotulo:'Exoc',tipo:'num',fmt:v=>v?fInt(v):'—',dim:true,dica:'Com ocorrência: visita feita, corte não executado.'},{k:'taxa',rotulo:'Taxa',tipo:'num',render:r=>statusTaxa(C,r.taxa)},{k:'eq',rotulo:'Equipes*',tipo:'num',fmt:fInt,dim:true,dica:'Coluna "Eq" do relatório. Conta equipes de todos os serviços na cidade, não só de corte (ver Conferência).'}],
+      rodape:{nome:'Total',exec:D.corte_por_cidade.total.exec,exoc:D.corte_por_cidade.total.exoc,taxa:div(D.corte_por_cidade.total.exec,D.corte_por_cidade.total.exec+D.corte_por_cidade.total.exoc),eq:D.corte_por_cidade.total.eq}}),
+    nota('* "Equipes" segue o relatório e não é comparável entre linhas. O painel não calcula produtividade com ela.'));
+  const rk=D.ranking_corte;
+  const ranking=card('Ranking de equipes de corte',{sub:'Equipes que mais executaram corte no dia.'},
+    tabela({legenda:'Ranking de equipes de corte',nomeLinha:r=>r.recurso,linhas:rk.linhas,ordem:{k:'os_corte',dir:-1},
+      colunas:[{k:'rank',rotulo:'Posição',tipo:'num',fmt:v=>v+'º'},{k:'recurso',rotulo:'Equipe',render:r=>h('span',{class:'mono'},r.recurso)},{k:'os_corte',rotulo:'O.S. de corte',tipo:'num',barra:{cor:'c1'},fmt:fInt},{k:'neg',rotulo:'Negociações',tipo:'num',fmt:v=>v?fInt(v):'—',dim:true}],
+      rodape:{rank:'',recurso:'Total',os_corte:rk.total.os_corte,neg:rk.total.neg}}),
+    (()=>{ const fs=rk.linhas.filter(r=>/^RIOFSC/.test(r.recurso)); return fs.length?nota(fs.map(r=>r.recurso).join(', ')+' ('+fInt(sum(fs,r=>r.os_corte))+' O.S. de corte) '+(fs.length>1?'são equipes':'é equipe')+' de fiscalização, conforme o cadastro de frentes; as demais são de corte e religação.'):null; })());
+  return frag(h('div',{class:'mt'},kp),h('div',{class:'grid g2 mt'},cortePorTipo,religPorTipo),frentes,h('div',{class:'grid g2 mt'},cidades,ranking));
+}
+
+function vNegociacoes(){
+  const D=C.D, N=D.negociacoes, R=N.resumo_report, V=N.valores, K=N.kpis, tk=div(C.negVal,C.negQtd);
+  const kp=h('div',{class:'grid gk'},
+    kpi('Negociações',fInt(R.qtd),'no dia (o relatório também mostra '+fInt(K.total)+')',null,'131 = soma das cidades e card "Negociação tot". 132 = "Total Negociações" (inclui 1 sem cidade).'),
+    kpi('Valor negociado',fBRLc(R.valor),fBRL(R.valor),null,'Débito negociado no dia. Não confundir com valor pago/arrecadado.'),
+    kpi('Ticket médio',fBRL(R.ticket_medio),'valor ÷ negociações'),
+    kpi('Negociação principal',fInt(K.principal),fBRLc(V.principal)+' · '+fPct(div(K.principal,K.total),0)+' do total'),
+    kpi('Negociação pós-corte',fInt(K.pos_corte),fBRLc(V.desdobro_pos_corte)+' · '+fPct(div(V.desdobro_pos_corte,V.total),0)+' do valor','atencao','8 negociações rendem R$ 18 mil (31% do valor): ticket alto.'));
+  // Perfil × frente
+  const linhas=[]; for(const p of C.perfis){ linhas.push({...p,nivel:0}); if(S.expandidos.has(p.nome)) for(const f of p.filhos) linhas.push({...f,nome:f.frente,nivel:1,pai:p.nome,parteVal:div(f.valor,N.perfis_total.valor),parteQtd:div(f.qtd,N.perfis_total.qtd)}); }
+  const maxQ=Math.max(...C.perfis.map(p=>p.qtd)), maxV=Math.max(...C.perfis.map(p=>p.valor));
+  const tb=h('tbody'); linhas.forEach(r=>{
+    const pai=r.nivel===0; const tr=h('tr',{class:pai?'':'filho'});
+    const nomeCell=h('td',null,pai&&r.filhos.length?h('button',{class:'exp',type:'button','aria-expanded':String(S.expandidos.has(r.nome)),'aria-label':(S.expandidos.has(r.nome)?'Recolher ':'Expandir ')+r.nome,on:{click:()=>{ S.expandidos.has(r.nome)?S.expandidos.delete(r.nome):S.expandidos.add(r.nome); renderTudo(); }}},S.expandidos.has(r.nome)?'−':'+'):(pai?h('span',{style:'display:inline-block;width:26px'}):null),h('span',{class:pai?'nome':''},r.nome),pai&&!r.perfil?h('span',{style:'margin-left:8px'},situacao('alerta','cadastro incompleto')):null);
+    const bar=(v,max,cor)=>h('div',{class:'bar-wrap'},h('div',{class:'bar-track'},v?h('div',{class:'bar '+cor,style:'width:'+(v/max*100).toFixed(2)+'%'}):null),h('span',{class:'val'},''));
+    const q=h('td',{class:'n'},h('div',{class:'bar-wrap'},h('div',{class:'bar-track'},r.qtd?h('div',{class:'bar c1'+(pai?'':' lt'),style:'width:'+(r.qtd/maxQ*100).toFixed(2)+'%','data-tip':r.nome+'\nNegociações: '+fInt(r.qtd)}):null),h('span',{class:'val'},fInt(r.qtd))));
+    const v=h('td',{class:'n'},h('div',{class:'bar-wrap'},h('div',{class:'bar-track'},r.valor?h('div',{class:'bar c3'+(pai?'':' lt'),style:'width:'+(r.valor/maxV*100).toFixed(2)+'%','data-tip':r.nome+'\nValor: '+fBRL(r.valor)}):null),h('span',{class:'val',style:'min-width:82px'},fBRL(r.valor))));
+    tr.append(nomeCell,q,v,h('td',{class:'n'},fBRL(r.ticket)),h('td',{class:'n'},fPct(r.parteVal))); tb.appendChild(tr); });
+  const foot=h('tfoot',null,h('tr',null,h('td',null,'Total'),h('td',{class:'n'},fInt(N.perfis_total.qtd)),h('td',{class:'n'},fBRL(N.perfis_total.valor)),h('td',{class:'n'},fBRL(div(N.perfis_total.valor,N.perfis_total.qtd))),h('td',{class:'n'},'100,0%')));
+  const perfil=card('Quem negocia: perfil do cliente e frente que negociou',{sub:'Clique em + para abrir as frentes de cada perfil. Barras de valor em aqua, de quantidade em azul.',classe:''},
+    h('div',{class:'tw'},h('table',{class:'compacta'},h('thead',null,h('tr',null,h('th',{scope:'col'},'Perfil / frente'),h('th',{class:'n',scope:'col'},'Negociações'),h('th',{class:'n',scope:'col'},'Valor negociado'),h('th',{class:'n',scope:'col'},'Ticket médio'),h('th',{class:'n',scope:'col','data-tip':'Parte do valor total (R$ 58.104,64).'},'% do valor'))),tb,foot)),
+    nota(h('b',null,'Leitura: '),'a frente Leitura faz a maior parte das negociações; Corte e Religa faz poucas, mas de valor alto (ticket de '+fBRL(C.frentesNeg.find(f=>/corte/i.test(f.frente)).ticket)+', contra '+fBRL(C.frentesNeg.find(f=>/leitura/i.test(f.frente)).ticket)+' da Leitura). "Frente" aqui segue os mesmos nomes do cadastro de frentes.'));
+  // Cidades
+  const M={valor:{rot:'Valor negociado',fmt:fBRL,cor:'c3'},qtd:{rot:'Negociações',fmt:fInt,cor:'c1'},ticket:{rot:'Ticket médio',fmt:fBRL,cor:'ct1'}};
+  const ctl=h('div',{class:'seg-ctl',role:'group','aria-label':'Ordenar cidades por'},Object.entries(M).map(([k,m])=>h('button',{type:'button','aria-pressed':String(S.metricaCidade===k),on:{click:()=>{S.metricaCidade=k;renderTudo();}}},m.rot)));
+  const cid=card('Cidades',{sub:'Clique em uma cidade para colocá-la em foco. A barra segue a coluna escolhida.',acoes:ctl},
+    tabela({legenda:'Negociações por cidade',nomeLinha:r=>r.nome,linhas:C.cidades,ordem:{k:S.metricaCidade,dir:-1},chave:r=>r.cidade,foco,aoClicar:r=>focar(r.cidade),
+      colunas:[{k:'nome',rotulo:'Cidade'},
+        {k:'qtd',rotulo:'Negociações',tipo:'num',fmt:fInt,...(S.metricaCidade==='qtd'?{barra:{cor:'c1'}}:{dim:true})},
+        {k:'valor',rotulo:'Valor',tipo:'num',fmt:fBRL,...(S.metricaCidade==='valor'?{barra:{cor:'c3'}}:{dim:true})},
+        {k:'ticket',rotulo:'Ticket médio',tipo:'num',fmt:fBRL,...(S.metricaCidade==='ticket'?{barra:{cor:'ct1'}}:{dim:true})}],
+      rodape:{nome:'Total das cidades',qtd:C.negQtd,valor:C.negVal,ticket:tk}}),
+    nota(h('b',null,'Diferença de 1 negociação: '),'o total exibido no relatório é '+fInt(K.total)+' e '+fBRL(V.total)+'. A diferença ('+fBRL(V.total-C.negVal)+') não está em nenhuma cidade.'));
+  // Equipes
+  const eq=card('Top equipes em negociação',{sub:'Equipes de leitura (RIOLTRIN). O relatório mostra 11 linhas por empate na 5ª posição.'},
+    tabela({classe:'compacta',legenda:'Top equipes em negociação',nomeLinha:r=>r.recurso,linhas:C.equipes,ordem:{k:'valor',dir:-1},
+      colunas:[{k:'recurso',rotulo:'Equipe',render:r=>h('span',{class:'mono'},r.recurso)},{k:'qtd',rotulo:'Negociações',tipo:'num',fmt:fInt,dim:true},{k:'valor',rotulo:'Valor',tipo:'num',barra:{cor:'c3'},fmt:fBRL},{k:'ticket',rotulo:'Ticket médio',tipo:'num',fmt:fBRL,dim:true},{k:'parte',rotulo:'% do valor',tipo:'num',fmt:v=>fPct(v),dica:'Parte do valor negociado no dia (R$ 58.104,64).'}],
+      rodape:{recurso:'Total das 11 equipes',qtd:N.top_equipes.total.qtd,valor:N.top_equipes.total.valor,ticket:div(N.top_equipes.total.valor,N.top_equipes.total.qtd),parte:div(N.top_equipes.total.valor,R.valor)}}),
+    nota('Ordene por "Ticket médio" para ver quem negocia valores mais altos: as equipes 023 e 007 têm poucas negociações, mas com ticket acima de R$ 800.'));
+  const tipoOS=card('Onde a negociação aconteceu',{sub:'Tipo da O.S. em que o cliente negociou.'},
+    pilhaHorizontal(N.por_tipo_os.map((t,i)=>({rot:bonito(t.tipo)+(t.derivado?'*':''),qtd:t.qtd,cor:['ct1','ct2','ct3'][i]}))),
+    nota('* Valor deduzido dos percentuais do gráfico de rosca do relatório (91,18% e 5,15%). A soma (136) passa dos 131/132 negociações; ver Conferência.'));
+  // Concentração
+  const top3=C.cidades.slice().sort((a,b)=>b.valor-a.valor).slice(0,3), e2=C.equipes.slice().sort((a,b)=>b.valor-a.valor).slice(0,2), cr=C.frentesNeg.find(f=>/corte/i.test(f.frente));
+  const meter=(rot,p,extra)=>h('div',{style:'margin:10px 0'},h('div',{style:'display:flex;justify-content:space-between;gap:10px'},h('span',null,rot),h('b',null,fPct(p,0))),h('div',{style:'height:10px;background:var(--track);border-radius:999px;margin-top:4px;overflow:hidden'},h('div',{class:'c1',style:'height:10px;border-radius:999px;width:'+(p*100).toFixed(1)+'%'})),extra&&h('div',{class:'small'},extra));
+  const conc=card('Concentração do valor negociado',{sub:'Quanto do valor do dia depende de poucos pontos.'},
+    meter('3 maiores cidades',div(sum(top3,c=>c.valor),C.negVal),top3.map(c=>c.nome).join(', ')),
+    meter('2 maiores equipes',div(sum(e2,e=>e.valor),R.valor),e2.map(e=>e.recurso).join(', ')),
+    meter('Frente Corte e Religa (valor)',cr.parteVal,fInt(cr.qtd)+' negociações = '+fPct(cr.parteQtd,0)+' da quantidade'));
+  return frag(h('div',{class:'mt'},kp),h('div',{class:'grid g2 mt'},perfil,cid),h('div',{class:'grid g2 mt'},eq,h('div',{class:'grid',style:'align-content:start'},tipoOS,conc)));
+}
+
+function vMetas(){
+  const D=C.D, lim=C.lim.meta;
+  const ctrl=card('Como a meta é lida aqui',{sub:'O relatório mostra o realizado de um dia ao lado do orçado. Para comparar de forma justa, o painel divide o orçado pelos dias úteis do mês.'},
+    h('div',{class:'filters',style:'padding:4px 0 0'},
+      h('label',null,'Dias úteis do mês',h('input',{type:'number',min:'1',max:'31',value:String(S.diasUteis),id:'inpDias',on:{change:e=>{ const n=Math.round(+e.target.value); if(n>=1&&n<=31){S.diasUteis=n; recalcular(); renderTudo();} else e.target.value=S.diasUteis; }}})),
+      h('button',{class:'chip',type:'button',on:{click:()=>{S.diasUteis=diasUteisDoMes(D.referencia.mes);recalcular();renderTudo();}}},'Usar dias de semana de '+mesBR(D.referencia.mes)+' ('+diasUteisDoMes(D.referencia.mes)+')'),
+      h('button',{class:'chip',type:'button',on:{click:()=>{S.diasUteis=1;recalcular();renderTudo();}}},'Orçado já é diário (1)')),
+    nota(h('b',null,'Meta diária de referência = orçado ÷ dias úteis. '),'Não desconta feriados. Se o orçado do relatório for diário, use 1. Atingimento = realizado do dia ÷ meta diária. Limiares: bom ≥ '+fPct(lim.bom,0)+', atenção ≥ '+fPct(lim.atencao,0)+', abaixo disso crítico.'));
+  const sitMeta=r=>{ if(r.real==null) return situacao('sem','Sem realizado no dia'); const t=tomMeta(C,r.ating); return situacao(t,{bom:'Na meta ou acima',atencao:'Atenção',critico:'Abaixo do ritmo'}[t]); };
+  const tab=card('Orçado × realizado',{sub:'Realizado do dia contra a meta diária de referência.'},
+    tabela({legenda:'Metas',nomeLinha:r=>r.rotulo,linhas:C.metas,ordem:null,
+      colunas:[{k:'rotulo',rotulo:'Indicador',quebra:true,render:r=>h('span',null,h('span',{class:'nome'},r.rotulo),r.rotulo_inferido?h('span',{class:'small','data-tip':'Nome completo deduzido: no PDF aparece "'+r.original+'".'},' *'):null)},
+        {k:'grupo',rotulo:'Grupo',dim:true},
+        {k:'orcado',rotulo:'Orçado',tipo:'num',fmt:(v,r)=>fInt(v)+(r.orcado_aprox?' ≈':''),dica:'Orçado do relatório. Onde aparece "≈", o relatório mostra valor arredondado (ex.: 1,2 Mil).'},
+        {k:'diaria',rotulo:'Meta diária de referência',tipo:'num',fmt:v=>fDec(v,1)},
+        {k:'real',rotulo:'Realizado no dia',tipo:'num',fmt:v=>v==null?'—':fInt(v)},
+        {k:'ating',rotulo:'Atingimento',tipo:'num',barra:{cor:'c1'},max:Math.max(1,...C.metas.map(m=>m.ating||0)),fmt:v=>v==null?'—':fPct(v,0)},
+        {k:'dif',rotulo:'Diferença',tipo:'num',fmt:v=>v==null?'—':(v>0?'+':'')+fDec(v,1),dica:'Realizado − meta diária de referência.'},
+        {k:'sit',rotulo:'Situação',render:sitMeta,ordenar:false}]}),
+    nota('* Nome deduzido. A linha "Dif" do relatório original é 0 em todos os cards e não representa orçado − realizado (ver Conferência); por isso não foi usada.'));
+  const comMeta=new Set(D.metas.map(m=>m.servico).filter(Boolean)), sem=C.S.filter(s=>!comMeta.has(s.nome)), semExec=sum(sem,s=>s.exec);
+  const semMeta=card('Serviços sem meta no relatório',{sub:'Serviços com execução no dia e nenhuma meta associada nos cards.'},
+    tabela({legenda:'Serviços sem meta',nomeLinha:r=>bonito(r.nome),linhas:sem,ordem:{k:'exec',dir:-1},colunas:[{k:'nome',rotulo:'Serviço',quebra:true,render:r=>h('span',{class:'nome'},bonito(r.nome))},{k:'exec',rotulo:'Executadas',tipo:'num',barra:{cor:'c1'},fmt:fInt},{k:'taxa',rotulo:'Taxa',tipo:'num',render:r=>statusTaxa(C,r.taxa)}],rodape:{nome:'Total sem meta',exec:semExec,taxa:null}}),
+    nota(fPct(div(semExec,C.tot.exec),0)+' das execuções do dia ('+fInt(semExec)+' de '+fInt(C.tot.exec)+') estão em serviços sem meta. Vale definir metas para eles.'));
+  const v=D.outros_indicadores, vd=v.vendas_meta/C.dias;
+  const outros=card('Vendas e recuperação',{sub:'Indicadores que aparecem no relatório fora dos cards de meta.'},
+    h('div',{class:'grid gk'},kpi('Vendas no dia',fInt(v.vendas),'meta do mês '+fInt(v.vendas_meta)+' · referência diária '+fDec(vd,1)+' ('+fPct(div(v.vendas,vd),0)+')'),kpi('Recuperação — cavalete',fInt(v.rec_cavalete),'sem meta no relatório'),kpi('Recuperação — ramal',fInt(v.rec_ramal),'sem meta no relatório'),kpi('"Vendas ALL"',fInt(v.vendas_all),'definição não identificada','atencao','Página 4 do PDF. Não dá para saber se é do mês, da empresa ou histórico.')));
+  const falta=card('O que falta para acompanhar a meta de verdade',{sub:'Pedido para a próxima etapa.'},
+    h('ul',{style:'margin:6px 0 0;padding-left:18px'},['Realizado acumulado do mês (hoje só existe o dia).','Confirmar se o orçado é mensal ou diário e quantos dias úteis o mês tem de fato.','Ritmo necessário: (orçado − acumulado) ÷ dias úteis restantes.','Projeção de fechamento do mês no ritmo atual.','Programado por dia (a coluna "Prog" do relatório está vazia).'].map(t=>h('li',null,t))));
+  return frag(h('div',{class:'mt'},ctrl),h('div',{class:'mt'},tab),h('div',{class:'grid g2 mt'},semMeta,outros),h('div',{class:'mt'},falta));
+}
+
+function vConferencia(){
+  const cont={ok:0,alerta:0,info:0}; CONF.forEach(c=>cont[c.status]++);
+  const f=S.confFiltro; const lista=CONF.filter(c=>f==='todas'||c.status===f);
+  const chip=(k,r)=>h('button',{class:'chip',type:'button','aria-pressed':String(f===k),on:{click:()=>{S.confFiltro=k;renderTudo();}}},r);
+  const resumo=card('Confiança nos números',{sub:'Cada linha é uma conta feita sobre os próprios dados do relatório. "Alerta" significa que dois lugares do relatório original mostram números diferentes para a mesma coisa, ou que a regra não fecha.'},
+    h('div',{class:'grid gk'},kpi('Conferem',fInt(cont.ok),'contas que fecham','bom'),kpi('Alertas',fInt(cont.alerta),'divergências a corrigir na origem',cont.alerta?'critico':null),kpi('Informativos',fInt(cont.info),'premissas e limites deste painel')),
+    h('div',{class:'chips',style:'margin-top:12px'},chip('todas','Todas ('+CONF.length+')'),chip('alerta','Alertas ('+cont.alerta+')'),chip('ok','Conferem ('+cont.ok+')'),chip('info','Informativos ('+cont.info+')')));
+  const grupos=[...new Set(lista.map(c=>c.grupo))];
+  const blocos=grupos.map(g=>h('div',null,h('div',{class:'sec-title'},g),h('div',{class:'conf'},lista.filter(c=>c.grupo===g).sort((a,b)=>({alerta:0,info:1,ok:2}[a.status]-{alerta:0,info:1,ok:2}[b.status])).map(c=>{
+    const tom=c.status==='ok'?'bom':c.status; const det=h('details',{open:c.status==='alerta'&&f!=='todas'?'':null},
+      h('summary',null,situacao(tom,c.status==='ok'?'Confere':c.status==='alerta'?'Alerta':'Info'),h('span',{class:'t'},c.titulo),h('span',{class:'small'},'▾')),
+      h('div',{class:'corpo'},h('div',{class:'eq'},h('div',null,h('small',null,'Esperado'),c.esperado),h('div',null,h('small',null,'Encontrado'),c.encontrado)),h('div',null,h('b',null,'O que significa: '),c.significa),h('div',null,h('b',null,'O que fazer: '),c.acao)));
+    return det; }))));
+  return frag(h('div',{class:'mt'},resumo),blocos.length?blocos:h('div',{class:'vazio'},'Nenhuma conferência neste filtro.'));
+}
+
+const DIC=[
+ ['O.S. percorridas','Perc · Vistorias realizadas','Visitas com resultado registrado no dia.','Exec + Exoc','Report › Serviço real executado'],
+ ['Executadas (Exec)','Exec','O.S. concluídas com o serviço feito. Negociação de débito no local conta como Exec (rodapé do relatório).','Contagem de O.S. com status Finalizada','Report › Serviço real executado'],
+ ['Com ocorrência (Exoc)','Exoc','O.S. encerrada com ocorrência: houve visita, mas o serviço não foi executado (o motivo aparece em "Motivo de Não Execução"). Negociação não conta como Exoc.','Contagem de O.S. encerradas com ocorrência, sem negociação','Report › Serviço real executado'],
+ ['Taxa de execução','% Asser (Report) · Efetividade (rodapé) · % Ass. (Corte)','Quanto das visitas terminou com o serviço executado. O relatório usa três nomes e, em Corte/Religação, uma conta diferente.','Exec ÷ (Exec + Exoc)','Padronizado neste painel'],
+ ['Equipes','Qtd Eq · Eq','Equipes (recursos) distintas que trabalharam. Não se soma entre linhas: a mesma equipe faz vários serviços.','Contagem distinta de recursos','Report, Corte'],
+ ['Programado','Prog','Quantidade programada para o dia. Vazia em todo o relatório na data analisada.','—','Tabelas de serviço, frente e cidade'],
+ ['Orçado','Orçado (linha dos cards)','Meta do relatório. Suposição deste painel: meta do mês.','Valor fixo por indicador','Report › cards de meta'],
+ ['Realizado no dia','Real','Executadas do serviço no dia selecionado. Confere com a linha do serviço (ex.: 29 cortes no cavalete).','Exec do serviço','Report › cards de meta'],
+ ['Meta diária de referência','(novo)','Orçado dividido pelos dias úteis informados. Serve para saber se o dia está acima ou abaixo do ritmo.','Orçado ÷ dias úteis','Aba Metas'],
+ ['Atingimento','(novo; substitui "Dif")','Realizado do dia ÷ meta diária de referência.','Real ÷ (Orçado ÷ dias úteis)','Aba Metas'],
+ ['Negociações','Neg · Negociação Tot · Negociação Principal/Corte/Desdobro/Pós Corte','Quantidade de negociações de débito no dia. "Principal" (124) coincide com as negociações em O.S. de Cobrança (124), o que sugere ser a negociação da O.S. principal.','Contagem','Report, Corte, Negociações'],
+ ['Valor negociado','Negociação Tot $','Soma do débito negociado. É valor negociado, não pago nem arrecadado.','Soma de R$','Report, Negociações'],
+ ['Ticket médio','Tickt Médio','Valor negociado por negociação.','R$ 58.104,64 ÷ 131 = R$ 443,55','Report'],
+ ['Assertividade de negociação','Neg %Ass · Assertividade (rodapé)','Negociações por visita realizada. O inverso diz quantas visitas são necessárias por negociação (ex.: 5,88% ≈ 1 a cada 17).','Neg ÷ (Exec + Exoc)','Report › Categoria'],
+ ['Termos aplicados','Termos · Termos Meta','Termos de irregularidade aplicados. Há 29 (card), 19 (tabela) e 20 (linhas da tabela) no mesmo dia; regra a confirmar.','Contagem de termos','Report'],
+ ['Efetividade de termos','Efet Termos','Regra não identificada no PDF (mostra 43%, 34%, "Infinito" e 100%).','?','Report › Categoria'],
+ ['Perfil do cliente','Cluster Perfil','Adimplente, Inadimplente, Nunca Pagou ou em branco.','Atributo do cliente','Negociações'],
+ ['Frente que negociou','Leitura · Corte e Religa · Pós Corte · Recadastro (filhos do perfil)','Grupo de equipes que fez a negociação. Os nomes coincidem com as frentes do cadastro (RIOLTRIN = Leitura, RIOCERIN = Corte-Religa, RIOFSCIN = Fiscalização).','Prefixo do recurso → frente','Negociações › Cluster Perfil'],
+ ['Equipe (recurso)','RIOCERIN-020 …','Código da equipe: prefixo (regional + frente + região) e número.','—','Corte, Negociações'],
+ ['Cavalete · Ramal · LISC','Cavalete · Ramal · LISC','Cavalete: ponto de ligação do imóvel, onde fica o hidrômetro. Ramal: tubulação entre a rede e o cavalete. LISC: sigla usada nos serviços "débito (LISC)"; significado a confirmar.','—','Corte, Religação'],
+ ['Recuperação (cavalete/ramal)','Rec. Cavalete · Rec. Ramal','Serviços de recuperação de ligações cortadas. Definição a confirmar.','Contagem','Report'],
+ ['Vendas','Vendas · Vendas Meta · Vendas ALL','17 no dia, meta 244. "ALL" (2.261) sem definição no PDF.','Contagem','Report, página 4']
+];
+const MAPA=[
+ ['1. Report','Cards Orçado/Real/Dif','10 indicadores × 3 linhas','Corte Cavalete, Corte Lisc Meta, Corte Ramal Meta, Religação Cavalete, Religação Lisc Meta, Religação Ramal, Meta Negociação, Instalação de H…, Substituição de…, Termos Meta'],
+ ['1. Report','Cards','Rec. Cavalete, Rec. Ramal, Vendas, Negociação Tot (R$), Negociação tot (qtd), Ticket Médio',''],
+ ['1. Report','Matriz "Serviço real executado"','Serviço › Prog, Qtd Eq, Exec, Exoc, Perc, % Asser','Linhas expansíveis; total tem 57 equipes distintas'],
+ ['1. Report','Tabela por categoria','Categoria › O.S Exec, Neg Tot, Neg %Ass, Termos, Efet Termos','Vistoria pós-corte, vistoria de irregularidade, corte'],
+ ['1. Report','Colunas "Motivo de Não Execução"','17 motivos × quantidade','Nomes truncados'],
+ ['1. Report','Filtros','Data (29/09/2026) · Mês (set/2026)','Botão voltar: página de detalhe (drill-through)'],
+ ['1. Corte','Cards','Corte Meta/Real, Relig. Meta/Real, Neg. Corte Meta, Neg. Corte, Neg. Corte $, Ticket Médio','Neg. Corte e Ticket = "--"'],
+ ['1. Corte','Tabelas por frente','Corte / Religação / Pós Corte › Frente, Eq/Qtd Equipes, PROG, EXEC, EXOC, NEG., % Ass.','A de Pós Corte tem colunas fora da área visível'],
+ ['1. Corte','Tabela por cidade','Cidade › Eq, PROG, EXEC, EXOC, NEG., % Ass.','7 cidades'],
+ ['1. Corte','Gráfico por dia','Corte, Religação e Pós Corte por dia','Com o filtro de um dia, mostra 1 ponto: 42, 73, 78'],
+ ['1. Corte','Top 10 recursos','Recurso › Ranking Corte, O.S Corte, Negociação tot',''],
+ ['1. Corte','3 roscas','Corte Aberto (cavalete/LISC) · Religação Aberto (cavalete/ramal/LISC) · Negociação (cobrança/vistoria pós-corte/religação)',''],
+ ['1. Negociações','Filtro "Todos"','Campo não identificado no PDF','Sobreposto ao botão voltar'],
+ ['1. Negociações','10 cards','Quantidades (principal, cadastro desdobro, corte, desdobro, pós-corte, total) e valores (principal, desdobro corte, desdobro, desdobro pós-corte, total)',''],
+ ['1. Negociações','Matriz "Negociações Comercial"','Cluster Perfil › Neg., R$ (perfil › frente)','5 negociações sem perfil'],
+ ['1. Negociações','Top 10 Negociações','Recurso › Top, Neg., R$','11 linhas por empate'],
+ ['1. Negociações','Negociação × Cidade','Cidade › Qtd., Neg. Total','11 cidades'],
+ ['1. Negociações','Motivo da não Execução','Gráfico quase vazio (1 item)','Filtrado por negociação'],
+ ['Página 4 (sem título)','Tabela','Vendas Meta (244) · Vendas ALL (2261)','Página auxiliar']
+];
+function vDicionario(){
+  const q=S.busca.trim().toLocaleLowerCase('pt-BR'); const ok=row=>!q||row.join(' ').toLocaleLowerCase('pt-BR').includes(q);
+  const busca=h('input',{class:'search',type:'search',placeholder:'Buscar indicador, sigla ou regra…',value:S.busca,'aria-label':'Buscar no dicionário',on:{input:e=>{S.busca=e.target.value; const pos=e.target.selectionStart; renderMain(); const i=document.querySelector('.search'); if(i){i.focus(); try{i.setSelectionRange(pos,pos);}catch(_){}} }}});
+  const d=DIC.filter(ok), m=MAPA.filter(ok);
+  return frag(h('div',{class:'mt'},card('Dicionário de indicadores',{sub:'O que cada número significa, como é calculado e como se chamava no relatório original.',acoes:busca},
+      h('div',{class:'tw'},h('table',{class:'dic'},h('thead',null,h('tr',null,['Neste painel','No relatório original','O que significa','Como se calcula','Onde aparece'].map(t=>h('th',{scope:'col'},t)))),h('tbody',null,d.length?d.map(r=>h('tr',null,r.map((c,i)=>h('td',{class:i===3?'mono':''},c)))):h('tr',null,h('td',{colspan:'5',class:'vazio'},'Nada encontrado.'))))))),
+    h('div',{class:'mt'},card('Mapa do relatório original (PDF)',{sub:'Páginas, visuais e campos, para localizar de onde vem cada número.'},
+      h('div',{class:'tw'},h('table',{class:'dic'},h('thead',null,h('tr',null,['Página','Visual','Campos / medidas','Observação'].map(t=>h('th',{scope:'col'},t)))),h('tbody',null,m.length?m.map(r=>h('tr',null,r.map(c=>h('td',null,c)))):h('tr',null,h('td',{colspan:'4',class:'vazio'},'Nada encontrado.'))))))),
+    h('div',{class:'mt'},card('Regras impressas no rodapé do relatório',{},h('ul',{style:'margin:0;padding-left:18px'},C.D.regras_rodape.map(t=>h('li',null,t))))));
+}
+
+/* =====================================================================
+   8. Navegação, cabeçalho, filtros e ações
+   ===================================================================== */
+const ABAS=[['resumo','Resumo do dia',vResumo],['operacao','Corte e religação',vOperacao],['negociacoes','Negociações',vNegociacoes],['metas','Metas',vMetas],['conferencia','Conferência',vConferencia],['dicionario','Dicionário',vDicionario]];
+function irPara(id){ S.aba=id; try{history.replaceState(null,'','#'+id);}catch(_){} renderTudo(); window.scrollTo({top:0}); }
+function renderTabs(){
+  const nav=document.getElementById('tabs'); nav.replaceChildren();
+  ABAS.forEach(([id,rot],i)=>{ const al=CONF.filter(c=>c.status==='alerta').length;
+    nav.appendChild(h('button',{class:'tab',role:'tab',id:'tab-'+id,'aria-selected':String(S.aba===id),'aria-controls':'main',tabindex:S.aba===id?'0':'-1',on:{click:()=>irPara(id),keydown:e=>{ const k={ArrowRight:1,ArrowLeft:-1}[e.key]; if(k){ e.preventDefault(); const n=ABAS[(i+k+ABAS.length)%ABAS.length][0]; irPara(n); document.getElementById('tab-'+n).focus(); } }}},rot,id==='conferencia'&&al?h('span',{class:'badge','aria-label':al+' alertas'},String(al)):null)); });
+}
+function renderFiltros(){
+  const f=document.getElementById('filtros'); f.replaceChildren();
+  const dias=Object.keys(S.snapshots).sort();
+  f.appendChild(h('label',null,'Dia',h('select',{id:'selDia','aria-label':'Dia dos dados',on:{change:e=>{S.dia=e.target.value;S.diasUteis=null;recalcular();renderTudo();}}},dias.map(d=>h('option',{value:d,selected:d===S.dia?'':null},dataBR(d)+' ('+diaSemana(d)+')')))));
+  const todas=[...new Set([...C.D.negociacoes.por_cidade.linhas,...C.D.corte_por_cidade.linhas].map(c=>c.cidade))].sort((a,b)=>nomeCidade(a).localeCompare(nomeCidade(b),'pt-BR'));
+  f.appendChild(h('label',null,'Cidade em foco',h('select',{id:'selCidade','aria-label':'Cidade em foco',on:{change:e=>{S.cidade=e.target.value;renderTudo();}}},h('option',{value:''},'Todas'),todas.map(c=>h('option',{value:c,selected:c===S.cidade?'':null},nomeCidade(c))))));
+  if(S.cidade) f.appendChild(h('span',{class:'pill'},nomeCidade(S.cidade),h('button',{type:'button','aria-label':'Limpar cidade em foco',on:{click:()=>focar(S.cidade)}},'×')));
+  f.appendChild(h('span',{class:'spacer'}));
+  f.appendChild(h('span',{class:'small hint'},dias.length>1?dias.length+' dias carregados':'1 dia carregado · a cidade em foco destaca linhas e abre a ficha no Resumo'));
+}
+function renderTopo(){
+  const r=C.D.referencia; document.getElementById('chipData').replaceChildren(h('b',null,dataBR(r.data)),' · '+diaSemana(r.data)+' · '+mesBR(r.mes));
+  document.getElementById('rodape').textContent='Fonte: '+r.fonte+'. Exportado em '+dataBR(r.exportado_em)+'. '+r.observacao+' Os números são os do relatório original; as taxas e proporções são recalculadas aqui e explicadas no Dicionário.';
+}
+function renderMain(){ const m=document.getElementById('main'); const v=ABAS.find(a=>a[0]===S.aba)[2]; m.setAttribute('role','tabpanel'); m.setAttribute('aria-labelledby','tab-'+S.aba); m.replaceChildren(v()); }
+function renderTudo(){ renderTopo(); renderTabs(); renderFiltros(); renderMain(); }
+
+function resumoTexto(){
+  const t=C.tot, R=C.D.negociacoes.resumo_report, r=C.D.referencia, al=CONF.filter(c=>c.status==='alerta').length;
+  return ['Mensal Comercial — '+dataBR(r.data),'',
+    'Taxa de execução: '+fPct(t.taxa)+' ('+fInt(t.exec)+' executadas de '+fInt(t.perc)+' percorridas; '+fInt(t.exoc)+' com ocorrência)',
+    'Negociações: '+fInt(R.qtd)+' · '+fBRL(R.valor)+' · ticket '+fBRL(R.ticket_medio),
+    'Cortes: '+fInt(C.D.totais_relatorio.corte_real.valor)+' · Religações: '+fInt(C.D.totais_relatorio.relig_real.valor),'','Destaques:']
+    .concat(destaques(C,CONF).map(d=>'• '+d.titulo+' — '+d.texto)).concat(['',al+' divergências entre os números do relatório original (aba Conferência).']).join('\n');
+}
+async function copiar(){
+  const t=resumoTexto(), b=document.getElementById('btnCopiar'), ic=b.querySelector('.ic'), lb=b.querySelector('.lbl'), r0=[ic.textContent,lb.textContent];
+  let ok=true;
+  try{ await navigator.clipboard.writeText(t); }
+  catch(_){ const ta=h('textarea',{style:'position:fixed;opacity:0'}); ta.value=t; document.body.appendChild(ta); ta.select(); try{ok=document.execCommand('copy');}catch(e){ok=false;} ta.remove(); }
+  ic.textContent=ok?'✔':'!'; lb.textContent=ok?'Copiado':'Não foi possível copiar';
+  setTimeout(()=>{ic.textContent=r0[0];lb.textContent=r0[1];},1800);
+}
+function avisar(msgs){ const a=document.getElementById('aviso'); a.replaceChildren(); if(msgs&&msgs.length) a.appendChild(h('div',{class:'erro',role:'alert'},h('b',null,'Não foi possível carregar o arquivo. '),h('ul',{style:'margin:6px 0 0;padding-left:18px'},msgs.map(m=>h('li',null,m))))); }
+function importar(file){
+  const rd=new FileReader(); rd.onerror=()=>avisar(['Erro ao ler o arquivo.']);
+  rd.onload=()=>{ let d; try{ d=JSON.parse(rd.result); }catch(e){ return avisar(['O arquivo não é um JSON válido: '+e.message]); }
+    const lote=Array.isArray(d)?d:[d]; const erros=[]; const ok=[];
+    lote.forEach((x,i)=>{ const e=validar(x); if(e.length) erros.push(...e.map(m=>(lote.length>1?'Item '+(i+1)+': ':'')+m)); else ok.push(x); });
+    if(erros.length) return avisar(erros);
+    avisar(null); ok.forEach(x=>{S.snapshots[x.referencia.data]=x;}); S.dia=ok[ok.length-1].referencia.data; S.diasUteis=null; S.cidade=''; recalcular(); renderTudo(); };
+  rd.readAsText(file);
+}
+function aplicarTema(t){ if(t) document.documentElement.setAttribute('data-theme',t); else document.documentElement.removeAttribute('data-theme'); }
+function alternarTema(){ const atual=document.documentElement.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); const novo=atual==='dark'?'light':'dark'; aplicarTema(novo); try{localStorage.setItem('mc-tema',novo);}catch(_){} }
+
+/* =====================================================================
+   9. Início
+   ===================================================================== */
+function iniciar(){
+  try{ const t=localStorage.getItem('mc-tema'); if(t==='dark'||t==='light') aplicarTema(t); }catch(_){}
+  const D=JSON.parse(document.getElementById('dados-embutidos').textContent);
+  const erros=validar(D); if(erros.length){ document.getElementById('main').appendChild(h('div',{class:'erro'},'Dados embutidos inválidos: '+erros.join(' '))); return; }
+  S.snapshots[D.referencia.data]=D; S.dia=D.referencia.data; recalcular();
+  const hash=location.hash.replace('#',''); if(ABAS.some(a=>a[0]===hash)) S.aba=hash;
+  document.getElementById('btnImportar').addEventListener('click',()=>document.getElementById('arquivo').click());
+  document.getElementById('arquivo').addEventListener('change',e=>{ if(e.target.files[0]) importar(e.target.files[0]); e.target.value=''; });
+  document.getElementById('btnCopiar').addEventListener('click',copiar);
+  document.getElementById('btnImprimir').addEventListener('click',()=>window.print());
+  document.getElementById('btnTema').addEventListener('click',alternarTema);
+  window.addEventListener('hashchange',()=>{ const x=location.hash.replace('#',''); if(ABAS.some(a=>a[0]===x)&&x!==S.aba){S.aba=x;renderTudo();} });
+  renderTudo();
+  window.__mc={S,get C(){return C;},get CONF(){return CONF;},validar,calcular,conferencias,resumoTexto}; // apoio a testes
+}
+iniciar();
+})();
+</script>
+</body>
+</html>

@@ -6,3 +6,7 @@ node_modules/
 *.xls
 *.xlsb
 *.csv
+# Relatórios Power BI e exportações em PDF trazem números de negócio: não versionar.
+*.pbix
+*.pbit
+mensal-comercial/*.pdf
