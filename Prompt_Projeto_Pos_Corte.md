@@ -17,13 +17,14 @@ O entregável principal é **um arquivo `.html` único e independente** (`Acompa
 - `src/core.js`: leitor de `.xlsx`, regras, deduplicação, frentes, filtros/agregações, CSV (roda no navegador e no Node);
 - `src/app.js`, `src/styles.css`, `src/template.html`: interface;
 - `src/frentes-padrao.js`: mapeamento padrão Nomenclatura → Frente (52 linhas, sem dados pessoais);
+- `docs/index.html`: cópia do HTML para o GitHub Pages (gerada pelo build);
 - `tests/core.test.mjs` (Node) e `tests/ui.test.cjs` (Chromium/Playwright); `tools/make_fixtures.py` gera planilhas **sintéticas** em `tests/fixtures/` (ignorada pelo git). `npm test` roda tudo.
 
 Depois de alterar `src/`, rode `node build.mjs` e os testes; entregue o HTML regenerado.
 
 ## Dados e privacidade
 
-A base real contém nomes, matrículas e débitos. **Não a incorpore ao HTML, não a versione e não a envie a hospedagem, repositório ou serviço externo sem minha autorização específica.** Não inclua chaves, credenciais ou tokens. O único conteúdo de negócio embutido é o mapeamento padrão de frentes. Testes usam planilhas sintéticas; a planilha real só entra em um teste opcional por variável de ambiente (`POSCORTE_AMOSTRA`).
+A base real contém nomes, matrículas e débitos. **Não a incorpore ao HTML, não a versione e não a envie a hospedagem, repositório ou serviço externo sem minha autorização específica.** (Por pedido meu, o painel grava no navegador local, via IndexedDB, o resultado de cada arquivo lido, só com os campos usados, para não reler tudo; deve haver botão para apagar e nada disso sai do computador.) Não inclua chaves, credenciais ou tokens. O único conteúdo de negócio embutido é o mapeamento padrão de frentes. Testes usam planilhas sintéticas; a planilha real só entra em um teste opcional por variável de ambiente (`POSCORTE_AMOSTRA`).
 
 ## Fonte e abas
 
@@ -38,7 +39,7 @@ As abas de termos e negociações estão contidas na Base. **Não some essas aba
 
 **Os arquivos que vou usar podem ser menos detalhados** (menos colunas, outra aba principal, sem as abas de apoio, título antes do cabeçalho). O leitor deve continuar aceitando isso: prefere a aba "Base"; sem ela, usa a única aba com o cabeçalho esperado (mínimo de 4 das 19 colunas), recusando ambiguidade; aceita o arquivo se existir ao menos uma coluna de indicador; marca como **indisponível** (nunca zero silencioso) o indicador cuja coluna falta; não classifica "Sem Desdobro" sem a coluna `Serviço adicionais resposta`; permite cadastrar nomes alternativos de colunas.
 
-Analise todas as colunas na leitura (auditoria de preenchimento) e mantenha no modelo só os campos necessários:
+**Só carregue e grave o que for usar**: as 19 colunas abaixo (as demais nem são lidas; a auditoria das outras colunas foi removida a meu pedido):
 
 1. Recurso
 2. Cód. Protocolo Origem
@@ -61,6 +62,10 @@ Analise todas as colunas na leitura (auditoria de preenchimento) e mantenha no m
 19. Serviço adicionais resposta
 
 Não una `Qual a situação do imóvel?` com `Situação Do Imóvel`.
+
+## Serviços considerados
+
+A base só traz atividades cujo `Código/Descrição` começa com: 110010, 110011, 110012, 210010, 210011, 210012, 310010, 310011, 310012 (6 dígitos exatos). Os demais serviços não são carregados nem gravados; informe quantos foram ignorados. Sem a coluna `Código/Descrição`, avise que o filtro não foi aplicado.
 
 ## Regras obrigatórias dos indicadores
 
@@ -95,7 +100,7 @@ A pasta é sincronizada no computador; digitar `C:\...` em uma página não a co
 - importação manual de arquivos; seleção manual de pasta quando a API não existe (sem monitoramento automático nesse modo);
 - lembrar a última pasta (guarda o acesso, **não** os dados) e oferecer "Reconectar pasta";
 - mensagens claras de carregamento, conclusão e erro; nome dos arquivos que falharam, com o motivo; aviso explícito de importação parcial; base anterior preservada quando nenhuma base válida for carregada;
-- reaproveitar a leitura de arquivos inalterados (nome + tamanho + data).
+- **ler somente arquivo novo ou modificado** (chave = versão das regras + caminho + tamanho + data), inclusive depois de recarregar a página (resultado por arquivo gravado no IndexedDB), informando "lidos agora" e "reaproveitados"; pedir confirmação para pastas com mais de 40 arquivos novos ou mais de 800 MB (o Chrome derrubou a aba por falta de memória com uma pasta grande);
 
 Não prometa que o HTML salva os dados importados nem que atualiza com a página fechada.
 
@@ -115,10 +120,10 @@ Data inicial/final, cidade, frente, equipe, seletor do indicador dos gráficos; 
 
 Resultados de referência da amostra (calculados, não fixos): Atividades 8.136 · Exec 7.461 · Exoc 675 · Negociações 230 · Termos 389 (382 + 7) · Sem Desdobro 2 · débito informado R$ 252.027,39 · período 02/01/2026 a 28/09/2026.
 
-Rode `npm test` (gera planilhas sintéticas, roda o núcleo no Node e a interface no Chromium). Com a planilha real: `POSCORTE_AMOSTRA=/caminho/arquivo.xlsx npm run test:core`. Não afirme ter testado no Windows, no Edge ou no OneDrive real se isso não foi executado (até agora **não** foi).
+Rode `npm test` (28 testes no Node e 21 no Chromium) (gera planilhas sintéticas, roda o núcleo no Node e a interface no Chromium). Com a planilha real: `POSCORTE_AMOSTRA=/caminho/arquivo.xlsx npm run test:core`. Não afirme ter testado no Windows, no Edge ou no OneDrive real se isso não foi executado (até agora **não** foi).
 
 ## Entrega e continuidade
 
-Entregue: (1) o HTML completo e independente, regenerado; (2) a documentação atualizada; (3) um resumo curto de alterações, validações e limitações. Se eu pedir publicação online, verifique a versão efetivamente publicada e informe o endereço só depois de confirmar; o endereço existente é `https://acompanhamento-pos-corte.analistafjp.chatgpt.site` e **não** foi atualizado por esta versão.
+Entregue: (1) o HTML completo e independente, regenerado; (2) a documentação atualizada; (3) um resumo curto de alterações, validações e limitações. Para publicar por URL há `docs/index.html` (GitHub Pages: branch `main`, pasta `/docs`, endereço esperado `https://analistafjp-design.github.io/pos-corte/`, ainda não ativado nem verificado). Se eu pedir publicação, verifique a versão efetivamente publicada e informe o endereço só depois de confirmar; o endereço antigo `https://acompanhamento-pos-corte.analistafjp.chatgpt.site` **não** foi atualizado.
 
 Comece lendo o repositório e a documentação e faça as alterações que eu pedir em seguida, mantendo estas regras como referência.

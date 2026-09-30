@@ -10,7 +10,7 @@ Painel em **um único arquivo HTML** que lê planilhas Excel (`.xlsx`) de uma pa
 
 Regras, formatos aceitos, limites e validações: veja [`Projeto_Pos_Corte.md`](Projeto_Pos_Corte.md). Prompt para continuar o desenvolvimento: [`Prompt_Projeto_Pos_Corte.md`](Prompt_Projeto_Pos_Corte.md).
 
-> A base real tem dados pessoais. Ela **não** está no HTML nem no repositório (`.gitignore` bloqueia `.xlsx` e `.csv`).
+> A base real tem dados pessoais. Ela **não** está no HTML nem no repositório (`.gitignore` bloqueia `.xlsx` e `.csv`). Para não reler tudo, o painel grava no navegador deste computador o resultado de cada arquivo lido (só as colunas usadas); há botão para apagar.
 
 ## Desenvolver
 
@@ -32,3 +32,13 @@ build.mjs        junta tudo em um HTML único
 tests/           core.test.mjs (Node) · ui.test.cjs (Chromium) · fixtures/ (geradas, ignoradas)
 tools/make_fixtures.py  gera planilhas sintéticas (296 colunas × 8.136 linhas e casos-limite)
 ```
+
+## Publicar por URL (GitHub Pages)
+
+O painel é só código (sem dados), então pode ficar em uma URL fixa. O `node build.mjs` gera também `docs/index.html`.
+
+1. No GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch**, **Branch: `main`**, **Folder: `/docs`**, Save.
+2. Em alguns minutos o painel abre em `https://analistafjp-design.github.io/pos-corte/`.
+3. Os arquivos continuam sendo lidos **no computador de quem abre a página**: nada da pasta do OneDrive é enviado ao GitHub.
+
+Observações: a página publicada é pública (quem tiver a URL a vê, mas só vê o painel vazio). Em repositório privado, o GitHub Pages exige plano pago (Pro/Team). Os dados gravados no navegador ficam ligados ao endereço da página; abrir por outra URL (ou pelo arquivo local) começa sem eles.

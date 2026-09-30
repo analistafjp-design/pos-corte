@@ -118,8 +118,8 @@
     status: null,
     aliases: {},
     ignoradosFormato: [],
-    auditoriaAberta: false,
     limiteConfirmado: false,
+    leitura: { lidos: 0, salvos: 0, memoria: 0 },
   };
   let vm = null; // modelo de visualização calculado a partir dos filtros
   let anRows = []; // linhas do analítico (filtros + indicador + busca)
@@ -214,30 +214,51 @@
   const idb = {
     open() {
       return new Promise((res, rej) => {
-        const r = indexedDB.open('poscorte', 1);
-        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        const r = indexedDB.open('poscorte', 2);
+        r.onupgradeneeded = () => {
+          const db = r.result;
+          if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+          if (!db.objectStoreNames.contains('arquivos')) db.createObjectStore('arquivos');
+        };
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
       });
     },
-    async get(k) {
+    async op(loja, modo, fn) {
       const db = await this.open();
-      return new Promise((res, rej) => {
-        const q = db.transaction('kv').objectStore('kv').get(k);
-        q.onsuccess = () => res(q.result);
-        q.onerror = () => rej(q.error);
-      });
+      try {
+        return await new Promise((res, rej) => {
+          const tx = db.transaction(loja, modo);
+          const out = fn(tx.objectStore(loja));
+          tx.oncomplete = () => res(out && 'result' in out ? out.result : undefined);
+          tx.onerror = () => rej(tx.error);
+          tx.onabort = () => rej(tx.error);
+        });
+      } finally {
+        db.close();
+      }
     },
-    async set(k, v) {
-      const db = await this.open();
-      return new Promise((res, rej) => {
-        const tx = db.transaction('kv', 'readwrite');
-        tx.objectStore('kv').put(v, k);
-        tx.oncomplete = () => res();
-        tx.onerror = () => rej(tx.error);
+    get(k) { return this.op('kv', 'readonly', (st) => st.get(k)); },
+    set(k, v) { return this.op('kv', 'readwrite', (st) => { st.put(v, k); }); },
+    // resultado já lido de cada arquivo (só os campos usados); a chave inclui caminho, tamanho e data
+    arquivoTem(k) { return this.op('arquivos', 'readonly', (st) => st.count(k)).then((n) => n > 0); },
+    arquivoGet(k) { return this.op('arquivos', 'readonly', (st) => st.get(k)); },
+    arquivoPut(k, v) { return this.op('arquivos', 'readwrite', (st) => { st.put(v, k); }); },
+    arquivoLimpar(manter) {
+      return this.op('arquivos', 'readwrite', (st) => {
+        const q = st.openKeyCursor();
+        q.onsuccess = () => {
+          const c = q.result;
+          if (!c) return;
+          if (!manter || !manter.has(c.key)) st.delete(c.key);
+          c.continue();
+        };
       });
     },
   };
+
+  /** Assinatura das regras de leitura: mudou (versão, nomes alternativos) => leituras gravadas deixam de valer. */
+  const assinaturaLeitura = () => 'v' + PC.PARSER_VERSION + ':' + JSON.stringify(state.aliases) + ':';
 
   async function listarPasta(dir, prefixo, prof) {
     const out = [];
@@ -300,21 +321,39 @@
         return;
       }
 
+      // Metadados dos arquivos (nome, tamanho, data de modificação): a chave identifica uma versão do arquivo.
+      const assin = assinaturaLeitura();
+      const metas = [];
+      const falhas = [];
+      const chaves = [];
+      for (const e of xlsx) {
+        try {
+          const file = await e.getFile();
+          const chave = assin + e.path + '|' + file.size + '|' + file.lastModified;
+          metas.push({ e, file, chave, origem: '' });
+          chaves.push(chave);
+        } catch (err) {
+          falhas.push({ path: e.path, motivo: friendly(err) });
+          chaves.push('ERR:' + e.path);
+        }
+      }
+      // Só é lido do disco o que é novo ou foi modificado; o resto vem da memória ou do que já foi gravado.
+      const aLer = [];
+      for (const m of metas) {
+        if (state.cache.has(m.chave)) { m.origem = 'memória'; continue; }
+        let salvo = false;
+        try { salvo = await idb.arquivoTem(m.chave); } catch (_) { /* sem armazenamento: lê do arquivo */ }
+        if (salvo) m.origem = 'salvo'; else aLer.push(m);
+      }
+
       // Pastas muito grandes podem esgotar a memória da aba: pede confirmação antes de ler.
       if (!opts.confirmado && !state.limiteConfirmado) {
-        let nNovos = 0;
-        let bytes = 0;
-        for (const e of xlsx) {
-          try {
-            const f = await e.getFile();
-            if (!state.cache.has(e.path + '|' + f.size + '|' + f.lastModified)) { nNovos++; bytes += f.size; }
-          } catch (_) { /* o erro aparece na leitura */ }
-        }
-        if (nNovos > LIMITE_ARQUIVOS || bytes > LIMITE_BYTES) {
+        const bytes = aLer.reduce((a, m) => a + m.file.size, 0);
+        if (aLer.length > LIMITE_ARQUIVOS || bytes > LIMITE_BYTES) {
           setStatus({
             kind: 'warning',
             title: 'Pasta grande: confirme antes de ler',
-            detail: fmtInt(nNovos) + ' ' + plural(nNovos, 'arquivo', 'arquivos') + ' (' + fmtBytes(bytes) + ') para ler em "' + rotulo + '". Cada arquivo lido ocupa vários MB de memória do navegador e ler muitos de uma vez pode travar a aba. Deixe na pasta só os arquivos necessários; se todos forem, confirme.',
+            detail: fmtInt(aLer.length) + ' ' + plural(aLer.length, 'arquivo', 'arquivos') + ' (' + fmtBytes(bytes) + ') para ler em "' + rotulo + '". Cada arquivo lido ocupa vários MB de memória do navegador e ler muitos de uma vez pode travar a aba. Deixe na pasta só os arquivos necessários; se todos forem, confirme.',
             actions: [{ label: 'Ler mesmo assim', run: () => { state.limiteConfirmado = true; carregar(entries, {}); } }],
           });
           return;
@@ -322,25 +361,25 @@
       }
 
       const ok = [];
-      const falhas = [];
-      const chaves = [];
       const novos = [];
+      const leitura = { lidos: 0, salvos: 0, memoria: 0 };
       let ultimoProgresso = 0;
-      for (let i = 0; i < xlsx.length; i++) {
-        const e = xlsx[i];
-        const prefixo = 'Arquivo ' + (i + 1) + ' de ' + xlsx.length + ': ' + e.name;
-        let file;
-        try {
-          file = await e.getFile();
-        } catch (err) {
-          falhas.push({ path: e.path, motivo: friendly(err) });
-          chaves.push('ERR:' + e.path);
-          continue;
+      for (let i = 0; i < metas.length; i++) {
+        const m = metas[i];
+        const e = m.e;
+        const file = m.file;
+        const prefixo = 'Arquivo ' + (i + 1) + ' de ' + metas.length + ': ' + e.name;
+        let res = state.cache.get(m.chave);
+        if (res) {
+          leitura.memoria++;
+        } else if (m.origem === 'salvo') {
+          try {
+            res = await idb.arquivoGet(m.chave);
+          } catch (_) { res = null; }
+          if (res) { state.cache.set(m.chave, res); leitura.salvos++; }
         }
-        const chave = e.path + '|' + file.size + '|' + file.lastModified;
-        chaves.push(chave);
-        let res = state.cache.get(chave);
         if (!res) {
+          m.origem = 'lido';
           if (!opts.auto) setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo, progress: 0 });
           try {
             res = await PC.readSpreadsheetFile(file, {
@@ -349,26 +388,30 @@
               onProgress: (p) => {
                 if (opts.auto || (p.fraction < 1 && Date.now() - ultimoProgresso < 120)) return;
                 ultimoProgresso = Date.now();
-                setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo + ' — ' + p.phase + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / xlsx.length });
+                setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo + ' — ' + p.phase + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / metas.length });
               },
             });
             res.path = e.path;
             res.name = e.name;
             res.size = file.size;
             res.lastModified = file.lastModified;
-            state.cache.set(chave, res);
+            state.cache.set(m.chave, res);
+            idb.arquivoPut(m.chave, res).catch(() => { /* sem espaço ou sem armazenamento: continua só na memória */ });
+            leitura.lidos++;
             novos.push(e.path);
           } catch (err) {
             falhas.push({ path: e.path, motivo: friendly(err) });
             continue;
           }
         }
+        res.origem = m.origem;
         ok.push(res);
       }
       for (const k of [...state.cache.keys()]) if (!chaves.includes(k)) state.cache.delete(k);
+      if (ok.length) idb.arquivoLimpar(new Set(chaves)).catch(() => {});
       state.lastCheck = new Date();
 
-      const sig = chaves.slice().sort().join('\n') + '\n' + JSON.stringify(state.aliases);
+      const sig = chaves.slice().sort().join('\n');
       if (opts.auto && sig === state.lastSig && ok.length) {
         renderSideFoot();
         return; // nada mudou desde a última leitura
@@ -395,6 +438,7 @@
       state.files = ok.map((r) => ({ ok: true, res: r })).concat(falhas.map((f) => ({ ok: false, path: f.path, motivo: f.motivo })));
       state.ignoradosFormato = ignoradosFormato;
       state.lastRead = new Date();
+      state.leitura = leitura;
       calcularCobertura(ok);
       sanitizarFiltros();
       resetarAnalitico();
@@ -417,6 +461,7 @@
           : (opts.auto && novos.length ? 'Pasta atualizada: ' : 'Base carregada: ') + fmtInt(cons.records.length) + ' ' + plural(cons.records.length, 'atividade', 'atividades') + ' de ' + ok.length + ' ' + plural(ok.length, 'arquivo', 'arquivos'),
         detail:
           (parcial ? fmtInt(cons.records.length) + ' atividades foram carregadas dos arquivos válidos. ' : '') +
+          'Lidos do arquivo agora: ' + leitura.lidos + ' · reaproveitados (já lidos antes): ' + (leitura.salvos + leitura.memoria) + '. ' +
           (cons.duplicatas ? fmtInt(cons.duplicatas) + ' ' + plural(cons.duplicatas, 'duplicata removida', 'duplicatas removidas') + '. ' : '') +
           (nAvisos ? nAvisos + ' ' + plural(nAvisos, 'aviso de leitura', 'avisos de leitura') + ' em "Base e regras". ' : ''),
         items: itens,
@@ -1101,22 +1146,23 @@
     return out;
   }
 
+  const ROTULO_ORIGEM = { lido: 'lido do arquivo agora', salvo: 'reaproveitado (gravado)', 'memória': 'reaproveitado (memória)' };
   function tabelaArquivos() {
     const linhas = state.files
       .slice()
       .sort((a, b) => (a.ok && b.ok ? a.res.lastModified - b.res.lastModified : a.ok ? -1 : 1))
       .map((f) => {
-        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
+        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { class: 'n', text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
         const r = f.res;
         const conf = r.conferencia.map((c) => c.erro ? c.rotulo + ': ' + c.erro : c.rotulo + ': ' + (c.conciliado ? 'conciliado com a aba ' + c.aba + ' (' + fmtInt(c.linhas) + ')' : 'DIVERGE da aba ' + c.aba + ' (aba ' + fmtInt(c.linhas) + ' · cálculo ' + fmtInt(c.calculadoNaBase) + ' · na Base ' + fmtInt(c.naBase) + ')'));
         return h('tr', null,
           h('td', { text: r.path }), h('td', { class: 'num', text: fmtDataHora(r.lastModified) }), h('td', { class: 'num', text: fmtBytes(r.size) }),
-          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }),
-          h('td', null, tag('OK', 'exec'), r.warnings.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, r.warnings.map((w) => h('li', { text: w }))) : null,
+          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }), h('td', { class: 'n', text: r.filtroServico ? fmtInt(r.foraServico) : 'sem filtro' }),
+          h('td', null, tag('OK', 'exec'), ' ' + (ROTULO_ORIGEM[r.origem] || ''), r.warnings.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, r.warnings.map((w) => h('li', { text: w }))) : null,
             conf.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, conf.map((c) => h('li', { text: c }))) : null));
       });
     return h('div', { class: 'table-wrap' }, h('table', null,
-      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Linhas lidas', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 ? 'n' : '', text: c })))),
+      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Atividades', 'Outros serviços ignorados', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 || i === 5 ? 'n' : '', text: c })))),
       h('tbody', null, linhas)));
   }
 
@@ -1132,6 +1178,11 @@
     add('Arquivos válidos', state.files.length ? state.files.filter((f) => f.ok).length + ' de ' + state.files.length : '—');
     add('Registros lidos / atividades', c ? fmtInt(c.lidos) + ' / ' + fmtInt(c.records.length) : '—');
     add('Duplicatas removidas', c ? fmtInt(c.duplicatas) : '—');
+    if (state.files.length) {
+      const fora = state.files.filter((f) => f.ok).reduce((a, f) => a + (f.res.foraServico || 0), 0);
+      add('Outros serviços ignorados', fmtInt(fora) + ' linhas fora dos códigos ' + PC.CODIGOS_SERVICO.join(', '));
+      add('Nesta leitura', state.leitura.lidos + ' lidos do arquivo · ' + (state.leitura.salvos + state.leitura.memoria) + ' reaproveitados');
+    }
     if (c && c.semChave) add('Linhas sem chave completa', fmtInt(c.semChave) + ' (nunca são unidas a outras)');
     if (state.records.length) {
       let mn = '', mx = '';
@@ -1143,6 +1194,8 @@
       kv,
       state.files.length ? h('div', { style: { marginTop: '12px' } }, tabelaArquivos()) : null,
       state.ignoradosFormato.length ? h('p', { class: 'note warn', text: 'Ignorados (formato não suportado; salve como .xlsx): ' + state.ignoradosFormato.join(', ') }) : null,
+      h('p', { class: 'note', text: 'Só arquivos novos ou modificados (nome, tamanho e data) são lidos; o resultado de cada arquivo fica gravado neste navegador, neste computador, e é reaproveitado ao recarregar a página. Nada é enviado para a internet.' }),
+      h('button', { class: 'btn small', type: 'button', text: 'Limpar dados gravados', onclick: async () => { state.cache.clear(); state.lastSig = ''; try { await idb.arquivoLimpar(null); } catch (_) { /* ignora */ } setStatus({ kind: 'success', title: 'Dados gravados apagados', detail: 'Na próxima atualização todos os arquivos serão lidos de novo.' }); } }),
       h('p', { class: 'note', text: 'A ordem dos arquivos para deduplicação é a data de modificação (do mais antigo ao mais recente). É um critério operacional, não garante que o conteúdo seja o mais atual: evite misturar versões conflitantes na pasta.' })
     );
   }
@@ -1170,7 +1223,7 @@
     };
     const listaAl = Object.entries(state.aliases).flatMap(([k, ns]) => ns.map((n) => ({ k, n })));
     return h('section', { class: 'card' },
-      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Colunas reconhecidas' }), h('p', { class: 'hint', text: 'O painel usa só estas 19 colunas; as demais são apenas auditadas. A comparação ignora maiúsculas, acentos e pontuação.' }))),
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Colunas reconhecidas' }), h('p', { class: 'hint', text: 'O painel lê e grava só estas 19 colunas; as demais nem são carregadas. A comparação ignora maiúsculas, acentos e pontuação.' }))),
       okFiles.length ? okFiles.map((r) => h('details', { style: { marginBottom: '8px' } },
         h('summary', { text: r.name + ' — ' + r.cobertura.reconhecidas.length + ' de ' + campos.length + ' colunas reconhecidas' + (r.cobertura.ausentes.length ? ' (' + r.cobertura.ausentes.length + ' ausentes)' : '') }),
         h('div', { class: 'table-wrap', style: { marginTop: '8px' } }, h('table', null,
@@ -1209,35 +1262,14 @@
     );
   }
 
-  function cardAuditoria() {
-    const arq = state.files.filter((f) => f.ok).map((f) => f.res).sort((a, b) => b.lastModified - a.lastModified)[0];
-    if (!arq) return null;
-    const cols = arq.audit.colunas;
-    const linhas = arq.audit.linhas;
-    const aberta = state.auditoriaAberta;
-    const dados = cols.slice().sort((a, b) => (b.mantida - a.mantida) || a.coluna - b.coluna);
-    return h('section', { class: 'card' },
-      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Auditoria de preenchimento das colunas' }), h('p', { class: 'hint', text: 'Arquivo mais recente: ' + arq.name + ' · ' + fmtInt(linhas) + ' linhas · ' + cols.length + ' colunas com cabeçalho · ' + cols.filter((c) => c.mantida).length + ' usadas pelo painel.' }))),
-      h('details', { ontoggle: (e) => { state.auditoriaAberta = e.target.open; } , open: aberta },
-        h('summary', { text: 'Ver todas as colunas' }),
-        h('div', { class: 'table-wrap', style: { marginTop: '8px', maxHeight: '420px' } }, h('table', null,
-          h('thead', null, h('tr', null, ['Coluna', 'Nome', 'Preenchidas', '%', 'Usada no painel'].map((c, i) => h('th', { scope: 'col', class: i === 2 || i === 3 ? 'n' : '', text: c })))),
-          h('tbody', null, dados.map((c) => h('tr', null,
-            h('td', { class: 'num', text: colLetra(c.coluna) }), h('td', { text: c.nome }), h('td', { class: 'n', text: fmtInt(c.preenchidas) }),
-            h('td', { class: 'n', text: fmtPct(c.preenchidas, linhas) }), h('td', null, c.mantida ? tag('sim', 'exec') : '—'))))))));
-  }
-  function colLetra(i) {
-    let s = '';
-    for (i += 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s;
-    return s;
-  }
-
   function cardRegras() {
     const li = (...t) => h('li', null, ...t);
     return h('section', { class: 'card rules' },
       h('div', { class: 'card-head' }, h('h2', { text: 'Regras dos indicadores' })),
       h('h3', { text: 'Atividades' }),
       h('p', { text: 'Registros da aba Base após a deduplicação entre arquivos e os filtros escolhidos. As abas de Termos e Negociações são recortes da Base: não são somadas a ela (só conferidas).' }),
+      h('h3', { text: 'Serviços considerados' }),
+      h('p', null, 'Só entram atividades cujo ', h('code', { text: 'Código/Descrição' }), ' começa com um destes códigos: ', h('code', { text: PC.CODIGOS_SERVICO.join(', ') }), '. Linhas de outros serviços não são carregadas nem gravadas (o número ignorado aparece em "Fonte e arquivos lidos").'),
       h('h3', { text: 'Exec e Exoc' }),
       h('ul', null, li(h('strong', { text: 'Exec' }), ': Status da Atividade = ', h('code', { text: 'Finalizada' }), '.'), li(h('strong', { text: 'Exoc' }), ': Status da Atividade = ', h('code', { text: 'Encerrada com Ocorrência' }), '. Outros status aparecem na distribuição dos status.')),
       h('h3', { text: 'Negociações e Sem Desdobro' }),
@@ -1259,7 +1291,7 @@
         li('Arquivos temporários (~$) são ignorados; subpastas são lidas.')),
       h('h3', { text: 'Formatos e limites' }),
       h('ul', null,
-        li('Lê .xlsx sem senha. Não lê .xls, .xlsb, arquivos com senha nem ZIP64. Fórmulas são lidas pelo resultado gravado, sem recalcular.'),
+        li('Lê apenas as colunas usadas e só os arquivos novos ou modificados. Lê .xlsx sem senha. Não lê .xls, .xlsb, arquivos com senha nem ZIP64. Fórmulas são lidas pelo resultado gravado, sem recalcular.'),
         li('Arquivos com menos colunas ou outra aba principal são aceitos: a aba "Base" é preferida; sem ela, vale a única aba com as colunas esperadas. Indicadores sem a coluna necessária são marcados como indisponíveis, nunca como zero silencioso.'),
         li('Este painel não grava no OneDrive nem atualiza com a página fechada. A base carregada não fica salva no arquivo HTML: ao reabrir, conecte a pasta novamente (o navegador pode lembrar a última pasta).'))
     );
@@ -1268,7 +1300,7 @@
   function renderBase() {
     const root = $('#view-base');
     root.replaceChildren(h('div', { class: 'stack' },
-      state.records.length ? [cardFonte(), cardVerificacoes(), cardColunas(), cardFrentes(), cardAuditoria(), cardRegras()] : [estadoVazio(), cardColunas(), cardRegras()]
+      state.records.length ? [cardFonte(), cardVerificacoes(), cardColunas(), cardFrentes(), cardRegras()] : [estadoVazio(), cardColunas(), cardRegras()]
     ));
   }
 

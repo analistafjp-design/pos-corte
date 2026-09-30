@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Junta src/ em um único arquivo HTML independente (CSS, JS e mapeamento de frentes incorporados).
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,4 +17,7 @@ for (const [k, v] of Object.entries(partes)) {
 }
 const saida = join(raiz, 'Acompanhamento_Pos_Corte.html');
 writeFileSync(saida, html);
-console.log('gerado', saida, (html.length / 1024).toFixed(0) + ' KB');
+// Cópia para o GitHub Pages (Settings > Pages > Branch main, pasta /docs): o painel não contém dados, só código.
+mkdirSync(join(raiz, 'docs'), { recursive: true });
+writeFileSync(join(raiz, 'docs', 'index.html'), html);
+console.log('gerado', saida, '(+ docs/index.html)', (html.length / 1024).toFixed(0) + ' KB');

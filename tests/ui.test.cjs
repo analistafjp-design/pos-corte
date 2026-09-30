@@ -398,6 +398,78 @@ test('pasta grande (mais de 40 arquivos): pede confirmação antes de ler e não
   await page.context().close();
 });
 
+test('lê só arquivo novo ou modificado: Atualizar, arquivo novo, arquivo alterado e recarga da página', { timeout: 180000 }, async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'pt-BR' });
+  const page = await abrir({ ctx, url: baseUrl, initScript: MOCK_PICKER });
+  const leitura = () => page.evaluate(() => ({ ...window.__poscorte.state.leitura }));
+  // clica em Atualizar e espera a leitura terminar de fato (a data da verificação avança e o painel fica livre)
+  const atualizar = async () => {
+    const antes = await page.evaluate(() => window.__poscorte.state.lastCheck.getTime());
+    await page.click('#btn-atualizar');
+    await page.waitForFunction((t) => !window.__poscorte.state.loading && window.__poscorte.state.lastCheck.getTime() > t, antes, { timeout: 30000 });
+  };
+  await opfsEscrever(page, 'a.xlsx', ler('pasta_dedup', 'snapshot_antigo.xlsx'));
+  await opfsEscrever(page, 'b.xlsx', ler('pasta_dedup', 'sub', 'snapshot_novo.xlsx'));
+  await page.click('#btn-pasta');
+  await aguardaTitulo(page, /Base carregada: \d+ atividades de 2 arquivos/);
+  assert.deepEqual(await leitura(), { lidos: 2, salvos: 0, memoria: 0 });
+
+  // Atualizar sem mudanças: nada é lido do disco
+  await atualizar();
+  assert.deepEqual(await leitura(), { lidos: 0, salvos: 0, memoria: 2 });
+  assert.match(await statusTexto(page), /Lidos do arquivo agora: 0 · reaproveitados \(já lidos antes\): 2/);
+
+  // arquivo novo: só ele é lido
+  await opfsEscrever(page, 'c.xlsx', ler('pequeno_xlsxwriter.xlsx'));
+  await atualizar();
+  assert.deepEqual(await leitura(), { lidos: 1, salvos: 0, memoria: 2 });
+
+  // arquivo modificado: só ele é lido de novo
+  await opfsEscrever(page, 'c.xlsx', ler('pequeno_1904.xlsx'));
+  await atualizar();
+  assert.deepEqual(await leitura(), { lidos: 1, salvos: 0, memoria: 2 });
+
+  // recarregar a página: tudo vem do que ficou gravado, nada é lido dos arquivos
+  await page.waitForFunction(() => new Promise((res) => {
+    const r = indexedDB.open('poscorte', 2);
+    r.onsuccess = () => {
+      const c = r.result.transaction('arquivos').objectStore('arquivos').getAllKeys();
+      c.onsuccess = () => { r.result.close(); const gravadas = new Set(c.result); res([...window.__poscorte.state.cache.keys()].every((k) => gravadas.has(k)) && gravadas.size === 3); };
+    };
+  }), null, { timeout: 30000 });
+  await page.reload();
+  await page.waitForFunction(() => window.__poscorte.state.leitura.salvos === 3, null, { timeout: 30000 });
+  assert.deepEqual(await leitura(), { lidos: 0, salvos: 3, memoria: 0 });
+  assert.ok(await page.locator('.kpis').isVisible());
+
+  // limpar os dados gravados: a leitura seguinte volta a ler tudo
+  await page.click('#nav-side button[data-view=base]');
+  await page.click('text=Limpar dados gravados');
+  await page.waitForFunction(() => /Dados gravados apagados/.test(document.querySelector('#status')?.textContent || ''));
+  await page.reload();
+  await page.waitForFunction(() => window.__poscorte.state.leitura.lidos === 3, null, { timeout: 60000 });
+  assert.deepEqual(await leitura(), { lidos: 3, salvos: 0, memoria: 0 });
+  semErros(page);
+  await ctx.close();
+});
+
+test('somente os serviços dos 9 códigos são carregados e as colunas fora de uso não são lidas', async () => {
+  const page = await abrir();
+  await importar(page, PEQUENO);
+  assert.deepEqual(await kpis(page), KPIS_PEQUENO);
+  const ids = await page.evaluate(() => window.__poscorte.state.records.map((r) => r.id));
+  assert.ok(!ids.some((i) => ['20', '21', '22'].includes(i)));
+  const chaves = await page.evaluate(() => Object.keys(window.__poscorte.state.records[0]).sort());
+  assert.ok(!chaves.includes('filled'), 'sem auditoria das demais colunas');
+  await page.click('#nav-side button[data-view=base]');
+  const t = await page.textContent('#view-base');
+  assert.match(t, /Serviços considerados/);
+  assert.match(t, /110010, 110011, 110012, 210010, 210011, 210012, 310010, 310011, 310012/);
+  assert.match(t, /Outros serviços ignorados3 linhas fora dos códigos/);
+  assert.doesNotMatch(t, /Auditoria de preenchimento/);
+  await page.context().close();
+});
+
 test('leitura automática a cada 60 s: só com a página visível e permissão concedida', { timeout: 120000 }, async () => {
   const page = await abrir({ url: baseUrl, initScript: MOCK_PICKER, clock: true });
   await opfsEscrever(page, 'a.xlsx', ler('pasta_dedup', 'snapshot_antigo.xlsx'));
