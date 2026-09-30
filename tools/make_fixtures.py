@@ -450,6 +450,21 @@ def montar_bases(out):
             elif v != "":
                 ws.write(r, c, v)
     wb.close()
+    # base com várias abas: a primeira é de outro serviço; a de pós-corte usa NUM_LIGACAO no lugar de Matrícula
+    wb = xlsxwriter.Workbook(str(out / "Base_Multi_Abas_25_09.xlsx"))
+    ws = wb.add_worksheet("Unijato ")
+    for c, n in enumerate(["Recurso", "Cód. Protocolo Origem", "Matrícula", "Código/Descrição"]):
+        ws.write(0, c, n)
+    ws.write_row(1, 0, ["R1", "1896574/2026-1", "100625984", "204005-SUBSTITUIÇÃO DE HD (SEM CUSTO)"])
+    ws = wb.add_worksheet("Resumo ")
+    ws.write_row(0, 0, ["Projeto", "Cidade", "Qtd"])
+    ws.write_row(1, 0, ["Sub. Preventiva", "Aperibé", 13])
+    ws = wb.add_worksheet("Pós Corte")
+    for c, n in enumerate(["NUM_LIGACAO", "Zona ", "Cód. Protocolo Origem", "Cidade ", "DESCRICAO"]):
+        ws.write(0, c, n)
+    ws.write_row(1, 0, [1001, 14, "OS1", "RIO BONITO", "CAVALETE"])
+    ws.write_row(2, 0, [3003, 5, "OS3", "CANTAGALO", "RAMAL"])
+    wb.close()
     wb = xlsxwriter.Workbook(str(out / "Base_Sem_Chave.xlsx"))
     ws = wb.add_worksheet("Base")
     for c, n in enumerate(["Cidade", "Endereço"]):

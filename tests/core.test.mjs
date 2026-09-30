@@ -735,3 +735,12 @@ test('bases de campo: Excel com o resumo e as linhas que faltam', async () => {
   const bytes = await EX.toXlsx(sheets);
   assert.ok(bytes.length > 500);
 });
+
+test('bases de campo: com várias abas usa a de Pós Corte e reconhece NUM_LIGACAO como matrícula', { skip: !fs.existsSync(fx('Base_Multi_Abas_25_09.xlsx')) && 'gere as planilhas' }, async () => {
+  const b = await PC.readBaseCampo(arquivo(fx('Base_Multi_Abas_25_09.xlsx')), { ref: new Date(2026, 8, 30) });
+  assert.equal(b.aba, 'Pós Corte', 'não a primeira aba (Unijato, outro serviço)');
+  assert.deepEqual(b.colunas.slice(0, 3), ['NUM_LIGACAO', 'Zona', 'Cód. Protocolo Origem']);
+  assert.equal(b.colMatricula, 0);
+  assert.equal(b.linhas.length, 2);
+  assert.equal(b.dataNome, '2026-09-25');
+});
