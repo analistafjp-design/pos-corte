@@ -782,6 +782,9 @@ test('bases de campo: subir base, cruzamento por protocolo, recortes, pastas por
   await page.waitForSelector('.basecard');
   assert.equal(await page.textContent('.basecard h3'), 'Base_Campo_28_09_2026.xlsx');
   assert.equal(await miniTxt(page, 'total'), '4', 'OS1, OS2, OS3 e a linha sem chave (OS2 repetida conta uma vez)');
+  assert.match(await page.textContent('.basecard [data-bk=total] .mini-sub'), /matrículas distintas de 5 linhas \(1 repetida\)/);
+  assert.match(await page.textContent('.basecard'), /Linhas repetidas: a base tem 5 linhas, mas 1 repete uma matrícula já listada/);
+  assert.equal(await page.locator('.basecard [data-bk=semDesdobro]').count(), 0, 'sem card de desdobro nas bases');
   assert.equal(await miniTxt(page, 'percorrido'), '1');
   assert.equal(await miniTxt(page, 'faltam'), '3');
   assert.equal(await miniTxt(page, 'exec'), '1');
