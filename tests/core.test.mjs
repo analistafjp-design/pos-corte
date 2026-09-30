@@ -682,33 +682,44 @@ test('bases de campo: leitura de todas as colunas e cabeçalho de chave', { skip
   await assert.rejects(PC.readBaseCampo(arquivo(fx('Base_Sem_Chave.xlsx'))), (e) => e.code === 'SEM_CHAVE');
 });
 
-test('bases de campo: cruzamento com o realizado (protocolo, matrícula, data da base, repetidas e sem chave)', () => {
-  const rec = (o) => ({ protocolo: '', matricula: '', data: '2026-09-10', recurso: 'E1', exec: true, exoc: false, neg: false, semDesdobro: false, termo: false, t11: false, t31: false, valor: null, ...o });
+test('bases de campo: cruzamento sempre pelo Cód. Protocolo Origem (qualquer data, prefixo, repetidas e sem protocolo)', () => {
+  const rec = (o) => ({ protocolo: '', matricula: '', data: '2026-09-10', recurso: 'E1', exec: true, exoc: false, neg: false, semDesdobro: false, termo: false, t11: false, t31: false, valor: null, recorte: false, recorteTipo: '', ...o });
   const records = [
     rec({ protocolo: 'OS1', matricula: '1001', data: '2026-09-10' }),
     rec({ protocolo: 'OS1', matricula: '1001', data: '2026-09-12', exec: false, exoc: true, recurso: 'E2' }), // mais recente
-    rec({ protocolo: 'OS2', matricula: '2002', data: '2026-08-01', neg: true, semDesdobro: true }),         // antes da data da base
-    rec({ protocolo: '', matricula: '4004', data: '2026-09-15', neg: true, termo: true, t11: true }),
+    rec({ protocolo: 'OS2', matricula: '2002', data: '2026-01-05', neg: true, semDesdobro: true, termo: true, t11: true }),
+    rec({ protocolo: '1234/2025-1', matricula: '5005', data: '2026-06-01', recorte: true, recorteTipo: 'RAMAL' }),
+    rec({ protocolo: '', matricula: '4004' }),
   ];
   const base = {
     colProtocolo: 0, colMatricula: 1,
-    linhas: [['OS1', '1001'], ['0OS1'.slice(1), '1001'], ['OS2', '2002'], ['', '4004'], ['OS3', '3003'], ['', '']],
+    linhas: [['OS1', '1001'], ['os1 ', '1001'], ['OS2', '2002'], ['OS3', '3003'], ['', '4004'], ['1234', '9999'], ['OS9', '2002']],
   };
-  const av = PC.avaliarBase(base, records, '2026-09-01');
-  assert.equal(av.duplicadas, 1, 'OS1 repetida');
-  assert.equal(av.semChave, 1);
-  assert.equal(av.total, 5, 'OS1, OS2, matrícula 4004, OS3 e a linha sem chave');
-  assert.equal(av.percorridos, 2, 'OS1 (atividade mais recente) e matrícula 4004; OS2 foi antes da base');
+  const av = PC.avaliarBase(base, records);
+  assert.equal(av.duplicadas, 1, 'OS1 repetida (caixa e espaços não importam)');
+  assert.equal(av.semChave, 1, 'sem protocolo: a matrícula não é usada');
+  assert.equal(av.total, 6);
+  assert.equal(av.percorridos, 3, 'OS1, OS2 (qualquer data) e 1234 (pelo prefixo do protocolo)');
+  assert.deepEqual(av.pendentes, [3, 4, 6]);
   assert.equal(av.faltam, 3);
-  assert.deepEqual(av.pendentes, [2, 4, 5]);
   assert.equal(av.resumo.exoc, 1, 'vale a atividade mais recente de OS1');
-  assert.equal(av.resumo.exec, 1);
+  assert.equal(av.resumo.exec, 2);
+  assert.equal(av.resumo.neg, 1);
+  assert.equal(av.resumo.semDesdobro, 1);
   assert.equal(av.resumo.termos, 1);
+  assert.equal(av.resumo.recortes, 1);
+  assert.deepEqual(av.resumo.recorteTipos, { RAMAL: 1 });
   assert.equal(av.resumo.equipes, 2);
-  const sem = PC.avaliarBase(base, records, '');
-  assert.equal(sem.percorridos, 3, 'sem data da base, OS2 também conta');
-  assert.equal(sem.resumo.neg, 2);
-  assert.equal(sem.resumo.semDesdobro, 1);
+});
+
+test('recorte: Fez o corte novamente = Sim e tipo por "Onde Foi Feito O Corte?"', { skip: !fs.existsSync(fx('pequeno_xlsxwriter.xlsx')) && 'gere as planilhas' }, async () => {
+  const res = await ler(fx('pequeno_xlsxwriter.xlsx'));
+  const s = PC.summarize(res.records);
+  assert.equal(s.recortes, 5, 'ids 2, 3, 4, 6 e 7 (o 5 é NÃO)');
+  assert.deepEqual(s.recorteTipos, { RAMAL: 3, 'CAVALETE SIMPLES': 1, 'NÃO INFORMADO': 1 });
+  assert.equal(s.exec, 18);
+  assert.ok(Math.abs(s.recorteSobreExec - 5 / 18) < 1e-9);
+  assert.equal(res.cobertura.semRecorte, false);
 });
 
 test('bases de campo: Excel com o resumo e as linhas que faltam', async () => {

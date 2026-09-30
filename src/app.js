@@ -506,7 +506,8 @@
     for (const r of ok) {
       for (const k of r.cobertura.indisponiveis) (indisponiveis[k] = indisponiveis[k] || []).push(r.name);
     }
-    state.cobertura = { indisponiveis };
+    const semRecorte = ok.filter((r) => r.cobertura.semRecorte).map((r) => r.name);
+    state.cobertura = { indisponiveis, semRecorte };
   }
 
   async function lerPastaHandle(auto) {
@@ -1393,7 +1394,7 @@
     };
     const listaAl = Object.entries(state.aliases).flatMap(([k, ns]) => ns.map((n) => ({ k, n })));
     return h('section', { class: 'card' },
-      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Colunas reconhecidas' }), h('p', { class: 'hint', text: 'O painel lê e grava só estas 19 colunas; as demais nem são carregadas. A comparação ignora maiúsculas, acentos e pontuação.' }))),
+      h('div', { class: 'card-head' }, h('div', null, h('h2', { text: 'Colunas reconhecidas' }), h('p', { class: 'hint', text: 'O painel lê e grava só estas 21 colunas (as duas últimas, de recorte, são opcionais); as demais nem são carregadas. A comparação ignora maiúsculas, acentos e pontuação.' }))),
       okFiles.length ? okFiles.map((r) => h('details', { style: { marginBottom: '8px' } },
         h('summary', { text: r.name + ' — ' + r.cobertura.reconhecidas.length + ' de ' + campos.length + ' colunas reconhecidas' + (r.cobertura.ausentes.length ? ' (' + r.cobertura.ausentes.length + ' ausentes)' : '') }),
         h('div', { class: 'table-wrap', style: { marginTop: '8px' } }, h('table', null,
@@ -1498,15 +1499,21 @@
       const lista = await idb.baseLista();
       const ids = new Set(state.bases.map((b) => b.id));
       for (const b of lista || []) if (b && b.id && !ids.has(b.id)) state.bases.push(b);
+      // bases gravadas antes do reconhecimento de datas sem ano no nome ("Base 18.09"): completa a data, uma vez
+      for (const b of state.bases) {
+        if (b.dataBase) continue;
+        const d = PC.dataDoNome(b.nome, new Date(b.enviadoEm));
+        if (d) { b.dataBase = b.dataNome = d; idb.basePut(b.id, b).catch(() => {}); }
+      }
     } catch (_) { /* sem armazenamento: as bases valem só nesta sessão */ }
     if (state.view === 'bases') renderTudo();
   }
 
   function avaliacaoDaBase(b) {
     if (state.baseEvalRecords !== state.records) { state.baseEval.clear(); state.baseEvalRecords = state.records; }
-    const k = b.id + '|' + (b.dataBase || '');
+    const k = b.id;
     let av = state.baseEval.get(k);
-    if (!av) { av = PC.avaliarBase(b, state.records, b.dataBase || ''); state.baseEval.set(k, av); }
+    if (!av) { av = PC.avaliarBase(b, state.records); state.baseEval.set(k, av); }
     return av;
   }
 
@@ -1576,13 +1583,6 @@
     renderTudo();
   }
 
-  async function mudarDataBase(b, iso) {
-    b.dataBase = iso || '';
-    state.baseEval.clear();
-    try { await idb.basePut(b.id, b); } catch (_) { /* ignora */ }
-    renderTudo();
-  }
-
   async function baixarFaltantes(b) {
     const av = avaliacaoDaBase(b);
     try {
@@ -1602,22 +1602,46 @@
       sub ? h('span', { class: 'mini-sub', text: sub }) : null);
   }
 
+  /** Nome do tipo de recorte ("RAMAL" -> "Corte no Ramal"). */
+  function rotuloRecorte(t) {
+    if (t === 'NÃO INFORMADO') return 'Tipo não informado';
+    return (/^(REDE|LIGA)/.test(t) ? 'Corte na ' : 'Corte no ') + t.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+  }
+
+  function cartaoRecorte(r) {
+    const tipos = Object.entries(r.recorteTipos).sort((a, c) => c[1] - a[1]);
+    const semCol = (state.cobertura.semRecorte || []).length;
+    return h('section', { class: 'recorte', dataset: { bk: 'recorte' }, 'aria-label': 'Recortes realizados' },
+      h('div', { class: 'recorte-res' },
+        h('span', { class: 'mini-label' }, h('i', { class: 'kdot', style: { '--kc': COR.exoc } }), 'Recortes realizados'),
+        h('span', { class: 'mini-value num', dataset: { rk: 'total' }, text: fmtInt(r.recortes) }),
+        h('span', { class: 'mini-sub', dataset: { rk: 'pct' }, text: fmtPctVal(r.recorteSobreExec) + ' do Exec (Total recorte ÷ Exec)' }),
+        h('span', { class: 'mini-sub', text: '"Fez o corte novamente" = Sim' })),
+      h('div', { class: 'recorte-tipos' },
+        tipos.length
+          ? tipos.map(([t, n]) => h('div', { class: 'rc-row', dataset: { tipo: t } },
+            h('span', { class: 'rc-nome', text: rotuloRecorte(t) }),
+            h('span', { class: 'rc-track' }, h('span', { style: { width: Math.max((n / r.recortes) * 100, 1.5) + '%' } })),
+            h('span', { class: 'rc-val num', text: fmtPctVal(n / r.recortes) + ' · ' + fmtInt(n) })))
+          : h('p', { class: 'note', text: 'Nenhum recorte nesta base.' }),
+        semCol ? h('p', { class: 'note warn', text: '⚠ Coluna "Fez o corte novamente" ausente em ' + semCol + ' ' + plural(semCol, 'arquivo', 'arquivos') + ' da base principal: o recorte deles não foi contado.' }) : null));
+  }
+
   function cartaoBase(b) {
     const av = avaliacaoDaBase(b);
     const r = av.resumo;
     const pctTxt = av.pct == null ? '—' : (av.pct * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
     const notas = [];
     if (av.duplicadas) notas.push(fmtInt(av.duplicadas) + ' ' + plural(av.duplicadas, 'linha repetida', 'linhas repetidas') + ' na base (contadas uma vez).');
-    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' protocolo e matrícula (contam como faltantes).');
+    if (av.semChave) notas.push(fmtInt(av.semChave) + ' ' + plural(av.semChave, 'linha sem', 'linhas sem') + ' protocolo (contam como faltantes).');
     if (!state.records.length) notas.push('As atividades realizadas ainda não foram carregadas: conecte a pasta para calcular o percorrido.');
-    const campoData = h('input', { type: 'date', value: b.dataBase || '', 'aria-label': 'Data da base ' + b.nome, onchange: (e) => mudarDataBase(b, e.target.value) });
+    else if (av.percorridos === 0 && av.exemploBase) notas.push('Nenhum item achou atividade. Exemplo de protocolo na base: "' + av.exemploBase + '"; exemplo no realizado: "' + av.exemploRealizado + '". Se os formatos forem diferentes, me avise.');
     return h('article', { class: 'basecard', dataset: { baseId: b.id }, 'aria-label': 'Base ' + b.nome },
       h('div', { class: 'basehead' },
         h('div', { class: 'basetitle' },
           h('h3', { text: b.nome }),
-          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento por ' + av.chave })),
+          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento pelo ' + av.chave })),
         h('div', { class: 'basetools' },
-          h('label', { class: 'datefield' }, h('span', { text: 'Data da base' }), campoData),
           h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar' }, disabled: av.faltam === 0, onclick: () => baixarFaltantes(b) }, icon('download', 16), h('span', { text: 'Baixar o que falta (Excel)' })),
           h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Excluir a base ' + b.nome, title: 'Excluir esta base da lista', onclick: () => excluirBase(b) }, icon('trash', 16)))),
       h('div', { class: 'progresso' },
@@ -1637,6 +1661,7 @@
         miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), 'Negociações ÷ Exec', COR.neg),
         miniKpi('semDesdobro', 'Sem Desdobro', fmtInt(r.semDesdobro), null, COR.semDesdobro),
         miniKpi('equipes', 'Total de equipes', fmtInt(r.equipes), null, COR.atividades)),
+      cartaoRecorte(r),
       notas.length ? h('p', { class: 'note', text: notas.join(' ') }) : null);
   }
 
@@ -1663,9 +1688,9 @@
       h('div', { class: 'card-head' },
         h('div', null,
           h('h2', { text: 'Bases de campo' }),
-          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (o nome do arquivo deve ter a data). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
+          h('p', { class: 'hint', text: 'Suba as bases que saem para campo (precisam ter a coluna Cód. Protocolo Origem). O painel cruza cada base com as atividades realizadas e calcula os indicadores dela. Ficam gravadas neste navegador, separadas por mês e pela data em que subiram.' })),
         subir),
-      h('p', { class: 'note', text: 'Cruzamento: um item da base está percorrido quando há atividade Exec ou Exoc com o mesmo Cód. Protocolo Origem (ou a mesma Matrícula, se a linha não tiver protocolo) realizada a partir da data da base; vale a atividade mais recente. Total da base = itens distintos.' }));
+      h('p', { class: 'note', text: 'Cruzamento sempre pelo Cód. Protocolo Origem, com o histórico da base principal em qualquer data: o item está percorrido quando há atividade Exec ou Exoc com o mesmo protocolo (vale a mais recente). Linhas sem protocolo contam como faltantes. Total da base = protocolos distintos.' }));
     if (!state.bases.length) {
       root.replaceChildren(h('div', { class: 'stack' }, topo, h('section', { class: 'card empty' },
         h('h2', { text: 'Nenhuma base enviada ainda' }),

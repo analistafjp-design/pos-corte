@@ -304,8 +304,8 @@
         [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
         [],
         [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
-        ['Total da base', intCel(av.total), 'Itens distintos da base (' + av.chave + ')'],
-        ['Percorrido da base', intCel(av.percorridos), 'Itens da base com atividade Exec ou Exoc' + (meta.dataBase ? ' realizada a partir de ' + meta.dataBase : '')],
+        ['Total da base', intCel(av.total), 'Protocolos distintos da base (' + av.chave + ')'],
+        ['Percorrido da base', intCel(av.percorridos), 'Protocolos da base com atividade Exec ou Exoc no histórico da base principal'],
         ['Faltam percorrer', intCel(av.faltam), 'Total da base − percorrido (linhas na aba "Faltam percorrer")'],
         ['% percorrido', pctCel(av.pct), 'Percorrido ÷ total da base'],
         ['Total de Exec', intCel(r.exec), 'Status da Atividade = Finalizada'],
@@ -316,7 +316,9 @@
         ['Efetividade', pctCel(r.efetividade), 'Negociações ÷ Exec'],
         ['Negociações Sem Desdobro', intCel(r.semDesdobro), 'Negociação com Serviço adicionais resposta vazio'],
         ['Equipes que trabalharam', intCel(r.equipes), 'Recursos distintos nas atividades desta base'],
-      ],
+        ['Recortes realizados', intCel(r.recortes), 'Fez o corte novamente = Sim'],
+        ['Recortes ÷ Exec', pctCel(r.recorteSobreExec), 'Total de recortes ÷ total de Exec'],
+      ].concat(Object.entries(r.recorteTipos || {}).sort((a, b) => b[1] - a[1]).map(([t, n]) => ['Recorte: ' + t, intCel(n), (r.recortes ? (n / r.recortes * 100).toFixed(1).replace('.', ',') : '0') + '% dos recortes (Onde Foi Feito O Corte?)'])),
     };
     const faltam = {
       nome: 'Faltam percorrer',
