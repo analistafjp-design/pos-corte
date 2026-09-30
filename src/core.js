@@ -1403,7 +1403,7 @@
   /* ------------------------------------------------------------------ */
 
   const INDICADORES = [
-    { key: 'atividades', rotulo: 'Atividades', curto: 'Atividades', test: () => true },
+    { key: 'atividades', rotulo: 'Percorrido (Exec + Exoc)', curto: 'Percorrido', test: () => true },
     { key: 'exec', rotulo: 'Finalizadas (Exec)', curto: 'Exec', test: (r) => r.exec },
     { key: 'exoc', rotulo: 'Encerradas com Ocorrência (Exoc)', curto: 'Exoc', test: (r) => r.exoc },
     { key: 'neg', rotulo: 'Negociações', curto: 'Negociações', test: (r) => r.neg },
@@ -1437,8 +1437,17 @@
     });
   }
 
+  /**
+   * Indicadores de um conjunto de registros. Percorrido = Exec + Exoc (só esses status são carregados).
+   * Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec (null quando não há Exec).
+   * Equipes = recursos distintos que trabalharam; equipeDias = pares (equipe, dia) com atividade;
+   * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
+   */
   function summarize(records) {
     const s = { atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0 };
+    const equipes = new Set();
+    const dias = new Set();
+    const equipeDias = new Set();
     for (const r of records) {
       s.atividades++;
       if (r.exec) s.exec++;
@@ -1456,8 +1465,35 @@
         if (r.t31) s.t31++;
         if (r.neg) s.negETermo++;
       }
+      if (r.recurso) {
+        equipes.add(r.recurso);
+        if (r.data) equipeDias.add(r.recurso + '|' + r.data);
+      }
+      if (r.data) dias.add(r.data);
     }
+    s.percorrido = s.atividades;
+    s.equipes = equipes.size;
+    s.dias = dias.size;
+    s.equipeDias = equipeDias.size;
+    s.assertividade = s.exec ? s.termos / s.exec : null;
+    s.efetividade = s.exec ? s.neg / s.exec : null;
+    s.produtividade = s.equipeDias ? s.atividades / s.equipeDias : null;
+    s.equipesPorDia = s.dias ? s.equipeDias / s.dias : null;
     return s;
+  }
+
+  /** Agrupa por um campo (cidade, recurso, frente) e calcula os indicadores de cada grupo, do maior para o menor percorrido. */
+  function agrupar(records, campo) {
+    const m = new Map();
+    for (const r of records) {
+      const k = r[campo] || (campo === 'recurso' ? '(sem recurso)' : campo === 'cidade' ? '(sem cidade)' : NAO_MAPEADA);
+      let g = m.get(k);
+      if (!g) m.set(k, (g = []));
+      g.push(r);
+    }
+    const out = [...m].map(([chave, recs]) => Object.assign({ chave }, summarize(recs), { frente: recs[0].frente || '' }));
+    out.sort((a, b) => b.atividades - a.atividades || a.chave.localeCompare(b.chave, 'pt-BR'));
+    return out;
   }
 
   function addMonth(ym, k) {
@@ -1604,6 +1640,6 @@
     XmlStream, openZip, openWorkbook, readSpreadsheetFile, readRecordsSheet, makeMatcher,
     buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate, ordenarArquivos,
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
-    toCsv, csvCell,
+    toCsv, csvCell, agrupar,
   };
 });

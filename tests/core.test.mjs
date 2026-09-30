@@ -10,6 +10,9 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const PC = require('../src/core.js');
+const EX = require('../src/exportar.js');
+import { spawnSync } from 'node:child_process';
+import os from 'node:os';
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const FX = path.join(aqui, 'fixtures');
 const fx = (n) => path.join(FX, n);
@@ -526,4 +529,127 @@ test('amostra real (opcional): números de referência do projeto', { skip: !pro
       for (const k of ['atividades', 'exec', 'neg', 'termos']) assert.equal(porFrente[f][k], v[k] || 0, `${f}/${k}`);
     }
   }
+});
+
+/* ------------------------------------------------------------------ */
+test('indicadores em destaque: percorrido, assertividade, efetividade, equipes e produtividade', async () => {
+  const res = await ler(fx('pequeno_xlsxwriter.xlsx'));
+  const cons = PC.consolidate([{ ...res, path: 'p', lastModified: 1 }]);
+  comFrentes({ records: cons.records, frentes: res.frentes, name: 'p' });
+  const esp = json('pequeno_esperados.json');
+  const s = PC.summarize(cons.records);
+  const perto = (a, b, m) => assert.ok(Math.abs(a - b) < 1e-9, `${m}: ${a} vs ${b}`);
+  assert.equal(s.percorrido, s.exec + s.exoc, 'Percorrido = Exec + Exoc');
+  assert.equal(s.percorrido, esp.atividades);
+  perto(s.assertividade, esp.assertividade, 'assertividade = termos / exec');
+  perto(s.efetividade, esp.efetividade, 'efetividade = negociações / exec');
+  assert.equal(s.equipes, esp.equipes, 'equipes que trabalharam');
+  assert.equal(s.dias, esp.dias);
+  assert.equal(s.equipeDias, esp.equipeDias);
+  perto(s.produtividade, esp.produtividade, 'produtividade = percorrido / equipe-dias');
+  // equipes por dia: filtrando um único dia
+  for (const [dia, n] of Object.entries(esp.equipesPorDia)) {
+    const d = PC.summarize(PC.filterRecords(cons.records, { from: dia, to: dia }));
+    assert.equal(d.equipes, n, 'equipes em ' + dia);
+    assert.equal(d.dias, 1);
+  }
+  // produtividade por cidade
+  for (const g of PC.agrupar(cons.records, 'cidade')) {
+    const e = esp.porCidadeProd[g.chave.toLowerCase()];
+    assert.equal(g.percorrido, e.percorrido);
+    assert.equal(g.equipeDias, e.equipeDias);
+    perto(g.produtividade, e.produtividade, 'produtividade da cidade');
+    perto(g.assertividade, e.assertividade, 'assertividade da cidade');
+    perto(g.efetividade, e.efetividade, 'efetividade da cidade');
+  }
+  // sem Exec não há divisão por zero
+  const vazio = PC.summarize([]);
+  assert.deepEqual([vazio.assertividade, vazio.efetividade, vazio.produtividade, vazio.equipes], [null, null, null, 0]);
+});
+
+test('equipe-dia: a mesma equipe em dois dias conta duas vezes; equipes sem data não entram em equipe-dias', () => {
+  const r = (recurso, data, extra) => Object.assign({ recurso, data, exec: true, exoc: false, neg: false, semDesdobro: false, termo: false, t11: false, t31: false, valor: null }, extra || {});
+  const s = PC.summarize([r('A', '2026-01-01'), r('A', '2026-01-01'), r('A', '2026-01-02'), r('B', '2026-01-02'), r('C', ''), r('', '2026-01-03')]);
+  assert.equal(s.equipes, 3, 'A, B e C trabalharam');
+  assert.equal(s.dias, 3);
+  assert.equal(s.equipeDias, 3, '(A,01) (A,02) (B,02); sem data ou sem recurso não formam equipe-dia');
+  assert.equal(s.percorrido, 6);
+  assert.equal(s.produtividade, 2);
+});
+
+test('exportação para Excel: o .xlsx abre em outro leitor e traz os mesmos números', async (t) => {
+  const py = spawnSync('python3', ['-c', 'import openpyxl'], { encoding: 'utf8' });
+  if (py.status !== 0) return t.skip('python3 com openpyxl não disponível');
+  const res = await ler(fx('pequeno_xlsxwriter.xlsx'));
+  const cons = PC.consolidate([{ ...res, path: 'p', lastModified: 1 }]);
+  comFrentes({ records: cons.records, frentes: res.frentes, name: 'p' });
+  const esp = json('pequeno_esperados.json');
+  const sheets = EX.montarExport(cons.records, { geradoEm: new Date(2026, 8, 30, 10, 5), fonte: 'pasta X', periodo: '03/07/2026 a 28/09/2026', filtros: 'Cidade: Cidade Norte' });
+  const bytes = await EX.toXlsx(sheets);
+  assert.equal(String.fromCharCode(bytes[0], bytes[1]), 'PK');
+  const arq = path.join(os.tmpdir(), 'pc-export-' + process.pid + '.xlsx');
+  fs.writeFileSync(arq, bytes);
+  const code = `
+import openpyxl, json, sys
+wb = openpyxl.load_workbook(sys.argv[1])
+r = wb['Resumo']
+resumo = {str(row[0].value): row[1].value for row in r.iter_rows(min_row=8) if row[0].value}
+reg = wb['Registros']
+hdr = [c.value for c in reg[1]]
+i_sol = hdr.index('Nome do Solicitante'); i_val = hdr.index('Valor Total dos Débitos'); i_dat = hdr.index('Data')
+hyper = [c for c in reg.iter_rows(min_row=2) if c[i_sol].value and str(c[i_sol].value).startswith('=')]
+cid = wb['Produtividade por cidade']
+out = {
+  'abas': wb.sheetnames, 'titulo': r['A1'].value, 'filtros': r['B5'].value, 'resumo': resumo,
+  'registros': reg.max_row - 1, 'colunas': reg.max_column, 'cab': hdr[:3],
+  'formula_tipo': hyper[0][i_sol].data_type if hyper else None, 'formula_valor': hyper[0][i_sol].value if hyper else None,
+  'fmt_valor': reg.cell(2, i_val + 1).number_format, 'fmt_data': reg.cell(2, i_dat + 1).number_format,
+  'freeze': reg.freeze_panes, 'filtro_auto': reg.auto_filter.ref,
+  'cidades': [[c.value for c in row] for row in cid.iter_rows(min_row=2)],
+  'pct_fmt': r['B12'].number_format,
+}
+print(json.dumps(out, default=str))`;
+  const o = spawnSync('python3', ['-c', code, arq], { encoding: 'utf8' });
+  fs.unlinkSync(arq);
+  assert.equal(o.status, 0, o.stderr);
+  const x = JSON.parse(o.stdout);
+  assert.deepEqual(x.abas, ['Resumo', 'Mensal', 'Produtividade por cidade', 'Equipes', 'Frentes', 'Registros']);
+  assert.equal(x.titulo, 'Pós-Corte Interior');
+  assert.equal(x.filtros, 'Cidade: Cidade Norte');
+  const perto = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, a + ' vs ' + b);
+  assert.equal(x.resumo['Percorrido'], esp.atividades);
+  assert.equal(x.resumo['Total de Exec'], esp.exec);
+  assert.equal(x.resumo['Total de Exoc'], esp.exoc);
+  assert.equal(x.resumo['Termos aplicados'], esp.termos);
+  assert.equal(x.resumo['Negociações'], esp.neg);
+  assert.equal(x.resumo['Negociações Sem Desdobro'], esp.semDesdobro);
+  perto(x.resumo['Assertividade'], esp.assertividade);
+  perto(x.resumo['Efetividade'], esp.efetividade);
+  perto(x.resumo['Débito informado nas negociações'], esp.debito);
+  assert.equal(x.resumo['Equipes que trabalharam'], esp.equipes);
+  perto(x.resumo['Produtividade (visitas por equipe por dia)'], esp.produtividade);
+  assert.equal(x.registros, esp.atividades, 'todas as linhas filtradas, sem cortar');
+  assert.equal(x.colunas, PC.CSV_COLUMNS.length);
+  assert.notEqual(x.formula_tipo, 'f', 'texto iniciado por "=" fica como texto, não vira fórmula');
+  assert.equal(x.formula_valor, '=HYPERLINK("x")');
+  assert.match(x.fmt_valor, /R\$/);
+  assert.equal(x.fmt_data, 'dd/mm/yyyy');
+  assert.equal(x.pct_fmt, '0.0%');
+  assert.equal(x.freeze, 'A2');
+  assert.match(x.filtro_auto, /^A1:/);
+  const e = esp.porCidadeProd['cidade norte'];
+  assert.equal(x.cidades.length, 1);
+  assert.equal(x.cidades[0][1], e.percorrido);
+  perto(x.cidades[0][10], e.produtividade);
+});
+
+test('exportação para Excel: grande (8.136 linhas) gera arquivo válido e compacto', { skip: !fs.existsSync(fx('grande_sintetico.xlsx')) && 'gere as planilhas', timeout: 120000 }, async () => {
+  const res = await ler(fx('grande_sintetico.xlsx'));
+  const cons = PC.consolidate([{ ...res, path: 'g', lastModified: 1 }]);
+  comFrentes({ records: cons.records, frentes: res.frentes, name: 'g' });
+  const t0 = performance.now();
+  const bytes = await EX.toXlsx(EX.montarExport(cons.records, {}));
+  console.log(`  xlsx de ${cons.records.length} registros: ${(bytes.length / 1048576).toFixed(2)} MB em ${Math.round(performance.now() - t0)} ms`);
+  assert.ok(bytes.length < 6 * 1048576, 'compactado');
+  assert.equal(EX.crc32(new TextEncoder().encode('123456789')), 0xcbf43926, 'CRC-32 padrão');
 });

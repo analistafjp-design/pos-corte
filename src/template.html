@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Acompanhamento de Pós Corte · AnalistaFJP</title>
-<meta name="description" content="Painel de acompanhamento de Pós Corte: Exec, Exoc, negociações, termos aplicados e frentes de serviço, atualizado por arquivos Excel de uma pasta do OneDrive.">
+<title>Pós-Corte Interior · AnalistaFJP</title>
+<meta name="description" content="Pós-Corte Interior: percorrido, Exec, Exoc, assertividade, efetividade, equipes e produtividade por cidade, atualizado por arquivos Excel de uma pasta do OneDrive.">
 <style>
 /*INLINE:css*/
 </style>
@@ -15,7 +15,7 @@
   <aside class="side" aria-label="Menu lateral">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">FJP</div>
-      <div><div class="brand-name">AnalistaFJP</div><div class="brand-sub">Pós Corte</div></div>
+      <div><div class="brand-name">AnalistaFJP</div><div class="brand-sub">Pós-Corte Interior</div></div>
     </div>
     <nav class="nav" id="nav-side" aria-label="Seções"></nav>
     <div class="side-foot" id="side-foot"></div>
@@ -26,16 +26,19 @@
       <div class="top-title">
         <div class="brand-mark" aria-hidden="true">FJP</div>
         <div>
-          <h1>Acompanhamento de Pós Corte</h1>
-          <div class="sub" id="top-sub">Exec, Exoc, negociações, termos aplicados e frentes de serviço</div>
+          <h1>Pós-Corte Interior</h1>
+          <div class="sub" id="top-sub">Percorrido, Exec, Exoc, assertividade, efetividade e produtividade</div>
         </div>
       </div>
       <div class="actions">
         <button class="btn primary" id="btn-pasta" type="button"></button>
         <button class="btn" id="btn-atualizar" type="button"></button>
         <button class="btn" id="btn-importar" type="button"></button>
+        <button class="btn" id="btn-excel" type="button"></button>
+        <button class="btn" id="btn-pdf" type="button"></button>
       </div>
     </header>
+    <div class="print-head" id="print-head" aria-hidden="true"></div>
 
     <div id="status" aria-live="polite"></div>
 
@@ -66,6 +69,9 @@
 </script>
 <script>
 /*INLINE:core*/
+</script>
+<script>
+/*INLINE:exportar*/
 </script>
 <script>
 /*INLINE:app*/

@@ -1,4 +1,4 @@
-# Acompanhamento de Pós Corte (AnalistaFJP)
+# Pós-Corte Interior (AnalistaFJP)
 
 Painel em **um único arquivo HTML** que lê planilhas Excel (`.xlsx`) de uma pasta do OneDrive e mostra Exec, Exoc, negociações, termos aplicados (110013/310013), Sem Desdobro e frentes de serviço. Tudo roda no navegador: nenhum dado sai do computador.
 
@@ -25,6 +25,7 @@ Requisitos de desenvolvimento: Node 20+, Python 3 com `xlsxwriter` e `openpyxl` 
 
 ```
 src/core.js      leitor .xlsx (ZIP + XML incremental), regras, deduplicação, frentes, filtros, CSV
+src/exportar.js  exportação para Excel (.xlsx gerado sem bibliotecas)
 src/app.js       interface (Visão geral, Analítico, Base e regras), pasta/OneDrive, mensagens
 src/styles.css   estilos          src/template.html   casca da página
 src/frentes-padrao.js  mapeamento padrão Nomenclatura → Frente

@@ -49,7 +49,9 @@ async function abrir(opts) {
   return page;
 }
 const semErros = (page) => assert.deepEqual(page.errosPagina, [], 'erros no console/página');
-const kpis = (page) => page.$$eval('.kpi-value', (els) => els.map((e) => e.textContent));
+// valores dos cartões na ordem antiga: percorrido, exec, exoc, negociações, termos, sem desdobro
+const kpis = (page) => page.evaluate(() => ['atividades', 'exec', 'exoc', 'neg', 'termos', 'semDesdobro'].map((k) => document.querySelector(`[data-fk="kpi:${k}"] .kpi-value`).textContent));
+const kpiTexto = (page, k) => page.textContent(`[data-fk="kpi:${k}"]`);
 async function importar(page, arquivos, esperaKpis = true) {
   await page.setInputFiles('#inp-files', arquivos);
   if (esperaKpis) await page.waitForSelector('.kpi-value');
@@ -67,7 +69,7 @@ test('estado inicial: sem dados incorporados, com instruções e sem erros', asy
     assert.ok(await page.locator(id).isVisible(), t);
     assert.match(await page.textContent(id), new RegExp(t));
   }
-  assert.equal(await page.locator('.kpis').count(), 0);
+  assert.equal(await page.locator('.kpi-groups').count(), 0);
   assert.ok(await page.locator('#filters').isHidden());
   semErros(page);
   await page.context().close();
@@ -79,20 +81,22 @@ test('importar Excel: cartões, gráficos e tabela mensal calculados a partir do
   assert.deepEqual(await kpis(page), KPIS_PEQUENO);
   assert.match(await statusTitulo(page), /Base carregada: 19 atividades de 1 arquivo/);
   // sub-textos
-  const sub = await page.$$eval('.kpi', (els) => els.map((e) => e.textContent));
-  assert.match(sub[3], /Débito informado: R\$\s2\.535,06/);
-  assert.match(sub[4], /110013 Serviços: 6 · 310013 VCG: 2/);
-  assert.match(sub[5], /Parte das negociações/);
+  assert.match(await kpiTexto(page, 'neg'), /Débito informado: R\$\s2\.535,06/);
+  assert.match(await kpiTexto(page, 'termos'), /110013 Serviços: 6 · 310013 VCG: 2/);
+  assert.match(await kpiTexto(page, 'semDesdobro'), /Parte das negociações/);
   // tabela mensal
   const linhas = await page.$$eval('section[aria-labelledby=h-tm] .table-wrap tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
   assert.deepEqual(linhas.map((l) => l[0]), ['jul/2026', 'ago/2026', 'set/2026']);
   assert.equal(linhas[0][1], '17');
   const total = await page.$$eval('section[aria-labelledby=h-tm] .table-wrap tfoot td', (tds) => tds.map((c) => c.textContent));
-  assert.deepEqual(total.slice(0, 7), ['Total', '19', '18', '1', '5', '2', '7']);
+  // Mês | Percorrido | Exec | Exoc | Termos | Assertividade | Negociações | Efetividade | Sem Desdobro | Equipes | Débito
+  assert.deepEqual([total[0], total[1], total[2], total[3], total[4], total[6], total[8], total[9]], ['Total', '19', '18', '1', '7', '5', '2', '3']);
+  assert.equal(total[5], '38,9%');
+  assert.equal(total[7], '27,8%');
   // gráficos com legenda e alternativa em tabela
   assert.ok(await page.locator('.legend').first().isVisible());
   // rankings conciliam com o total
-  for (const id of ['h-frente', 'h-cidade', 'h-recurso']) {
+  for (const id of ['h-frente', 'h-recurso']) {
     const soma = await page.$$eval(`section[aria-labelledby=${id}] .rank-list .rv`, (els) => els.reduce((a, e) => a + parseInt(e.firstChild.textContent.replace(/\./g, ''), 10), 0));
     assert.equal(soma, 19, id);
   }
@@ -246,11 +250,11 @@ test('arquivos enxutos: outra aba, título antes do cabeçalho e colunas ausente
   assert.match(await statusTexto(page), /19 linhas sem chave de deduplicação completa/);
   // coluna de indicador ausente: aviso e marcação nos cartões, sem zero silencioso
   await page.setInputFiles('#inp-files', fx('sem_coluna_servadic.xlsx'));
-  await page.waitForFunction(() => /indisponível em 1 arquivo/.test(document.querySelector('.kpis').textContent));
-  const cards = await page.$$eval('.kpi', (els) => els.map((e) => e.textContent));
-  assert.match(cards[4], /indisponível em 1 arquivo/);
-  assert.match(cards[5], /indisponível em 1 arquivo/);
-  assert.doesNotMatch(cards[3], /indisponível/);
+  await page.waitForFunction(() => /indisponível em 1 arquivo/.test(document.querySelector('.kpi-groups').textContent));
+  assert.match(await kpiTexto(page, 'termos'), /indisponível em 1 arquivo/);
+  assert.match(await kpiTexto(page, 'assertividade'), /indisponível em 1 arquivo/);
+  assert.match(await kpiTexto(page, 'semDesdobro'), /indisponível em 1 arquivo/);
+  assert.doesNotMatch(await kpiTexto(page, 'neg'), /indisponível/);
   assert.equal((await kpis(page))[5], '0', 'sem a coluna ninguém vira Sem Desdobro');
   assert.match(await statusTexto(page), /Termos não pôde ser calculado em: sem_coluna_servadic\.xlsx/);
   await page.context().close();
@@ -262,6 +266,7 @@ test('nomes alternativos de colunas: cadastro na tela reprocessa os arquivos sel
   await page.waitForFunction(() => /Nenhuma base válida/.test(document.querySelector('#status').textContent));
   assert.match(await statusTexto(page), /nenhuma aba tem as colunas esperadas/);
   await page.click('#nav-side button[data-view=base]');
+  if (!(await page.locator('#al-campo').isVisible())) await page.click('.avancado > summary');
   const alias = { recurso: 'Equipe', data: 'Dt', status: 'Situação', cidade: 'Município', valor: 'Débito', negociou: 'Negociou?', servAdic: 'Serviços adicionais' };
   for (const [campo, nome] of Object.entries(alias)) {
     await page.selectOption('#al-campo', campo);
@@ -386,7 +391,7 @@ test('pasta grande (mais de 40 arquivos): pede confirmação antes de ler e não
   await page.click('#btn-pasta');
   await aguardaTitulo(page, /Pasta grande: confirme antes de ler/);
   assert.match(await statusTexto(page), /41 arquivos/);
-  assert.equal(await page.locator('.kpis').count(), 0, 'nada é lido antes da confirmação');
+  assert.equal(await page.locator('.kpi-groups').count(), 0, 'nada é lido antes da confirmação');
   await page.click('#status button:has-text("Ler mesmo assim")');
   await aguardaTitulo(page, /Base carregada: 19 atividades de 41 arquivos/);
   assert.match(await statusTexto(page), /840 duplicatas removidas/);
@@ -440,7 +445,7 @@ test('lê só arquivo novo ou modificado: Atualizar, arquivo novo, arquivo alter
   await page.reload();
   await page.waitForFunction(() => window.__poscorte.state.leitura.salvos === 3, null, { timeout: 30000 });
   assert.deepEqual(await leitura(), { lidos: 0, salvos: 3, memoria: 0 });
-  assert.ok(await page.locator('.kpis').isVisible());
+  assert.ok(await page.locator('.kpi-groups').isVisible());
 
   // limpar os dados gravados: a leitura seguinte volta a ler tudo
   await page.click('#nav-side button[data-view=base]');
@@ -561,7 +566,7 @@ test('a última pasta é lembrada e recarregada ao reabrir o painel (sem guardar
   });
   await page2.goto(baseUrl);
   await page2.waitForFunction(() => /Última pasta usada/.test(document.querySelector('#status')?.textContent || ''));
-  assert.equal(await page2.locator('.kpis').count(), 0, 'não carrega sem autorização');
+  assert.equal(await page2.locator('.kpi-groups').count(), 0, 'não carrega sem autorização');
   await page2.click('#status button:has-text("Reconectar pasta")');
   await aguardaTitulo(page2, /Base carregada: 200 atividades/);
   await ctx.close();
@@ -600,6 +605,124 @@ for (const [w, h] of [[390, 844], [820, 1000], [1440, 900]]) {
     await page.context().close();
   });
 }
+
+test('cartões em destaque: percorrido, exec, exoc, equipes, assertividade e efetividade', async () => {
+  const page = await abrir();
+  await importar(page, PEQUENO);
+  const t = (k) => kpiTexto(page, k);
+  assert.match(await t('atividades'), /Percorrido.*19.*Exec \+ Exoc/);
+  assert.match(await t('exec'), /Total de Exec.*18.*Finalizada/);
+  assert.match(await t('exoc'), /Total de Exoc.*1.*Encerrada com Ocorrência/);
+  assert.match(await t('equipes'), /Equipes que trabalharam.*3/);
+  assert.match(await t('assertividade'), /Assertividade.*38,9%.*Termos ÷ Exec.*7 ÷ 18/);
+  assert.match(await t('efetividade'), /Efetividade.*27,8%.*Negociações ÷ Exec.*5 ÷ 18/);
+  // equipes de um único dia (3 equipes em 03/07/2026)
+  await page.fill('#f-from', '2026-07-03');
+  await page.fill('#f-to', '2026-07-03');
+  assert.match(await t('equipes'), /3.*no dia 03\/07\/2026/);
+  await page.fill('#f-from', '2026-08-10');
+  await page.fill('#f-to', '2026-08-10');
+  assert.match(await t('equipes'), /1.*no dia 10\/08\/2026/);
+  // sem Exec no filtro: divisão protegida
+  await page.fill('#f-from', '2026-09-28');
+  await page.fill('#f-to', '2026-09-28');
+  assert.match(await t('assertividade'), /0,0%|—/);
+  // cartões informativos não abrem o analítico; os de indicador abrem
+  await page.click('#chips button.ghost');
+  await page.click('[data-fk="kpi:equipes"]');
+  assert.ok(await page.locator('#view-geral').isVisible());
+  semErros(page);
+  await page.context().close();
+});
+
+test('produtividade por cidade: visitas por equipe-dia, total e filtro por clique', async () => {
+  const page = await abrir();
+  await importar(page, PEQUENO);
+  const linhas = await page.$$eval('section[aria-labelledby=h-cidades] tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent.trim())));
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0][0], 'Cidade Norte');
+  assert.equal(linhas[0][1], '19');
+  assert.equal(linhas[0][9], '5', 'equipe-dias');
+  assert.equal(linhas[0][10], '3,8', '19 percorridas ÷ 5 equipe-dias');
+  const total = await page.$$eval('section[aria-labelledby=h-cidades] tfoot td', (tds) => tds.map((c) => c.textContent.trim()));
+  assert.equal(total[10], '3,8');
+  assert.match(await page.textContent('section[aria-labelledby=h-cidades]'), /Produtividade = Percorrido ÷ equipe-dias/);
+  await page.click('[data-fk="cid:Cidade Norte"]');
+  assert.equal(await page.inputValue('#f-cidade'), 'Cidade Norte');
+  await page.click('[data-fk="cid:Cidade Norte"]');
+  assert.equal(await page.inputValue('#f-cidade'), '');
+  await page.context().close();
+});
+
+test('exportar Excel pelo botão: baixa um .xlsx válido com o filtro aplicado', async () => {
+  const py = require('node:child_process').spawnSync('python3', ['-c', 'import openpyxl'], { encoding: 'utf8' });
+  const page = await abrir();
+  await importar(page, PEQUENO);
+  assert.ok(await page.locator('#btn-excel').isEnabled());
+  await page.fill('#f-from', '2026-07-01');
+  await page.fill('#f-to', '2026-07-31');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-excel')]);
+  assert.match(dl.suggestedFilename(), /^pos-corte-interior_\d{8}_\d{4}\.xlsx$/);
+  const arq = require('node:path').join(require('node:os').tmpdir(), 'pc-ui-' + process.pid + '.xlsx');
+  await dl.saveAs(arq);
+  const buf = fs.readFileSync(arq);
+  assert.equal(buf.subarray(0, 2).toString(), 'PK');
+  if (py.status === 0) {
+    const o = require('node:child_process').spawnSync('python3', ['-c', `
+import openpyxl, sys, json
+wb = openpyxl.load_workbook(sys.argv[1]); r = wb['Resumo']
+print(json.dumps({'filtros': r['B5'].value, 'percorrido': r['B8'].value, 'registros': wb['Registros'].max_row - 1, 'abas': wb.sheetnames}, default=str))`, arq], { encoding: 'utf8' });
+    const x = JSON.parse(o.stdout);
+    assert.equal(x.percorrido, 17, 'só julho');
+    assert.equal(x.registros, 17);
+    assert.match(x.filtros, /Período: 01\/07\/2026 a 31\/07\/2026/);
+    assert.equal(x.abas.length, 6);
+  }
+  // sem dados o botão fica desativado
+  const vazia = await abrir();
+  assert.ok(await vazia.locator('#btn-excel').isDisabled());
+  assert.ok(await vazia.locator('#btn-pdf').isDisabled());
+  semErros(page);
+  await page.context().close();
+  await vazia.context().close();
+});
+
+test('exportar PDF: o botão abre a impressão da Visão geral e o layout de impressão é compacto', async () => {
+  const page = await abrir();
+  await importar(page, PEQUENO);
+  await page.evaluate(() => { window.__prints = []; window.print = () => window.__prints.push(document.querySelector('#view-geral').hidden ? 'oculta' : 'geral'); });
+  await page.click('#btn-pdf');
+  assert.deepEqual(await page.evaluate(() => window.__prints), ['geral']);
+  // estando em outra aba, volta para a Visão geral antes de imprimir
+  await page.click('#nav-side button[data-view=analitico]');
+  await page.click('#btn-pdf');
+  await page.waitForFunction(() => window.__prints.length === 2);
+  assert.deepEqual(await page.evaluate(() => window.__prints), ['geral', 'geral']);
+  // layout de impressão
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await page.emulateMedia({ media: 'print' });
+  for (const sel of ['.side', '.tabbar', '.actions', '.filters', '#nav-side', '#view-analitico', '.card-status']) {
+    assert.equal(await page.locator(sel).first().isVisible(), false, sel + ' oculto na impressão');
+  }
+  assert.ok(await page.locator('#print-head').isVisible());
+  assert.match(await page.textContent('#print-head'), /Pós-Corte Interior.*Período dos dados: 03\/07\/2026 a 28\/09\/2026.*Filtros: nenhum/);
+  assert.ok(await page.locator('.kpi-groups').isVisible());
+  const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true });
+  assert.equal(pdf.subarray(0, 4).toString(), '%PDF');
+  const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+  assert.ok(paginas >= 1 && paginas <= 4, 'páginas: ' + paginas);
+  semErros(page);
+  await page.context().close();
+});
+
+test('nome do painel e abas: Pós-Corte Interior; Visão geral, Analítico e Arquivos e regras', async () => {
+  const page = await abrir();
+  assert.equal(await page.title(), 'Pós-Corte Interior · AnalistaFJP');
+  assert.equal(await page.textContent('h1'), 'Pós-Corte Interior');
+  assert.match(await page.textContent('.brand-sub'), /Pós-Corte Interior/);
+  assert.deepEqual(await page.$$eval('#nav-side button', (bs) => bs.map((b) => b.textContent.trim())), ['Visão geral', 'Analítico', 'Arquivos e regras']);
+  await page.context().close();
+});
 
 test('teclado: cartão e barras acessíveis; foco preservado após filtrar', async () => {
   const page = await abrir();
