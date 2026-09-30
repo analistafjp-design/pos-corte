@@ -49,6 +49,7 @@ NOMES = ["Ana Souza", "Bruno Lima", "Carla Dias", "Diego Rocha", "Elisa Prado", 
 CODIGOS_SERVICO = ["110010-VISTORIA PÓS CORTE", "110011-VISTORIA PÓS CORTE - INTERMEDIÁRIO", "110012-VISTORIA PÓS CORTE - AVANÇADO",
                    "210010-VISTORIA PÓS CORTE", "210011-VISTORIA PÓS CORTE - INTERMEDIÁRIO", "210012-VISTORIA PÓS CORTE - AVANÇADO",
                    "310010-VISTORIA PÓS CORTE", "310011-VISTORIA PÓS CORTE - INTERMEDIÁRIO", "310012-VISTORIA PÓS CORTE - AVANÇADO"]
+STATUS_CONTADOS = ("Finalizada", "Encerrada com Ocorrência")
 EM_ESCOPO = re.compile(r"^\s*(110010|110011|110012|210010|210011|210012|310010|310011|310012)(?!\d)")
 
 
@@ -158,7 +159,7 @@ def esperados(rows, frentes=FRENTES):
                 best = (k, v)
         return best[1] if best else "Não mapeada"
 
-    rows = [r for r in rows if em_escopo(r)]  # só os serviços dos 9 códigos entram na base
+    rows = [r for r in rows if em_escopo(r) and r["Status da Atividade"] in STATUS_CONTADOS]  # só serviços dos 9 códigos e status contados
     out = {"atividades": 0, "exec": 0, "exoc": 0, "neg": 0, "termos": 0, "semDesdobro": 0, "t11": 0, "t31": 0,
            "debito": 0.0, "negETermo": 0, "porMes": {}, "porFrente": {}, "porCidade": {}, "porEquipe": {}}
     for r in rows:
@@ -369,7 +370,7 @@ def montar_pequeno(out):
         dict(**{"ID da Atividade": 9, "Serviço adicionais resposta": "9310013"}),  # sem termo
         dict(**{"ID da Atividade": 10, "Irregularidade Encontrada?": "Sim", "Serviço adicionais resposta": ""}),  # irregularidade sem código
         dict(**{"ID da Atividade": 11, "Negociou O Débito?": "Sim", "Serviço adicionais resposta": "110013", "Valor Total dos Débitos": 1234.56}),  # neg + termo
-        dict(**{"ID da Atividade": 12, "Status da Atividade": "Cancelada", "Nome do Solicitante": '<img src=x onerror="window.__xss=1">'}),  # outro status; nome com HTML
+        dict(**{"ID da Atividade": 12, "Nome do Solicitante": '<img src=x onerror="window.__xss=1">'}),  # nome com HTML
         dict(**{"ID da Atividade": 13, "Matrícula": "1001", "Data": date(2026, 8, 10)}),  # mesma matrícula, outra visita
         dict(**{"ID da Atividade": 14, "Negociou O Débito?": "Não", "Serviço adicionais resposta": "x=110013y"}),  # termo entre letras
         dict(**{"ID da Atividade": 15, "Recurso": "AL-X-02", "Cidade": "cidade norte"}),  # frente mais específica; caixa diferente
@@ -380,7 +381,10 @@ def montar_pequeno(out):
         # fora dos 9 códigos de serviço: não devem ser carregados (mesmo negociando e com termo)
         dict(**{"ID da Atividade": 20, "Código/Descrição": "180001 - OUTRO SERVIÇO", "Negociou O Débito?": "Sim", "Serviço adicionais resposta": "110013"}),
         dict(**{"ID da Atividade": 21, "Código/Descrição": "", "Status da Atividade": "Encerrada com Ocorrência"}),
-        dict(**{"ID da Atividade": 22, "Código/Descrição": "1100100-CÓDIGO MAIOR", "Negociou O Débito?": "Sim"}),  # código seguido de vírgula e dígito: 5 é dígito -> conta? (110013 seguido de ',') sim conta
+        dict(**{"ID da Atividade": 22, "Código/Descrição": "1100100-CÓDIGO MAIOR", "Negociou O Débito?": "Sim"}),
+        # status que não contam (só Finalizada e Encerrada com Ocorrência): mesmo negociando e com termo
+        dict(**{"ID da Atividade": 24, "Status da Atividade": "Cancelada"}),
+        dict(**{"ID da Atividade": 25, "Status da Atividade": "Paralisada", "Negociou O Débito?": "Sim", "Serviço adicionais resposta": "110013"}),  # código seguido de vírgula e dígito: 5 é dígito -> conta? (110013 seguido de ',') sim conta
     ]
     rows = []
     for i, c in enumerate(casos):
@@ -482,7 +486,7 @@ def main():
     pasta = out / "pasta_dedup"
     (pasta / "sub").mkdir(parents=True, exist_ok=True)
     rng = random.Random(11)
-    spec = dict(exoc=20, neg=12, termos=15, neg_e_termo=3, sem_desdobro=1, decoy_num=4, irreg_sem_codigo=5, neg_decoy=2, outros=2)
+    spec = dict(exoc=20, neg=12, termos=15, neg_e_termo=3, sem_desdobro=1, decoy_num=4, irreg_sem_codigo=5, neg_decoy=2, outros=0)
     rows_a = nova_matriz(rng, 200, spec)
     esc = dict
     escrever_xlsxwriter(pasta / "snapshot_antigo.xlsx", cabecalho(rng), rows_a, {})

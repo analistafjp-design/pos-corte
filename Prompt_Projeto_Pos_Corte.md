@@ -69,7 +69,7 @@ A base só traz atividades cujo `Código/Descrição` começa com: 110010, 11001
 
 ## Regras obrigatórias dos indicadores
 
-- **Atividades:** registros da Base após deduplicação e filtros. Não use só a matrícula para identificar uma atividade (há matrículas com várias visitas).
+- **Atividades:** só atividades **Finalizada ou Encerrada com Ocorrência** (Cancelada, Paralisada, Pendente etc. não contam; a versão mais nova de uma atividade pode anulá-la), dos 9 serviços, após deduplicação e filtros. Não use só a matrícula para identificar uma atividade (há matrículas com várias visitas).
 - **Finalizadas — Exec:** `Status da Atividade = Finalizada`.
 - **Encerradas com Ocorrência — Exoc:** `Status da Atividade = Encerrada com Ocorrência`. Outros status devem aparecer, não ser escondidos.
 - **Negociações:** somente quando `Negociou O Débito?` for **Sim** (espaços externos e caixa normalizados). Não deduza negociação de códigos, texto livre, valor ou desdobro.
@@ -89,7 +89,7 @@ A base só traz atividades cujo `Código/Descrição` começa com: 110010, 11001
 1. Ignore arquivos `~$`.
 2. Ordene por data de modificação.
 3. Chave principal: `ID da Atividade`; sem ID: `Cód. Protocolo Origem + Matrícula + Código/Descrição + Data + Recurso` — se algum desses campos estiver vazio, a linha não é unida a nenhuma outra (e o painel avisa).
-4. Chave repetida: prevalece o arquivo modificado mais recentemente.
+4. Chave repetida: prevalece o arquivo modificado mais recentemente. Arquivos marcados como **complementares** ("só completa", normalmente a base completa de referência) têm a menor prioridade: só preenchem o que falta e são descartados em duplicidade, qualquer que seja a data.
 5. Informe as duplicatas removidas. Documente que a data de modificação é critério operacional, não garantia de atualidade.
 
 ## Atualização por OneDrive
@@ -120,7 +120,7 @@ Data inicial/final, cidade, frente, equipe, seletor do indicador dos gráficos; 
 
 Resultados de referência da amostra (calculados, não fixos): Atividades 8.136 · Exec 7.461 · Exoc 675 · Negociações 230 · Termos 389 (382 + 7) · Sem Desdobro 2 · débito informado R$ 252.027,39 · período 02/01/2026 a 28/09/2026.
 
-Rode `npm test` (28 testes no Node e 21 no Chromium) (gera planilhas sintéticas, roda o núcleo no Node e a interface no Chromium). Com a planilha real: `POSCORTE_AMOSTRA=/caminho/arquivo.xlsx npm run test:core`. Não afirme ter testado no Windows, no Edge ou no OneDrive real se isso não foi executado (até agora **não** foi).
+Rode `npm test` (30 testes no Node e 22 no Chromium) (gera planilhas sintéticas, roda o núcleo no Node e a interface no Chromium). Com a planilha real: `POSCORTE_AMOSTRA=/caminho/arquivo.xlsx npm run test:core`. Não afirme ter testado no Windows, no Edge ou no OneDrive real se isso não foi executado (até agora **não** foi).
 
 ## Entrega e continuidade
 

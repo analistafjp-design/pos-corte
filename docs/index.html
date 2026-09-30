@@ -257,7 +257,8 @@ tfoot td { font-weight: 700; background: #f7f7f4; }
 .rules p, .rules li { font-size: 14px; color: var(--ink); }
 .rules ul { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 3px; }
 .rules code, code { background: #eeede8; padding: 1px 5px; border-radius: 5px; font-size: 13px; }
-.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+.kv { display: grid; grid-template-columns: minmax(max-content, 34%) minmax(0, 1fr); gap: 4px 14px; font-size: 14px; }
+.kv dt { overflow-wrap: anywhere; }
 .kv dt { color: var(--ink-2); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 
@@ -308,6 +309,10 @@ tfoot td { font-weight: 700; background: #f7f7f4; }
 }
 @media (min-width: 760px) and (max-width: 1279px) {
   .grid-rank { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .kv { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .kv dd { margin-bottom: 8px; }
 }
 @media (max-width: 420px) {
   .brow, .mgroup { grid-template-columns: 62px minmax(0, 1fr); gap: 6px; }
@@ -623,7 +628,7 @@ window.FRENTES_PADRAO = [
   const isBlank = (v) => v == null || String(v).trim() === '';
 
   /** Versão das regras de leitura; muda quando o resultado gravado deixa de valer. */
-  const PARSER_VERSION = 2;
+  const PARSER_VERSION = 3;
 
   /** Serviços considerados (início de "Código/Descrição"); os demais não são carregados. */
   const CODIGOS_SERVICO = ['110010', '110011', '110012', '210010', '210011', '210012', '310010', '310011', '310012'];
@@ -1444,6 +1449,10 @@ window.FRENTES_PADRAO = [
     const codigos = opts.codigos === undefined ? new Set(CODIGOS_SERVICO) : opts.codigos; // null = sem filtro
     let foraServico = 0;
     let filtroAtivo = false;
+    const filtrarStatus = opts.somenteRealizadas !== false;
+    let statusAtivo = false;
+    let foraStatus = 0;
+    const descartados = [];
     const fv = new Array(FIELDS.length);
     const fk = new Array(FIELDS.length);
     const D1904 = ctx.date1904;
@@ -1467,6 +1476,7 @@ window.FRENTES_PADRAO = [
       headers = names;
       hasServ = found.has(FIELD_INDEX.servAdic);
       filtroAtivo = codigos !== null && found.has(FIELD_INDEX.codigo);
+      statusAtivo = filtrarStatus && found.has(FIELD_INDEX.status);
       for (const [fi, c] of found) fieldOfCol[c] = fi;
       return true;
     }
@@ -1565,7 +1575,16 @@ window.FRENTES_PADRAO = [
         }
         if (!any) { ignoredRows++; dataRows--; return; }
         if (filtroAtivo && !codigos.has(codigoServico(fv[FIELD_INDEX.codigo]))) { foraServico++; dataRows--; return; }
-        records.push(buildRecord());
+        const rec = buildRecord();
+        if (statusAtivo && !(rec.exec || rec.exoc)) {
+          // Só Finalizada e Encerrada com Ocorrência contam. Guarda apenas a identificação: se esta for a versão mais
+          // nova da atividade, ela anula a versão antiga (ex.: Finalizada -> Cancelada) na consolidação.
+          foraStatus++;
+          dataRows--;
+          descartados.push({ id: rec.id, protocolo: rec.protocolo, matricula: rec.matricula, codigo: rec.codigo, data: rec.data, dataTxt: rec.dataTxt, recurso: rec.recurso, linha: rec.linha, descartado: true });
+          return;
+        }
+        records.push(rec);
       },
       opts.onProgress,
       (c) => header === null || (c < 16384 && fieldOfCol[c] >= 0)
@@ -1644,6 +1663,9 @@ window.FRENTES_PADRAO = [
       ignoredRows,
       foraServico,
       filtroServico: filtroAtivo,
+      foraStatus,
+      filtroStatus: statusAtivo,
+      descartados,
       stats,
       warnings,
       missing: missing.map((f) => f.header),
@@ -1783,6 +1805,7 @@ window.FRENTES_PADRAO = [
       arquivo: opts.path || file.name,
       matcher,
       codigos: opts.codigos,
+      somenteRealizadas: opts.somenteRealizadas,
       onProgress: (f) => progress({ phase: `Lendo aba ${base.s.name}`, fraction: f }),
     });
     warnings.push(...baseRes.warnings);
@@ -1818,7 +1841,7 @@ window.FRENTES_PADRAO = [
       }
       try {
         progress({ phase: `Conferindo aba ${sh.name}`, fraction: 0 });
-        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher, codigos: opts.codigos });
+        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher, codigos: opts.codigos, somenteRealizadas: opts.somenteRealizadas });
         let naBase = 0;
         let regraOk = 0;
         let semChave = 0;
@@ -1858,6 +1881,9 @@ window.FRENTES_PADRAO = [
       audit: { linhas: baseRes.dataRows, linhasIgnoradas: baseRes.ignoredRows },
       foraServico: baseRes.foraServico,
       filtroServico: baseRes.filtroServico,
+      foraStatus: baseRes.foraStatus,
+      filtroStatus: baseRes.filtroStatus,
+      descartados: baseRes.descartados,
       stats: baseRes.stats,
       colunasNaoEncontradas: baseRes.missing,
     };
@@ -1935,29 +1961,40 @@ window.FRENTES_PADRAO = [
    * Consolida resultados de arquivos válidos: ordena por data de modificação,
    * remove duplicatas (o arquivo modificado mais recentemente prevalece).
    */
+  /**
+   * Ordem de precedência: arquivos "complementares" primeiro (menor prioridade: só completam o que não existe),
+   * depois os demais pela data de modificação (o mais recente vence).
+   */
+  function ordenarArquivos(files) {
+    return files.slice().sort((a, b) => (a.complementar ? 0 : 1) - (b.complementar ? 0 : 1) || a.lastModified - b.lastModified || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  }
+
   function consolidate(files) {
-    const ordered = files.slice().sort((a, b) => a.lastModified - b.lastModified || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    const ordered = ordenarArquivos(files);
     const byKey = new Map();
     let lidos = 0;
     let semChave = 0;
     for (const f of ordered) {
-      for (const r of f.records) {
-        lidos++;
+      for (const r of (f.descartados || []).concat(f.records)) {
         let k = recordKey(r);
         if (k === null) {
+          if (r.descartado) continue; // sem chave completa não há como anular outra versão
           // chave alternativa incompleta: a linha nunca é unida a outra
           semChave++;
           k = 'linha:' + f.path + '#' + r.linha;
         }
+        lidos++;
         byKey.set(k, r); // Map mantém a posição da primeira inserção; o valor é o mais recente
       }
     }
-    const records = [...byKey.values()];
-    const duplicatas = lidos - records.length;
+    const todos = [...byKey.values()];
+    const records = todos.filter((r) => !r.descartado);
+    const duplicatas = lidos - todos.length;
+    const anuladas = todos.length - records.length; // atividades cuja versão vencedora não é Finalizada/Encerrada com Ocorrência
     for (const r of records) r.busca = norm([r.matricula, r.protocolo, r.solicitante, r.id].join(' '));
     canonicalize(records, 'cidade');
     canonicalize(records, 'recurso');
-    return { records, lidos, duplicatas, semChave, ordemArquivos: ordered.map((f) => f.path) };
+    return { records, lidos, duplicatas, anuladas, semChave, ordemArquivos: ordered.map((f) => f.path) };
   }
 
   /* ------------------------------------------------------------------ */
@@ -2164,7 +2201,7 @@ window.FRENTES_PADRAO = [
     parseDateText, parseDateValue, serialToParts, parseValor, fmtBR, isoToBR, isDateFormatCode,
     classify, recordKey,
     XmlStream, openZip, openWorkbook, readSpreadsheetFile, readRecordsSheet, makeMatcher,
-    buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate,
+    buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate, ordenarArquivos,
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell,
   };
@@ -2294,6 +2331,7 @@ window.FRENTES_PADRAO = [
     ignoradosFormato: [],
     limiteConfirmado: false,
     leitura: { lidos: 0, salvos: 0, memoria: 0 },
+    complementares: new Set(),
   };
   let vm = null; // modelo de visualização calculado a partir dos filtros
   let anRows = []; // linhas do analítico (filtros + indicador + busca)
@@ -2305,6 +2343,14 @@ window.FRENTES_PADRAO = [
     state.aliases = JSON.parse(localStorage.getItem('poscorte.aliases') || '{}') || {};
   } catch (_) {
     state.aliases = {};
+  }
+  try {
+    state.complementares = new Set(JSON.parse(localStorage.getItem('poscorte.complementares') || '[]'));
+  } catch (_) {
+    state.complementares = new Set();
+  }
+  function salvarComplementares() {
+    try { localStorage.setItem('poscorte.complementares', JSON.stringify([...state.complementares])); } catch (_) { /* vale só nesta sessão */ }
   }
   function salvarAliases() {
     try { localStorage.setItem('poscorte.aliases', JSON.stringify(state.aliases)); } catch (_) { /* sem armazenamento: vale só nesta sessão */ }
@@ -2603,8 +2649,9 @@ window.FRENTES_PADRAO = [
       }
 
       state.lastSig = sig;
+      for (const r of ok) r.complementar = state.complementares.has(r.name);
       const cons = PC.consolidate(ok);
-      const ordemMod = ok.slice().sort((a, b) => a.lastModified - b.lastModified || (a.path < b.path ? -1 : 1));
+      const ordemMod = PC.ordenarArquivos(ok);
       state.frenteMap = PC.mergeFrentes(state.frenteMap, ordemMod.map((r) => ({ nome: r.name, frentes: r.frentes })));
       PC.applyFrentes(cons.records, state.frenteMap);
       state.records = cons.records;
@@ -2636,6 +2683,7 @@ window.FRENTES_PADRAO = [
         detail:
           (parcial ? fmtInt(cons.records.length) + ' atividades foram carregadas dos arquivos válidos. ' : '') +
           'Lidos do arquivo agora: ' + leitura.lidos + ' · reaproveitados (já lidos antes): ' + (leitura.salvos + leitura.memoria) + '. ' +
+          (cons.anuladas ? fmtInt(cons.anuladas) + ' ' + plural(cons.anuladas, 'atividade fora de Finalizada/Encerrada com Ocorrência', 'atividades fora de Finalizada/Encerrada com Ocorrência') + ' não contam. ' : '') +
           (cons.duplicatas ? fmtInt(cons.duplicatas) + ' ' + plural(cons.duplicatas, 'duplicata removida', 'duplicatas removidas') + '. ' : '') +
           (nAvisos ? nAvisos + ' ' + plural(nAvisos, 'aviso de leitura', 'avisos de leitura') + ' em "Base e regras". ' : ''),
         items: itens,
@@ -2711,6 +2759,15 @@ window.FRENTES_PADRAO = [
       setStatus({ kind: 'info', title: 'Selecione os arquivos novamente', detail: 'A importação manual não monitora os arquivos. Selecione-os de novo para reler.' });
       $('#inp-files').click();
     }
+  }
+
+  /** Reconsolida (ex.: arquivo marcado como complementar) sem invalidar o que já foi lido. */
+  async function reconsolidar() {
+    state.lastSig = '';
+    const s = state.source;
+    if (!s) return;
+    if (s.mode === 'handle') await lerPastaHandle(false);
+    else if (s.entries) await carregar(s.entries, {});
   }
 
   /** Reaplica as regras (ex.: novo nome alternativo de coluna) aos arquivos já selecionados. */
@@ -3312,7 +3369,7 @@ window.FRENTES_PADRAO = [
     const somaMeses = meses.reduce((a, m) => a + m.sum.atividades, 0);
     add(somaMeses === s.atividades, 'Soma dos meses = Atividades', fmtInt(somaMeses) + ' de ' + fmtInt(s.atividades));
     const cons = state.consolidado;
-    if (cons) add(cons.records.length + cons.duplicatas === cons.lidos, 'Registros lidos − duplicatas = Atividades', fmtInt(cons.lidos) + ' − ' + fmtInt(cons.duplicatas) + ' = ' + fmtInt(cons.records.length));
+    if (cons) add(cons.records.length + cons.duplicatas + cons.anuladas === cons.lidos, 'Linhas lidas − duplicatas − fora dos status = Atividades', fmtInt(cons.lidos) + ' − ' + fmtInt(cons.duplicatas) + ' − ' + fmtInt(cons.anuladas) + ' = ' + fmtInt(cons.records.length));
     const semData = recs.filter((r) => !r.data).length;
     add(semData === 0, 'Registros com data válida', semData ? fmtInt(semData) + ' sem data válida (saem de filtros de período)' : 'todos');
     const naoMap = recs.filter((r) => r.frente === PC.NAO_MAPEADA).length;
@@ -3326,17 +3383,18 @@ window.FRENTES_PADRAO = [
       .slice()
       .sort((a, b) => (a.ok && b.ok ? a.res.lastModified - b.res.lastModified : a.ok ? -1 : 1))
       .map((f) => {
-        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { class: 'n', text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
+        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
         const r = f.res;
         const conf = r.conferencia.map((c) => c.erro ? c.rotulo + ': ' + c.erro : c.rotulo + ': ' + (c.conciliado ? 'conciliado com a aba ' + c.aba + ' (' + fmtInt(c.linhas) + ')' : 'DIVERGE da aba ' + c.aba + ' (aba ' + fmtInt(c.linhas) + ' · cálculo ' + fmtInt(c.calculadoNaBase) + ' · na Base ' + fmtInt(c.naBase) + ')'));
         return h('tr', null,
           h('td', { text: r.path }), h('td', { class: 'num', text: fmtDataHora(r.lastModified) }), h('td', { class: 'num', text: fmtBytes(r.size) }),
-          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }), h('td', { class: 'n', text: r.filtroServico ? fmtInt(r.foraServico) : 'sem filtro' }),
+          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }), h('td', { class: 'n', text: (r.filtroServico ? fmtInt(r.foraServico) : 'sem filtro') + ' / ' + (r.filtroStatus ? fmtInt(r.foraStatus) : 'sem filtro') }),
+          h('td', null, h('label', { class: 'count-note' }, h('input', { type: 'checkbox', checked: state.complementares.has(r.name), 'aria-label': 'Arquivo complementar: ' + r.name, onchange: (e) => { if (e.target.checked) state.complementares.add(r.name); else state.complementares.delete(r.name); salvarComplementares(); reconsolidar(); } }), ' só completa')),
           h('td', null, tag('OK', 'exec'), ' ' + (ROTULO_ORIGEM[r.origem] || ''), r.warnings.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, r.warnings.map((w) => h('li', { text: w }))) : null,
             conf.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, conf.map((c) => h('li', { text: c }))) : null));
       });
     return h('div', { class: 'table-wrap' }, h('table', null,
-      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Atividades', 'Outros serviços ignorados', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 || i === 5 ? 'n' : '', text: c })))),
+      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Atividades', 'Ignoradas: outro serviço / outro status', 'Prioridade', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 || i === 5 ? 'n' : '', text: c })))),
       h('tbody', null, linhas)));
   }
 
@@ -3350,7 +3408,8 @@ window.FRENTES_PADRAO = [
     add('Última leitura com mudanças', state.lastRead ? fmtDataHora(state.lastRead.getTime()) : '—');
     add('Última verificação', state.lastCheck ? hhmmss(state.lastCheck) : '—');
     add('Arquivos válidos', state.files.length ? state.files.filter((f) => f.ok).length + ' de ' + state.files.length : '—');
-    add('Registros lidos / atividades', c ? fmtInt(c.lidos) + ' / ' + fmtInt(c.records.length) : '—');
+    add('Linhas lidas / atividades', c ? fmtInt(c.lidos) + ' / ' + fmtInt(c.records.length) : '—');
+    if (c) add('Fora de Finalizada e Encerrada com Ocorrência', fmtInt(c.anuladas) + ' atividades (Cancelada, Paralisada, Pendente etc. não contam)');
     add('Duplicatas removidas', c ? fmtInt(c.duplicatas) : '—');
     if (state.files.length) {
       const fora = state.files.filter((f) => f.ok).reduce((a, f) => a + (f.res.foraServico || 0), 0);
@@ -3370,7 +3429,7 @@ window.FRENTES_PADRAO = [
       state.ignoradosFormato.length ? h('p', { class: 'note warn', text: 'Ignorados (formato não suportado; salve como .xlsx): ' + state.ignoradosFormato.join(', ') }) : null,
       h('p', { class: 'note', text: 'Só arquivos novos ou modificados (nome, tamanho e data) são lidos; o resultado de cada arquivo fica gravado neste navegador, neste computador, e é reaproveitado ao recarregar a página. Nada é enviado para a internet.' }),
       h('button', { class: 'btn small', type: 'button', text: 'Limpar dados gravados', onclick: async () => { state.cache.clear(); state.lastSig = ''; try { await idb.arquivoLimpar(null); } catch (_) { /* ignora */ } setStatus({ kind: 'success', title: 'Dados gravados apagados', detail: 'Na próxima atualização todos os arquivos serão lidos de novo.' }); } }),
-      h('p', { class: 'note', text: 'A ordem dos arquivos para deduplicação é a data de modificação (do mais antigo ao mais recente). É um critério operacional, não garante que o conteúdo seja o mais atual: evite misturar versões conflitantes na pasta.' })
+      h('p', { class: 'note', text: 'Marque "só completa" no arquivo-base: ele só preenche o que não existe nos outros arquivos e, em duplicidade, é o outro que vale (descarta-se a linha do complementar), qualquer que seja a data. Sem marca, a ordem para deduplicação é a data de modificação (do mais antigo ao mais recente). É um critério operacional, não garante que o conteúdo seja o mais atual: evite misturar versões conflitantes na pasta.' })
     );
   }
 
@@ -3441,9 +3500,11 @@ window.FRENTES_PADRAO = [
     return h('section', { class: 'card rules' },
       h('div', { class: 'card-head' }, h('h2', { text: 'Regras dos indicadores' })),
       h('h3', { text: 'Atividades' }),
-      h('p', { text: 'Registros da aba Base após a deduplicação entre arquivos e os filtros escolhidos. As abas de Termos e Negociações são recortes da Base: não são somadas a ela (só conferidas).' }),
+      h('p', { text: 'Registros da aba Base dos serviços e dos status considerados (abaixo), após a deduplicação entre arquivos e os filtros escolhidos. As abas de Termos e Negociações são recortes da Base: não são somadas a ela (só conferidas).' }),
       h('h3', { text: 'Serviços considerados' }),
       h('p', null, 'Só entram atividades cujo ', h('code', { text: 'Código/Descrição' }), ' começa com um destes códigos: ', h('code', { text: PC.CODIGOS_SERVICO.join(', ') }), '. Linhas de outros serviços não são carregadas nem gravadas (o número ignorado aparece em "Fonte e arquivos lidos").'),
+      h('h3', { text: 'Status considerados' }),
+      h('p', null, 'Atividades = só as com status ', h('strong', { text: 'Finalizada' }), ' (Exec) ou ', h('strong', { text: 'Encerrada com Ocorrência' }), ' (Exoc). Cancelada, Paralisada, Pendente, Iniciada, Em Rota etc. não contam. Se a versão mais nova de uma atividade tiver outro status, ela deixa de contar, mesmo que um arquivo antigo a traga como Finalizada.'),
       h('h3', { text: 'Exec e Exoc' }),
       h('ul', null, li(h('strong', { text: 'Exec' }), ': Status da Atividade = ', h('code', { text: 'Finalizada' }), '.'), li(h('strong', { text: 'Exoc' }), ': Status da Atividade = ', h('code', { text: 'Encerrada com Ocorrência' }), '. Outros status aparecem na distribuição dos status.')),
       h('h3', { text: 'Negociações e Sem Desdobro' }),

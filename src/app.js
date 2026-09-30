@@ -120,6 +120,7 @@
     ignoradosFormato: [],
     limiteConfirmado: false,
     leitura: { lidos: 0, salvos: 0, memoria: 0 },
+    complementares: new Set(),
   };
   let vm = null; // modelo de visualização calculado a partir dos filtros
   let anRows = []; // linhas do analítico (filtros + indicador + busca)
@@ -131,6 +132,14 @@
     state.aliases = JSON.parse(localStorage.getItem('poscorte.aliases') || '{}') || {};
   } catch (_) {
     state.aliases = {};
+  }
+  try {
+    state.complementares = new Set(JSON.parse(localStorage.getItem('poscorte.complementares') || '[]'));
+  } catch (_) {
+    state.complementares = new Set();
+  }
+  function salvarComplementares() {
+    try { localStorage.setItem('poscorte.complementares', JSON.stringify([...state.complementares])); } catch (_) { /* vale só nesta sessão */ }
   }
   function salvarAliases() {
     try { localStorage.setItem('poscorte.aliases', JSON.stringify(state.aliases)); } catch (_) { /* sem armazenamento: vale só nesta sessão */ }
@@ -429,8 +438,9 @@
       }
 
       state.lastSig = sig;
+      for (const r of ok) r.complementar = state.complementares.has(r.name);
       const cons = PC.consolidate(ok);
-      const ordemMod = ok.slice().sort((a, b) => a.lastModified - b.lastModified || (a.path < b.path ? -1 : 1));
+      const ordemMod = PC.ordenarArquivos(ok);
       state.frenteMap = PC.mergeFrentes(state.frenteMap, ordemMod.map((r) => ({ nome: r.name, frentes: r.frentes })));
       PC.applyFrentes(cons.records, state.frenteMap);
       state.records = cons.records;
@@ -462,6 +472,7 @@
         detail:
           (parcial ? fmtInt(cons.records.length) + ' atividades foram carregadas dos arquivos válidos. ' : '') +
           'Lidos do arquivo agora: ' + leitura.lidos + ' · reaproveitados (já lidos antes): ' + (leitura.salvos + leitura.memoria) + '. ' +
+          (cons.anuladas ? fmtInt(cons.anuladas) + ' ' + plural(cons.anuladas, 'atividade fora de Finalizada/Encerrada com Ocorrência', 'atividades fora de Finalizada/Encerrada com Ocorrência') + ' não contam. ' : '') +
           (cons.duplicatas ? fmtInt(cons.duplicatas) + ' ' + plural(cons.duplicatas, 'duplicata removida', 'duplicatas removidas') + '. ' : '') +
           (nAvisos ? nAvisos + ' ' + plural(nAvisos, 'aviso de leitura', 'avisos de leitura') + ' em "Base e regras". ' : ''),
         items: itens,
@@ -537,6 +548,15 @@
       setStatus({ kind: 'info', title: 'Selecione os arquivos novamente', detail: 'A importação manual não monitora os arquivos. Selecione-os de novo para reler.' });
       $('#inp-files').click();
     }
+  }
+
+  /** Reconsolida (ex.: arquivo marcado como complementar) sem invalidar o que já foi lido. */
+  async function reconsolidar() {
+    state.lastSig = '';
+    const s = state.source;
+    if (!s) return;
+    if (s.mode === 'handle') await lerPastaHandle(false);
+    else if (s.entries) await carregar(s.entries, {});
   }
 
   /** Reaplica as regras (ex.: novo nome alternativo de coluna) aos arquivos já selecionados. */
@@ -1138,7 +1158,7 @@
     const somaMeses = meses.reduce((a, m) => a + m.sum.atividades, 0);
     add(somaMeses === s.atividades, 'Soma dos meses = Atividades', fmtInt(somaMeses) + ' de ' + fmtInt(s.atividades));
     const cons = state.consolidado;
-    if (cons) add(cons.records.length + cons.duplicatas === cons.lidos, 'Registros lidos − duplicatas = Atividades', fmtInt(cons.lidos) + ' − ' + fmtInt(cons.duplicatas) + ' = ' + fmtInt(cons.records.length));
+    if (cons) add(cons.records.length + cons.duplicatas + cons.anuladas === cons.lidos, 'Linhas lidas − duplicatas − fora dos status = Atividades', fmtInt(cons.lidos) + ' − ' + fmtInt(cons.duplicatas) + ' − ' + fmtInt(cons.anuladas) + ' = ' + fmtInt(cons.records.length));
     const semData = recs.filter((r) => !r.data).length;
     add(semData === 0, 'Registros com data válida', semData ? fmtInt(semData) + ' sem data válida (saem de filtros de período)' : 'todos');
     const naoMap = recs.filter((r) => r.frente === PC.NAO_MAPEADA).length;
@@ -1152,17 +1172,18 @@
       .slice()
       .sort((a, b) => (a.ok && b.ok ? a.res.lastModified - b.res.lastModified : a.ok ? -1 : 1))
       .map((f) => {
-        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { class: 'n', text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
+        if (!f.ok) return h('tr', null, h('td', { text: f.path }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { class: 'n', text: '—' }), h('td', { text: '—' }), h('td', null, tag('Erro', 'exoc'), ' ' + f.motivo));
         const r = f.res;
         const conf = r.conferencia.map((c) => c.erro ? c.rotulo + ': ' + c.erro : c.rotulo + ': ' + (c.conciliado ? 'conciliado com a aba ' + c.aba + ' (' + fmtInt(c.linhas) + ')' : 'DIVERGE da aba ' + c.aba + ' (aba ' + fmtInt(c.linhas) + ' · cálculo ' + fmtInt(c.calculadoNaBase) + ' · na Base ' + fmtInt(c.naBase) + ')'));
         return h('tr', null,
           h('td', { text: r.path }), h('td', { class: 'num', text: fmtDataHora(r.lastModified) }), h('td', { class: 'num', text: fmtBytes(r.size) }),
-          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }), h('td', { class: 'n', text: r.filtroServico ? fmtInt(r.foraServico) : 'sem filtro' }),
+          h('td', { text: r.abaBase }), h('td', { class: 'n', text: fmtInt(r.records.length) }), h('td', { class: 'n', text: (r.filtroServico ? fmtInt(r.foraServico) : 'sem filtro') + ' / ' + (r.filtroStatus ? fmtInt(r.foraStatus) : 'sem filtro') }),
+          h('td', null, h('label', { class: 'count-note' }, h('input', { type: 'checkbox', checked: state.complementares.has(r.name), 'aria-label': 'Arquivo complementar: ' + r.name, onchange: (e) => { if (e.target.checked) state.complementares.add(r.name); else state.complementares.delete(r.name); salvarComplementares(); reconsolidar(); } }), ' só completa')),
           h('td', null, tag('OK', 'exec'), ' ' + (ROTULO_ORIGEM[r.origem] || ''), r.warnings.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, r.warnings.map((w) => h('li', { text: w }))) : null,
             conf.length ? h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, conf.map((c) => h('li', { text: c }))) : null));
       });
     return h('div', { class: 'table-wrap' }, h('table', null,
-      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Atividades', 'Outros serviços ignorados', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 || i === 5 ? 'n' : '', text: c })))),
+      h('thead', null, h('tr', null, ['Arquivo', 'Modificado em', 'Tamanho', 'Aba usada', 'Atividades', 'Ignoradas: outro serviço / outro status', 'Prioridade', 'Resultado'].map((c, i) => h('th', { scope: 'col', class: i === 4 || i === 5 ? 'n' : '', text: c })))),
       h('tbody', null, linhas)));
   }
 
@@ -1176,7 +1197,8 @@
     add('Última leitura com mudanças', state.lastRead ? fmtDataHora(state.lastRead.getTime()) : '—');
     add('Última verificação', state.lastCheck ? hhmmss(state.lastCheck) : '—');
     add('Arquivos válidos', state.files.length ? state.files.filter((f) => f.ok).length + ' de ' + state.files.length : '—');
-    add('Registros lidos / atividades', c ? fmtInt(c.lidos) + ' / ' + fmtInt(c.records.length) : '—');
+    add('Linhas lidas / atividades', c ? fmtInt(c.lidos) + ' / ' + fmtInt(c.records.length) : '—');
+    if (c) add('Fora de Finalizada e Encerrada com Ocorrência', fmtInt(c.anuladas) + ' atividades (Cancelada, Paralisada, Pendente etc. não contam)');
     add('Duplicatas removidas', c ? fmtInt(c.duplicatas) : '—');
     if (state.files.length) {
       const fora = state.files.filter((f) => f.ok).reduce((a, f) => a + (f.res.foraServico || 0), 0);
@@ -1196,7 +1218,7 @@
       state.ignoradosFormato.length ? h('p', { class: 'note warn', text: 'Ignorados (formato não suportado; salve como .xlsx): ' + state.ignoradosFormato.join(', ') }) : null,
       h('p', { class: 'note', text: 'Só arquivos novos ou modificados (nome, tamanho e data) são lidos; o resultado de cada arquivo fica gravado neste navegador, neste computador, e é reaproveitado ao recarregar a página. Nada é enviado para a internet.' }),
       h('button', { class: 'btn small', type: 'button', text: 'Limpar dados gravados', onclick: async () => { state.cache.clear(); state.lastSig = ''; try { await idb.arquivoLimpar(null); } catch (_) { /* ignora */ } setStatus({ kind: 'success', title: 'Dados gravados apagados', detail: 'Na próxima atualização todos os arquivos serão lidos de novo.' }); } }),
-      h('p', { class: 'note', text: 'A ordem dos arquivos para deduplicação é a data de modificação (do mais antigo ao mais recente). É um critério operacional, não garante que o conteúdo seja o mais atual: evite misturar versões conflitantes na pasta.' })
+      h('p', { class: 'note', text: 'Marque "só completa" no arquivo-base: ele só preenche o que não existe nos outros arquivos e, em duplicidade, é o outro que vale (descarta-se a linha do complementar), qualquer que seja a data. Sem marca, a ordem para deduplicação é a data de modificação (do mais antigo ao mais recente). É um critério operacional, não garante que o conteúdo seja o mais atual: evite misturar versões conflitantes na pasta.' })
     );
   }
 
@@ -1267,9 +1289,11 @@
     return h('section', { class: 'card rules' },
       h('div', { class: 'card-head' }, h('h2', { text: 'Regras dos indicadores' })),
       h('h3', { text: 'Atividades' }),
-      h('p', { text: 'Registros da aba Base após a deduplicação entre arquivos e os filtros escolhidos. As abas de Termos e Negociações são recortes da Base: não são somadas a ela (só conferidas).' }),
+      h('p', { text: 'Registros da aba Base dos serviços e dos status considerados (abaixo), após a deduplicação entre arquivos e os filtros escolhidos. As abas de Termos e Negociações são recortes da Base: não são somadas a ela (só conferidas).' }),
       h('h3', { text: 'Serviços considerados' }),
       h('p', null, 'Só entram atividades cujo ', h('code', { text: 'Código/Descrição' }), ' começa com um destes códigos: ', h('code', { text: PC.CODIGOS_SERVICO.join(', ') }), '. Linhas de outros serviços não são carregadas nem gravadas (o número ignorado aparece em "Fonte e arquivos lidos").'),
+      h('h3', { text: 'Status considerados' }),
+      h('p', null, 'Atividades = só as com status ', h('strong', { text: 'Finalizada' }), ' (Exec) ou ', h('strong', { text: 'Encerrada com Ocorrência' }), ' (Exoc). Cancelada, Paralisada, Pendente, Iniciada, Em Rota etc. não contam. Se a versão mais nova de uma atividade tiver outro status, ela deixa de contar, mesmo que um arquivo antigo a traga como Finalizada.'),
       h('h3', { text: 'Exec e Exoc' }),
       h('ul', null, li(h('strong', { text: 'Exec' }), ': Status da Atividade = ', h('code', { text: 'Finalizada' }), '.'), li(h('strong', { text: 'Exoc' }), ': Status da Atividade = ', h('code', { text: 'Encerrada com Ocorrência' }), '. Outros status aparecem na distribuição dos status.')),
       h('h3', { text: 'Negociações e Sem Desdobro' }),

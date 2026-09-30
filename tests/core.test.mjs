@@ -206,6 +206,8 @@ for (const nome of ['pequeno_xlsxwriter', 'pequeno_inline', 'pequeno_1904', 'peq
     assert.equal(res.frentes.length, 52);
     assert.equal(res.records.length, 19);
     assert.equal(res.foraServico, 3, 'IDs 20 (outro serviço), 21 (sem código) e 22 (código maior) não entram');
+    assert.equal(res.foraStatus, 2, 'IDs 24 (Cancelada) e 25 (Paralisada) não contam');
+    assert.deepEqual(res.descartados.map((d) => d.id).sort(), ['24', '25'], 'ficam só como marca de versão, sem os demais campos');
     assert.ok(!res.records.some((r) => ['20', '21', '22'].includes(r.id)));
     const cons = PC.consolidate([{ ...res, path: nome, lastModified: 1 }]);
     comFrentes({ records: cons.records, frentes: res.frentes, name: nome });
@@ -353,6 +355,40 @@ test('pasta com versões: deduplicação por ID, arquivo mais recente prevalece'
   const inv = PC.consolidate([{ ...rN, path: 'sub/snapshot_novo.xlsx', lastModified: 1 }, { ...rA, path: 'snapshot_antigo.xlsx', lastModified: 2 }]);
   assert.notEqual(inv.records.find((r) => r.id === String(meta.status_alterado_id)).status, meta.status_novo);
   assert.equal(inv.duplicatas, meta.duplicatas);
+});
+
+test('status: só Finalizada e Encerrada com Ocorrência; a versão mais nova pode anular a antiga', () => {
+  const mk = (id, status, extra) => Object.assign({ id, protocolo: 'P' + id, matricula: 'M', codigo: '110010', data: '2026-01-02', dataTxt: '02/01/2026', recurso: 'R', cidade: 'X', status, solicitante: '', linha: 1, arquivo: '' }, extra || {});
+  const tomb = (id) => ({ id, protocolo: 'P' + id, matricula: 'M', codigo: '110010', data: '2026-01-02', dataTxt: '02/01/2026', recurso: 'R', linha: 1, descartado: true });
+  const antigo = { path: 'antigo', lastModified: 1, records: [mk('1', 'Finalizada'), mk('2', 'Finalizada')], descartados: [] };
+  const novo = { path: 'novo', lastModified: 2, records: [mk('3', 'Finalizada')], descartados: [tomb('1'), tomb('9')] };
+  const c = PC.consolidate([antigo, novo]);
+  assert.deepEqual(c.records.map((r) => r.id).sort(), ['2', '3'], '1 foi cancelada na versão mais nova; 9 nunca contou');
+  assert.equal(c.anuladas, 2);
+  assert.equal(c.lidos, 5);
+  assert.equal(c.duplicatas, 1);
+  assert.equal(c.records.length + c.duplicatas + c.anuladas, c.lidos, 'conciliação do painel');
+  // versão mais nova finalizada volta a contar mesmo que a antiga tenha sido cancelada
+  const volta = PC.consolidate([{ path: 'a', lastModified: 1, records: [], descartados: [tomb('1')] }, { path: 'b', lastModified: 2, records: [mk('1', 'Finalizada')], descartados: [] }]);
+  assert.deepEqual(volta.records.map((r) => r.id), ['1']);
+});
+
+test('arquivo complementar: só completa o que não existe e, em duplicidade, vale o outro', () => {
+  const mk = (id, status) => ({ id, protocolo: 'P' + id, matricula: 'M', codigo: '110010', data: '2026-01-02', dataTxt: '02/01/2026', recurso: 'R', cidade: 'X', status, solicitante: '', linha: 1, arquivo: '' });
+  const pasta = { path: 'pasta.xlsx', lastModified: 100, records: [mk('1', 'Finalizada'), mk('2', 'Encerrada com Ocorrência')], descartados: [] };
+  // a base foi copiada para a pasta depois (data mais nova), mas é complementar
+  const base = { path: 'base.xlsx', lastModified: 999, complementar: true, records: [mk('1', 'Encerrada com Ocorrência'), mk('3', 'Finalizada'), mk('4', 'Finalizada')], descartados: [] };
+  const c = PC.consolidate([base, pasta]);
+  assert.deepEqual(c.records.map((r) => r.id).sort(), ['1', '2', '3', '4'], 'completa 3 e 4');
+  assert.equal(c.records.find((r) => r.id === '1').status, 'Finalizada', 'na duplicidade vale o arquivo da pasta');
+  assert.equal(c.duplicatas, 1);
+  // sem a marca, o mais recente (a base) venceria
+  const semMarca = PC.consolidate([{ ...base, complementar: false }, pasta]);
+  assert.equal(semMarca.records.find((r) => r.id === '1').status, 'Encerrada com Ocorrência');
+  // um cancelamento na pasta também vale sobre a base complementar
+  const cancel = PC.consolidate([base, { path: 'p2', lastModified: 1, records: [], descartados: [{ id: '3', protocolo: 'P3', matricula: 'M', codigo: '110010', data: '2026-01-02', dataTxt: '02/01/2026', recurso: 'R', linha: 1, descartado: true }] }]);
+  assert.ok(!cancel.records.some((r) => r.id === '3'));
+  assert.deepEqual(PC.ordenarArquivos([{ path: 'b', lastModified: 5 }, { path: 'a', lastModified: 9, complementar: true }, { path: 'c', lastModified: 1 }]).map((f) => f.path), ['a', 'c', 'b']);
 });
 
 test('deduplicação: chave alternativa e linhas sem chave completa', () => {

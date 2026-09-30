@@ -57,7 +57,7 @@ async function importar(page, arquivos, esperaKpis = true) {
 const statusTitulo = (page) => page.textContent('#status .st-title');
 const statusTexto = (page) => page.textContent('#status');
 const PEQUENO = fx('pequeno_xlsxwriter.xlsx');
-const KPIS_PEQUENO = ['19', '17', '1', '5', '7', '2'];
+const KPIS_PEQUENO = ['19', '18', '1', '5', '7', '2'];
 
 /* ------------------------------------------------------------------ */
 test('estado inicial: sem dados incorporados, com instruções e sem erros', async () => {
@@ -88,7 +88,7 @@ test('importar Excel: cartões, gráficos e tabela mensal calculados a partir do
   assert.deepEqual(linhas.map((l) => l[0]), ['jul/2026', 'ago/2026', 'set/2026']);
   assert.equal(linhas[0][1], '17');
   const total = await page.$$eval('section[aria-labelledby=h-tm] .table-wrap tfoot td', (tds) => tds.map((c) => c.textContent));
-  assert.deepEqual(total.slice(0, 7), ['Total', '19', '17', '1', '5', '2', '7']);
+  assert.deepEqual(total.slice(0, 7), ['Total', '19', '18', '1', '5', '2', '7']);
   // gráficos com legenda e alternativa em tabela
   assert.ok(await page.locator('.legend').first().isVisible());
   // rankings conciliam com o total
@@ -389,7 +389,7 @@ test('pasta grande (mais de 40 arquivos): pede confirmação antes de ler e não
   assert.equal(await page.locator('.kpis').count(), 0, 'nada é lido antes da confirmação');
   await page.click('#status button:has-text("Ler mesmo assim")');
   await aguardaTitulo(page, /Base carregada: 19 atividades de 41 arquivos/);
-  assert.match(await statusTexto(page), /760 duplicatas removidas/);
+  assert.match(await statusTexto(page), /840 duplicatas removidas/);
   // depois de confirmada, atualizações não pedem de novo
   await page.click('#btn-atualizar');
   await page.waitForTimeout(400);
@@ -451,6 +451,36 @@ test('lê só arquivo novo ou modificado: Atualizar, arquivo novo, arquivo alter
   assert.deepEqual(await leitura(), { lidos: 3, salvos: 0, memoria: 0 });
   semErros(page);
   await ctx.close();
+});
+
+test('só Finalizada e Encerrada com Ocorrência contam; arquivo marcado "só completa" perde nas duplicidades', { timeout: 120000 }, async () => {
+  const page = await abrir();
+  await importar(page, PEQUENO);
+  const stat = await page.evaluate(() => window.__poscorte.state.records.map((r) => r.status));
+  assert.ok(stat.every((x) => x === 'Finalizada' || x === 'Encerrada com Ocorrência'));
+  assert.ok(!(await page.evaluate(() => window.__poscorte.state.records.some((r) => ['24', '25'].includes(r.id)))), 'Cancelada e Paralisada não entram');
+  await page.click('#nav-side button[data-view=base]');
+  assert.match(await page.textContent('#view-base'), /Fora de Finalizada e Encerrada com Ocorrência2 atividades/);
+  await page.context().close();
+
+  // dois arquivos com as mesmas atividades e status diferente numa delas
+  const meta = JSON.parse(fs.readFileSync(fx('pasta_dedup', '_esperados.json'), 'utf8'));
+  const p2 = await abrir();
+  await p2.setInputFiles('#inp-files', [fx('pasta_dedup', 'snapshot_antigo.xlsx'), fx('pasta_dedup', 'sub', 'snapshot_novo.xlsx')]);
+  await p2.waitForSelector('.kpi-value');
+  const statusDe = () => p2.evaluate((id) => window.__poscorte.state.records.find((r) => r.id === id).status, String(meta.status_alterado_id));
+  await p2.click('#nav-side button[data-view=base]');
+  const antes = await statusDe();
+  // marca o arquivo que tinha a versão vencedora como complementar: passa a valer a versão do outro
+  const linha = p2.locator('#view-base tbody tr', { hasText: 'snapshot_novo.xlsx' }).first();
+  await linha.locator('input[type=checkbox]').check();
+  await p2.waitForFunction(() => !window.__poscorte.state.loading && window.__poscorte.state.complementares.size === 1, null, { timeout: 30000 });
+  const depois = await statusDe();
+  assert.notEqual(depois, antes, 'a versão do arquivo não complementar passou a valer');
+  assert.match(await p2.textContent('#view-base'), /só completa/);
+  // continua valendo depois de recarregar (guardado no navegador)
+  assert.match(await p2.evaluate(() => localStorage.getItem('poscorte.complementares')), /snapshot_novo\.xlsx/);
+  await p2.context().close();
 });
 
 test('somente os serviços dos 9 códigos são carregados e as colunas fora de uso não são lidas', async () => {

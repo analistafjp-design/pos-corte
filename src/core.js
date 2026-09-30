@@ -29,7 +29,7 @@
   const isBlank = (v) => v == null || String(v).trim() === '';
 
   /** Versão das regras de leitura; muda quando o resultado gravado deixa de valer. */
-  const PARSER_VERSION = 2;
+  const PARSER_VERSION = 3;
 
   /** Serviços considerados (início de "Código/Descrição"); os demais não são carregados. */
   const CODIGOS_SERVICO = ['110010', '110011', '110012', '210010', '210011', '210012', '310010', '310011', '310012'];
@@ -850,6 +850,10 @@
     const codigos = opts.codigos === undefined ? new Set(CODIGOS_SERVICO) : opts.codigos; // null = sem filtro
     let foraServico = 0;
     let filtroAtivo = false;
+    const filtrarStatus = opts.somenteRealizadas !== false;
+    let statusAtivo = false;
+    let foraStatus = 0;
+    const descartados = [];
     const fv = new Array(FIELDS.length);
     const fk = new Array(FIELDS.length);
     const D1904 = ctx.date1904;
@@ -873,6 +877,7 @@
       headers = names;
       hasServ = found.has(FIELD_INDEX.servAdic);
       filtroAtivo = codigos !== null && found.has(FIELD_INDEX.codigo);
+      statusAtivo = filtrarStatus && found.has(FIELD_INDEX.status);
       for (const [fi, c] of found) fieldOfCol[c] = fi;
       return true;
     }
@@ -971,7 +976,16 @@
         }
         if (!any) { ignoredRows++; dataRows--; return; }
         if (filtroAtivo && !codigos.has(codigoServico(fv[FIELD_INDEX.codigo]))) { foraServico++; dataRows--; return; }
-        records.push(buildRecord());
+        const rec = buildRecord();
+        if (statusAtivo && !(rec.exec || rec.exoc)) {
+          // Só Finalizada e Encerrada com Ocorrência contam. Guarda apenas a identificação: se esta for a versão mais
+          // nova da atividade, ela anula a versão antiga (ex.: Finalizada -> Cancelada) na consolidação.
+          foraStatus++;
+          dataRows--;
+          descartados.push({ id: rec.id, protocolo: rec.protocolo, matricula: rec.matricula, codigo: rec.codigo, data: rec.data, dataTxt: rec.dataTxt, recurso: rec.recurso, linha: rec.linha, descartado: true });
+          return;
+        }
+        records.push(rec);
       },
       opts.onProgress,
       (c) => header === null || (c < 16384 && fieldOfCol[c] >= 0)
@@ -1050,6 +1064,9 @@
       ignoredRows,
       foraServico,
       filtroServico: filtroAtivo,
+      foraStatus,
+      filtroStatus: statusAtivo,
+      descartados,
       stats,
       warnings,
       missing: missing.map((f) => f.header),
@@ -1189,6 +1206,7 @@
       arquivo: opts.path || file.name,
       matcher,
       codigos: opts.codigos,
+      somenteRealizadas: opts.somenteRealizadas,
       onProgress: (f) => progress({ phase: `Lendo aba ${base.s.name}`, fraction: f }),
     });
     warnings.push(...baseRes.warnings);
@@ -1224,7 +1242,7 @@
       }
       try {
         progress({ phase: `Conferindo aba ${sh.name}`, fraction: 0 });
-        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher, codigos: opts.codigos });
+        const rr = await readRecordsSheet(wb, sh, ctx, { arquivo: '', matcher, codigos: opts.codigos, somenteRealizadas: opts.somenteRealizadas });
         let naBase = 0;
         let regraOk = 0;
         let semChave = 0;
@@ -1264,6 +1282,9 @@
       audit: { linhas: baseRes.dataRows, linhasIgnoradas: baseRes.ignoredRows },
       foraServico: baseRes.foraServico,
       filtroServico: baseRes.filtroServico,
+      foraStatus: baseRes.foraStatus,
+      filtroStatus: baseRes.filtroStatus,
+      descartados: baseRes.descartados,
       stats: baseRes.stats,
       colunasNaoEncontradas: baseRes.missing,
     };
@@ -1341,29 +1362,40 @@
    * Consolida resultados de arquivos válidos: ordena por data de modificação,
    * remove duplicatas (o arquivo modificado mais recentemente prevalece).
    */
+  /**
+   * Ordem de precedência: arquivos "complementares" primeiro (menor prioridade: só completam o que não existe),
+   * depois os demais pela data de modificação (o mais recente vence).
+   */
+  function ordenarArquivos(files) {
+    return files.slice().sort((a, b) => (a.complementar ? 0 : 1) - (b.complementar ? 0 : 1) || a.lastModified - b.lastModified || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  }
+
   function consolidate(files) {
-    const ordered = files.slice().sort((a, b) => a.lastModified - b.lastModified || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    const ordered = ordenarArquivos(files);
     const byKey = new Map();
     let lidos = 0;
     let semChave = 0;
     for (const f of ordered) {
-      for (const r of f.records) {
-        lidos++;
+      for (const r of (f.descartados || []).concat(f.records)) {
         let k = recordKey(r);
         if (k === null) {
+          if (r.descartado) continue; // sem chave completa não há como anular outra versão
           // chave alternativa incompleta: a linha nunca é unida a outra
           semChave++;
           k = 'linha:' + f.path + '#' + r.linha;
         }
+        lidos++;
         byKey.set(k, r); // Map mantém a posição da primeira inserção; o valor é o mais recente
       }
     }
-    const records = [...byKey.values()];
-    const duplicatas = lidos - records.length;
+    const todos = [...byKey.values()];
+    const records = todos.filter((r) => !r.descartado);
+    const duplicatas = lidos - todos.length;
+    const anuladas = todos.length - records.length; // atividades cuja versão vencedora não é Finalizada/Encerrada com Ocorrência
     for (const r of records) r.busca = norm([r.matricula, r.protocolo, r.solicitante, r.id].join(' '));
     canonicalize(records, 'cidade');
     canonicalize(records, 'recurso');
-    return { records, lidos, duplicatas, semChave, ordemArquivos: ordered.map((f) => f.path) };
+    return { records, lidos, duplicatas, anuladas, semChave, ordemArquivos: ordered.map((f) => f.path) };
   }
 
   /* ------------------------------------------------------------------ */
@@ -1570,7 +1602,7 @@
     parseDateText, parseDateValue, serialToParts, parseValor, fmtBR, isoToBR, isDateFormatCode,
     classify, recordKey,
     XmlStream, openZip, openWorkbook, readSpreadsheetFile, readRecordsSheet, makeMatcher,
-    buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate,
+    buildFrenteIndex, frenteFor, applyFrentes, mergeFrentes, consolidate, ordenarArquivos,
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell,
   };
