@@ -119,6 +119,7 @@
     aliases: {},
     ignoradosFormato: [],
     auditoriaAberta: false,
+    limiteConfirmado: false,
   };
   let vm = null; // modelo de visualização calculado a partir dos filtros
   let anRows = []; // linhas do analítico (filtros + indicador + busca)
@@ -266,6 +267,8 @@
     return 'Falha inesperada ao ler o arquivo (' + (n || 'erro') + ': ' + (err && err.message) + ').';
   }
 
+  const LIMITE_ARQUIVOS = 40;
+  const LIMITE_BYTES = 800 * 1048576;
   const isXlsx = (n) => /\.xlsx$/i.test(n);
   const isFormatoAntigo = (n) => /\.(xls|xlsb|xlsm)$/i.test(n);
 
@@ -295,6 +298,27 @@
           items: ignoradosFormato.map((p) => 'Formato não suportado (salve como .xlsx): ' + p),
         });
         return;
+      }
+
+      // Pastas muito grandes podem esgotar a memória da aba: pede confirmação antes de ler.
+      if (!opts.confirmado && !state.limiteConfirmado) {
+        let nNovos = 0;
+        let bytes = 0;
+        for (const e of xlsx) {
+          try {
+            const f = await e.getFile();
+            if (!state.cache.has(e.path + '|' + f.size + '|' + f.lastModified)) { nNovos++; bytes += f.size; }
+          } catch (_) { /* o erro aparece na leitura */ }
+        }
+        if (nNovos > LIMITE_ARQUIVOS || bytes > LIMITE_BYTES) {
+          setStatus({
+            kind: 'warning',
+            title: 'Pasta grande: confirme antes de ler',
+            detail: fmtInt(nNovos) + ' ' + plural(nNovos, 'arquivo', 'arquivos') + ' (' + fmtBytes(bytes) + ') para ler em "' + rotulo + '". Cada arquivo lido ocupa vários MB de memória do navegador e ler muitos de uma vez pode travar a aba. Deixe na pasta só os arquivos necessários; se todos forem, confirme.',
+            actions: [{ label: 'Ler mesmo assim', run: () => { state.limiteConfirmado = true; carregar(entries, {}); } }],
+          });
+          return;
+        }
       }
 
       const ok = [];
@@ -449,6 +473,7 @@
       }
       state.source = { kind: 'folder', mode: 'handle', name: handle.name, handle };
       state.lastSig = '';
+      state.limiteConfirmado = false;
       idb.set('pasta', handle).catch(() => {});
       await lerPastaHandle(false);
     } else {
@@ -485,6 +510,7 @@
     const primeiro = files[0].webkitRelativePath || '';
     state.source = { kind: 'folder', mode: 'input', name: primeiro.split('/')[0] || 'pasta selecionada', entries: entradasDeArquivos(files) };
     state.lastSig = '';
+    state.limiteConfirmado = false;
     carregar(state.source.entries, {});
     e.target.value = '';
   });
@@ -493,6 +519,7 @@
     if (!files || !files.length) return;
     state.source = { kind: 'files', mode: 'input', name: files.length + ' ' + plural(files.length, 'arquivo selecionado', 'arquivos selecionados'), entries: entradasDeArquivos(files) };
     state.lastSig = '';
+    state.limiteConfirmado = false;
     carregar(state.source.entries, {});
     e.target.value = '';
   });

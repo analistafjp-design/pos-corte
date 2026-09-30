@@ -374,6 +374,15 @@
   /* XML incremental (estilo SAX)                                        */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * Devolve uma cópia independente do texto. Trechos (substring) de textos longos ficam presos ao
+   * pedaço grande de XML de onde saíram e o mantêm na memória; copiar libera esses pedaços.
+   * O espaço inicial é removido: todo consumidor aplica trim aos valores.
+   */
+  function own(s) {
+    return s.length < 13 ? s : (' ' + s).trimStart();
+  }
+
   function decodeEntities(s) {
     if (s.indexOf('&') < 0) return s;
     return s.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|lt|gt|amp|quot|apos);/g, (m, e) => {
@@ -641,7 +650,7 @@
           close(name) {
             if (name === 't') inT = false;
             else if (name === 'rPh') inRPh = false;
-            else if (name === 'si') { sst.push(acc); inSi = false; }
+            else if (name === 'si') { sst.push(own(acc)); inSi = false; }
           },
           text(t, raw) {
             if (inT) acc += raw ? t : decodeText(t);
@@ -713,8 +722,8 @@
           if (v === undefined) { badSst++; return; }
           break;
         }
-        case 'inlineStr': v = tAcc; break;
-        case 'str': v = decodeText(vAcc); break;
+        case 'inlineStr': v = own(tAcc); break;
+        case 'str': v = own(decodeText(vAcc)); break;
         case 'b': v = vAcc === '1' ? 'VERDADEIRO' : 'FALSO'; break;
         case 'e': return;
         case 'd': v = vAcc; break;

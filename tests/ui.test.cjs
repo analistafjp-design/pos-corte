@@ -379,6 +379,25 @@ test('pasta com acesso contínuo: conectar, atualizar, subpastas, arquivo removi
   await page.context().close();
 });
 
+test('pasta grande (mais de 40 arquivos): pede confirmação antes de ler e não trava', { timeout: 120000 }, async () => {
+  const page = await abrir({ url: baseUrl, initScript: MOCK_PICKER });
+  const buf = ler('pequeno_xlsxwriter.xlsx');
+  for (let i = 0; i < 41; i++) await opfsEscrever(page, 'copia' + i + '.xlsx', buf);
+  await page.click('#btn-pasta');
+  await aguardaTitulo(page, /Pasta grande: confirme antes de ler/);
+  assert.match(await statusTexto(page), /41 arquivos/);
+  assert.equal(await page.locator('.kpis').count(), 0, 'nada é lido antes da confirmação');
+  await page.click('#status button:has-text("Ler mesmo assim")');
+  await aguardaTitulo(page, /Base carregada: 19 atividades de 41 arquivos/);
+  assert.match(await statusTexto(page), /760 duplicatas removidas/);
+  // depois de confirmada, atualizações não pedem de novo
+  await page.click('#btn-atualizar');
+  await page.waitForTimeout(400);
+  assert.doesNotMatch(await statusTexto(page), /confirme/);
+  semErros(page);
+  await page.context().close();
+});
+
 test('leitura automática a cada 60 s: só com a página visível e permissão concedida', { timeout: 120000 }, async () => {
   const page = await abrir({ url: baseUrl, initScript: MOCK_PICKER, clock: true });
   await opfsEscrever(page, 'a.xlsx', ler('pasta_dedup', 'snapshot_antigo.xlsx'));
