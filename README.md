@@ -1,4 +1,4 @@
-# Pós-Corte Interior (AnalistaFJP)
+# Pós-Corte Interior
 
 Painel em **um único arquivo HTML** que lê planilhas Excel (`.xlsx`) de uma pasta do OneDrive e mostra Exec, Exoc, negociações, termos aplicados (110013/310013), Sem Desdobro e frentes de serviço. Tudo roda no navegador: nenhum dado sai do computador.
 

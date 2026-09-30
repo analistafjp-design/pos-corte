@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pós-Corte Interior · AnalistaFJP</title>
+<title>Pós-Corte Interior</title>
 <meta name="description" content="Pós-Corte Interior: percorrido, Exec, Exoc, assertividade, efetividade, equipes e produtividade por cidade, atualizado por arquivos Excel de uma pasta do OneDrive.">
 <style>
 /*INLINE:css*/
@@ -12,34 +12,30 @@
 <body>
 <a class="skip" href="#main">Ir para o conteúdo</a>
 <div class="app">
-  <aside class="side" aria-label="Menu lateral">
-    <div class="brand">
-      <div class="brand-mark" aria-hidden="true">FJP</div>
-      <div><div class="brand-name">AnalistaFJP</div><div class="brand-sub">Pós-Corte Interior</div></div>
-    </div>
-    <nav class="nav" id="nav-side" aria-label="Seções"></nav>
-    <div class="side-foot" id="side-foot"></div>
-  </aside>
-
-  <div class="main-col">
-    <header class="top">
-      <div class="top-title">
-        <div class="brand-mark" aria-hidden="true">FJP</div>
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="title">
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 20v-8"/><path d="M12 20V4"/><path d="M19 20v-5"/></svg></span>
         <div>
           <h1>Pós-Corte Interior</h1>
           <div class="sub" id="top-sub">Percorrido, Exec, Exoc, assertividade, efetividade e produtividade</div>
         </div>
       </div>
+      <nav class="tabs" id="nav-tabs" aria-label="Seções"></nav>
       <div class="actions">
-        <button class="btn primary" id="btn-pasta" type="button"></button>
+        <button class="btn" id="btn-pasta" type="button"></button>
         <button class="btn" id="btn-atualizar" type="button"></button>
         <button class="btn" id="btn-importar" type="button"></button>
+        <span class="sep" aria-hidden="true"></span>
         <button class="btn" id="btn-excel" type="button"></button>
         <button class="btn" id="btn-pdf" type="button"></button>
       </div>
-    </header>
-    <div class="print-head" id="print-head" aria-hidden="true"></div>
+    </div>
+  </header>
 
+  <div class="main-col">
+    <div class="print-head" id="print-head" aria-hidden="true"></div>
+    <div class="srcline" id="side-foot"></div>
     <div id="status" aria-live="polite"></div>
 
     <section class="filters" id="filters" aria-label="Filtros" hidden>
@@ -55,11 +51,10 @@
     <main id="main" tabindex="-1">
       <section id="view-geral" aria-label="Visão geral"></section>
       <section id="view-analitico" aria-label="Analítico" hidden></section>
-      <section id="view-base" aria-label="Base e regras" hidden></section>
+      <section id="view-base" aria-label="Arquivos e regras" hidden></section>
     </main>
   </div>
 </div>
-<nav class="tabbar" id="nav-bottom" aria-label="Seções"></nav>
 
 <input type="file" id="inp-files" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
 <input type="file" id="inp-folder" webkitdirectory multiple hidden>

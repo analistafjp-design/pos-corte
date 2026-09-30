@@ -1,5 +1,5 @@
 /*!
- * Acompanhamento de Pós Corte — núcleo de dados (AnalistaFJP)
+ * Acompanhamento de Pós Corte — núcleo de dados
  *
  * Contém: leitor de .xlsx por streaming (ZIP + XML incremental, sem árvore DOM),
  * regras dos indicadores, deduplicação, frentes de serviço, agregações e CSV.
