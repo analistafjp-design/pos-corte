@@ -83,6 +83,12 @@ test('importar Excel: cartões, gráficos e tabela mensal calculados a partir do
   // sub-textos
   assert.match(await kpiTexto(page, 'neg'), /Débito informado: R\$\s2\.535,06/);
   assert.match(await kpiTexto(page, 'termos'), /110013 Serviços: 6 · 310013 VCG: 2/);
+  // recortes da Visão geral: 5 recortes (3 ramal, 1 cavalete simples, 1 sem tipo) sobre 18 Exec
+  assert.equal(await page.textContent('.card-recorte [data-rk=total]'), '5');
+  assert.match(await page.textContent('.card-recorte [data-rk=pct]'), /27,8% do Exec \(Total recorte ÷ Exec\)/);
+  assert.match(await page.textContent('.card-recorte .rc-row[data-tipo=RAMAL]'), /Corte no Ramal.*60,0% · 3/);
+  assert.match(await page.textContent('.card-recorte .rc-row[data-tipo="CAVALETE SIMPLES"]'), /Corte no Cavalete Simples.*20,0% · 1/);
+  assert.match(await page.textContent('.card-recorte .rc-row[data-tipo="NÃO INFORMADO"]'), /Tipo não informado.*20,0% · 1/);
   assert.equal(await page.locator('[data-fk="kpi:semDesdobro"]').count(), 0, 'sem card de desdobro na visão geral');
   // tabela mensal
   const linhas = await page.$$eval('section[aria-labelledby=h-tm] .table-wrap tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));

@@ -2369,7 +2369,7 @@ window.FRENTES_PADRAO = [
   /* ------------------------------------------------------------------ */
 
   const BASE_PROTOCOLO = new Set(['cod protocolo origem', 'codigo protocolo origem', 'protocolo origem', 'cod protocolo', 'codigo protocolo', 'protocolo', 'numero protocolo', 'n protocolo']);
-  const BASE_MATRICULA = new Set(['matricula', 'matricula cliente', 'matricula do cliente', 'cod matricula', 'codigo matricula', 'matr']);
+  const BASE_MATRICULA = new Set(['matricula', 'matricula cliente', 'matricula do cliente', 'cod matricula', 'codigo matricula', 'matr', 'num ligacao', 'numero ligacao', 'n ligacao', 'ligacao', 'num lig']);
   const MAX_LINHAS_BASE = 300000;
 
   /** Data (AAAA-MM-DD) contida no nome do arquivo, ou '' quando não há uma data reconhecível. */
@@ -2422,7 +2422,24 @@ window.FRENTES_PADRAO = [
     const ctx = await wb.loadContext();
     const visiveis = wb.sheets.filter((x) => x.state === 'visible');
     const lista = visiveis.length ? visiveis : wb.sheets;
-    const sheet = lista.find((x) => /base/.test(norm(x.name))) || lista[0];
+    // abas candidatas: primeiro a de pós-corte, depois a chamada "base", depois as demais; vale a primeira que tenha a coluna de matrícula
+    const peso = (x) => (/pos.?corte/.test(norm(x.name)) ? 0 : /base/.test(norm(x.name)) ? 1 : 2);
+    const ordem = lista.map((x, i) => ({ x, i })).sort((a, b) => peso(a.x) - peso(b.x) || a.i - b.i).map((o) => o.x);
+    let primeiroErro = null;
+    for (const sheet of ordem) {
+      try {
+        const r = await lerAbaBase(wb, sheet, ctx, file, opts);
+        r.abas = lista.map((x) => x.name.trim());
+        return r;
+      } catch (e) {
+        if (!(e instanceof PcError) || !['SEM_CHAVE', 'SEM_CABECALHO', 'SEM_LINHAS'].includes(e.code)) throw e;
+        if (!primeiroErro) primeiroErro = e;
+      }
+    }
+    throw primeiroErro;
+  }
+
+  async function lerAbaBase(wb, sheet, ctx, file, opts) {
     let cabecalho = null;
     let colProtocolo = -1;
     let colMatricula = -1;
@@ -2480,7 +2497,7 @@ window.FRENTES_PADRAO = [
       throw new PcError('SEM_CHAVE', 'A base precisa ter a coluna "Matrícula" para ser cruzada com o realizado. Colunas encontradas: ' + cabecalho.nomes.join(', ') + '.');
     }
     if (!linhas.length) throw new PcError('SEM_LINHAS', 'A aba "' + sheet.name + '" não tem linhas de dados abaixo do cabeçalho.');
-    return { aba: sheet.name, colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name, opts.ref), truncado, nomeProtocolo: colProtocolo >= 0 ? cabecalho.nomes[colProtocolo] : '', nomeMatricula: colMatricula >= 0 ? cabecalho.nomes[colMatricula] : '' };
+    return { aba: sheet.name.trim(), colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name, opts.ref), truncado, nomeProtocolo: colProtocolo >= 0 ? cabecalho.nomes[colProtocolo] : '', nomeMatricula: colMatricula >= 0 ? cabecalho.nomes[colMatricula] : '' };
   }
 
   /**
@@ -4036,6 +4053,11 @@ window.FRENTES_PADRAO = [
     if (!state.records.length) { root.replaceChildren(estadoVazio()); return; }
     root.replaceChildren(h('div', { class: 'stack' },
       renderKpis(),
+      h('section', { class: 'card card-recorte', 'aria-labelledby': 'h-recorte' },
+        h('div', { class: 'card-head' }, h('div', null,
+          h('h2', { id: 'h-recorte', text: 'Recortes realizados' }),
+          h('p', { class: 'hint', text: 'Atividades com "Fez o corte novamente" = Sim, por tipo de corte (Onde Foi Feito O Corte?), no filtro atual. Total recorte ÷ Exec.' }))),
+        cartaoRecorte(vm.sum)),
       h('div', { class: 'grid-2' }, renderMensal(), renderStatusDist()),
       renderNegTermo(),
       renderCidades(),
@@ -4425,6 +4447,7 @@ window.FRENTES_PADRAO = [
           dataBase: r.dataNome || '',
           dataNome: r.dataNome || '',
           aba: r.aba,
+          abas: r.abas,
           colunas: r.colunas,
           linhas: r.linhas,
           colProtocolo: r.colProtocolo,
@@ -4533,7 +4556,7 @@ window.FRENTES_PADRAO = [
       h('div', { class: 'basehead' },
         h('div', { class: 'basetitle' },
           h('h3', { text: b.nome }),
-          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · cruzamento pela ' + av.chave + ' (serviços 110010-12, 210010-12 e 310010-12)' })),
+          h('p', { class: 'hint', text: 'Subiu em ' + fmtDataHora(b.enviadoEm) + ' · ' + fmtInt(b.linhas.length) + ' linhas · aba "' + (b.aba || '') + '"' + ' · cruzamento pela ' + av.chave + ' (serviços 110010-12, 210010-12 e 310010-12)' })),
         h('div', { class: 'basetools' },
           h('label', { class: 'datefield' }, h('span', { text: 'Data da base' }), campoData),
           h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar' }, disabled: av.faltam === 0, onclick: () => baixarFaltantes(b) }, icon('download', 16), h('span', { text: 'Baixar o que falta (Excel)' })),
