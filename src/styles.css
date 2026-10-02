@@ -437,3 +437,10 @@ button.cc-col { cursor: pointer; }
 .rc-val { font-weight: 700; white-space: nowrap; }
 @media (min-width: 720px) { .recorte { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); } }
 @media (max-width: 480px) { .rc-row { grid-template-columns: minmax(0, 1fr) auto; } .rc-track { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ---------- Pós-corte por categoria ---------- */
+.destaque { margin: 0 0 12px; padding: 10px 14px; background: var(--brand-tint); border: 1px solid #c9d7f8; border-radius: 10px; color: var(--ink); }
+.destaque strong { color: var(--brand-2); }
+.catbar { background: var(--exec); }
+tr.is-top th, tr.is-top td { background: #f4f8ff; }
+tr.is-top th { color: var(--brand-2); }

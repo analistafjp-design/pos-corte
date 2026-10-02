@@ -446,6 +446,13 @@ button.cc-col { cursor: pointer; }
 @media (min-width: 720px) { .recorte { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); } }
 @media (max-width: 480px) { .rc-row { grid-template-columns: minmax(0, 1fr) auto; } .rc-track { grid-column: 1 / -1; grid-row: 2; } }
 
+/* ---------- Pós-corte por categoria ---------- */
+.destaque { margin: 0 0 12px; padding: 10px 14px; background: var(--brand-tint); border: 1px solid #c9d7f8; border-radius: 10px; color: var(--ink); }
+.destaque strong { color: var(--brand-2); }
+.catbar { background: var(--exec); }
+tr.is-top th, tr.is-top td { background: #f4f8ff; }
+tr.is-top th { color: var(--brand-2); }
+
 </style>
 </head>
 <body>
@@ -2217,7 +2224,7 @@ window.FRENTES_PADRAO = [
   function agrupar(records, campo) {
     const m = new Map();
     for (const r of records) {
-      const k = r[campo] || (campo === 'recurso' ? '(sem recurso)' : campo === 'cidade' ? '(sem cidade)' : NAO_MAPEADA);
+      const k = r[campo] || (campo === 'recurso' ? '(sem recurso)' : campo === 'cidade' ? '(sem cidade)' : campo === 'categoria' ? '(sem categoria)' : NAO_MAPEADA);
       let g = m.get(k);
       if (!g) m.set(k, (g = []));
       g.push(r);
@@ -2815,6 +2822,15 @@ window.FRENTES_PADRAO = [
       linhas: [['Cidade', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes', 'Equipe-dias', 'Produtividade (visitas por equipe-dia)'].map(cab)].concat(agrupar(records, 'cidade').map(linhaGrupo)),
     };
 
+    const categorias = {
+      nome: 'Categorias',
+      colunas: [26, 12, 12, 10, 10, 10, 13, 13, 12],
+      cabecalho: 1,
+      linhas: [['Categoria', 'Percorrido', '% do total', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade'].map(cab)].concat(
+        agrupar(records, 'categoria').map((g) => [g.chave, intCel(g.percorrido), pctCel(s.percorrido ? g.percorrido / s.percorrido : null), intCel(g.exec), intCel(g.exoc), intCel(g.termos), pctCel(g.assertividade), intCel(g.neg), pctCel(g.efetividade)])
+      ),
+    };
+
     const equipes = {
       nome: 'Equipes',
       colunas: [26, 26, 12, 10, 10, 10, 13, 16, 16],
@@ -2846,7 +2862,7 @@ window.FRENTES_PADRAO = [
         }))
       ),
     };
-    return [resumo, mensal, cidades, equipes, frentes, registros];
+    return [resumo, mensal, cidades, categorias, equipes, frentes, registros];
   }
 
 
@@ -4000,6 +4016,32 @@ window.FRENTES_PADRAO = [
     );
   }
 
+  /** Pós-corte por categoria: qual categoria concentra mais atividades (Exec + Exoc), com os demais indicadores. */
+  function renderCategorias() {
+    const linhas = PC.agrupar(vm.filtered, 'categoria');
+    const total = vm.sum.percorrido;
+    const max = Math.max(1, ...linhas.map((g) => g.percorrido));
+    const topo = linhas[0];
+    const cab = ['Categoria', 'Percorrido', '% do total', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade'];
+    return h('section', { class: 'card card-categorias', 'aria-labelledby': 'h-categorias' },
+      h('div', { class: 'card-head' }, h('div', null,
+        h('h2', { id: 'h-categorias', text: 'Pós-corte por categoria' }),
+        h('p', { class: 'hint', text: 'Categoria do imóvel (coluna Categoria), do maior para o menor percorrido (Exec + Exoc), no filtro atual.' }))),
+      topo ? h('p', { class: 'destaque', dataset: { fk: 'cat-topo' } },
+        'Categoria com mais pós-corte: ', h('strong', { text: topo.chave }), ' — ', fmtInt(topo.percorrido), ' (' + fmtPct(topo.percorrido, total) + ' do percorrido)') : null,
+      linhas.length ? h('div', { class: 'table-wrap' }, h('table', null,
+        h('thead', null, h('tr', null, cab.map((c, i) => h('th', { scope: 'col', class: i ? 'n' : '', text: c })))),
+        h('tbody', null, linhas.map((g, i) => h('tr', { class: i === 0 ? 'is-top' : '', dataset: { cat: g.chave } },
+          h('th', { scope: 'row', text: g.chave }),
+          h('td', { class: 'n', 'data-tip': g.chave + '\n' + fmtInt(g.percorrido) + ' percorridas (' + fmtPct(g.percorrido, total) + ' do total)' },
+            h('span', { class: 'prod' }, h('span', { class: 'prodbar catbar', style: { width: Math.max((g.percorrido / max) * 90, 2) + 'px' } }), h('strong', { text: fmtInt(g.percorrido) }))),
+          h('td', { class: 'n', text: fmtPct(g.percorrido, total) }),
+          [fmtInt(g.exec), fmtInt(g.exoc), fmtInt(g.termos), fmtPctVal(g.assertividade), fmtInt(g.neg), fmtPctVal(g.efetividade)].map((v) => h('td', { class: 'n', text: v }))))),
+        h('tfoot', null, h('tr', null,
+          h('td', { text: 'Total' }),
+          [fmtInt(vm.sum.percorrido), fmtPct(vm.sum.percorrido, total), fmtInt(vm.sum.exec), fmtInt(vm.sum.exoc), fmtInt(vm.sum.termos), fmtPctVal(vm.sum.assertividade), fmtInt(vm.sum.neg), fmtPctVal(vm.sum.efetividade)].map((v) => h('td', { class: 'n', text: v })))))) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }));
+  }
+
   const LIMITE_RANK = 8;
   function renderRank(titulo, dim, filtroKey, chave) {
     const { items, total } = vm.rank[dim];
@@ -4061,6 +4103,7 @@ window.FRENTES_PADRAO = [
       h('div', { class: 'grid-2' }, renderMensal(), renderStatusDist()),
       renderNegTermo(),
       renderCidades(),
+      renderCategorias(),
       renderTabelaMensal(),
       h('div', { class: 'grid-rank' },
         renderRank('Frente de serviço', 'frente', 'frente'),

@@ -613,7 +613,7 @@ print(json.dumps(out, default=str))`;
   fs.unlinkSync(arq);
   assert.equal(o.status, 0, o.stderr);
   const x = JSON.parse(o.stdout);
-  assert.deepEqual(x.abas, ['Resumo', 'Mensal', 'Produtividade por cidade', 'Equipes', 'Frentes', 'Registros']);
+  assert.deepEqual(x.abas, ['Resumo', 'Mensal', 'Produtividade por cidade', 'Categorias', 'Equipes', 'Frentes', 'Registros']);
   assert.equal(x.titulo, 'Pós-Corte Interior');
   assert.equal(x.filtros, 'Cidade: Cidade Norte');
   const perto = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, a + ' vs ' + b);
@@ -743,4 +743,11 @@ test('bases de campo: com várias abas usa a de Pós Corte e reconhece NUM_LIGAC
   assert.equal(b.colMatricula, 0);
   assert.equal(b.linhas.length, 2);
   assert.equal(b.dataNome, '2026-09-25');
+});
+
+test('categoria: agrupa por Categoria, ordena pelo maior percorrido e usa "(sem categoria)"', () => {
+  const rec = (c, o) => ({ categoria: c, recurso: 'E1', data: '2026-09-10', exec: true, exoc: false, neg: false, semDesdobro: false, termo: false, t11: false, t31: false, valor: null, recorte: false, recorteTipo: '', ...o });
+  const g = PC.agrupar([rec('R-RESIDENCIAL'), rec('R-RESIDENCIAL'), rec('R-RESIDENCIAL', { exec: false, exoc: true }), rec('C-COMERCIAL'), rec('C-COMERCIAL'), rec('')], 'categoria');
+  assert.deepEqual(g.map((x) => [x.chave, x.percorrido]), [['R-RESIDENCIAL', 3], ['C-COMERCIAL', 2], ['(sem categoria)', 1]]);
+  assert.equal(g[0].exoc, 1);
 });

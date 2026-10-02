@@ -1501,7 +1501,7 @@
   function agrupar(records, campo) {
     const m = new Map();
     for (const r of records) {
-      const k = r[campo] || (campo === 'recurso' ? '(sem recurso)' : campo === 'cidade' ? '(sem cidade)' : NAO_MAPEADA);
+      const k = r[campo] || (campo === 'recurso' ? '(sem recurso)' : campo === 'cidade' ? '(sem cidade)' : campo === 'categoria' ? '(sem categoria)' : NAO_MAPEADA);
       let g = m.get(k);
       if (!g) m.set(k, (g = []));
       g.push(r);

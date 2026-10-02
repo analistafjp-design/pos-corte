@@ -1099,6 +1099,32 @@
     );
   }
 
+  /** Pós-corte por categoria: qual categoria concentra mais atividades (Exec + Exoc), com os demais indicadores. */
+  function renderCategorias() {
+    const linhas = PC.agrupar(vm.filtered, 'categoria');
+    const total = vm.sum.percorrido;
+    const max = Math.max(1, ...linhas.map((g) => g.percorrido));
+    const topo = linhas[0];
+    const cab = ['Categoria', 'Percorrido', '% do total', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade'];
+    return h('section', { class: 'card card-categorias', 'aria-labelledby': 'h-categorias' },
+      h('div', { class: 'card-head' }, h('div', null,
+        h('h2', { id: 'h-categorias', text: 'Pós-corte por categoria' }),
+        h('p', { class: 'hint', text: 'Categoria do imóvel (coluna Categoria), do maior para o menor percorrido (Exec + Exoc), no filtro atual.' }))),
+      topo ? h('p', { class: 'destaque', dataset: { fk: 'cat-topo' } },
+        'Categoria com mais pós-corte: ', h('strong', { text: topo.chave }), ' — ', fmtInt(topo.percorrido), ' (' + fmtPct(topo.percorrido, total) + ' do percorrido)') : null,
+      linhas.length ? h('div', { class: 'table-wrap' }, h('table', null,
+        h('thead', null, h('tr', null, cab.map((c, i) => h('th', { scope: 'col', class: i ? 'n' : '', text: c })))),
+        h('tbody', null, linhas.map((g, i) => h('tr', { class: i === 0 ? 'is-top' : '', dataset: { cat: g.chave } },
+          h('th', { scope: 'row', text: g.chave }),
+          h('td', { class: 'n', 'data-tip': g.chave + '\n' + fmtInt(g.percorrido) + ' percorridas (' + fmtPct(g.percorrido, total) + ' do total)' },
+            h('span', { class: 'prod' }, h('span', { class: 'prodbar catbar', style: { width: Math.max((g.percorrido / max) * 90, 2) + 'px' } }), h('strong', { text: fmtInt(g.percorrido) }))),
+          h('td', { class: 'n', text: fmtPct(g.percorrido, total) }),
+          [fmtInt(g.exec), fmtInt(g.exoc), fmtInt(g.termos), fmtPctVal(g.assertividade), fmtInt(g.neg), fmtPctVal(g.efetividade)].map((v) => h('td', { class: 'n', text: v }))))),
+        h('tfoot', null, h('tr', null,
+          h('td', { text: 'Total' }),
+          [fmtInt(vm.sum.percorrido), fmtPct(vm.sum.percorrido, total), fmtInt(vm.sum.exec), fmtInt(vm.sum.exoc), fmtInt(vm.sum.termos), fmtPctVal(vm.sum.assertividade), fmtInt(vm.sum.neg), fmtPctVal(vm.sum.efetividade)].map((v) => h('td', { class: 'n', text: v })))))) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }));
+  }
+
   const LIMITE_RANK = 8;
   function renderRank(titulo, dim, filtroKey, chave) {
     const { items, total } = vm.rank[dim];
@@ -1160,6 +1186,7 @@
       h('div', { class: 'grid-2' }, renderMensal(), renderStatusDist()),
       renderNegTermo(),
       renderCidades(),
+      renderCategorias(),
       renderTabelaMensal(),
       h('div', { class: 'grid-rank' },
         renderRank('Frente de serviço', 'frente', 'frente'),
