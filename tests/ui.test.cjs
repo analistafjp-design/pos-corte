@@ -83,6 +83,10 @@ test('importar Excel: cartões, gráficos e tabela mensal calculados a partir do
   // sub-textos
   assert.match(await kpiTexto(page, 'neg'), /Débito informado: R\$\s2\.535,06/);
   assert.match(await kpiTexto(page, 'termos'), /110013 Serviços: 6 · 310013 VCG: 2/);
+  // pós-corte por categoria: todos os 19 registros do fixture são da categoria Residencial
+  assert.match(await page.textContent('[data-fk=cat-topo]'), /Categoria com mais pós-corte: Residencial — 19 \(100% do percorrido\)/);
+  const cats = await page.$$eval('.card-categorias tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent.trim())));
+  assert.deepEqual(cats, [['Residencial', '19', '100%', '18', '1', '7', '38,9%', '5', '27,8%']]);
   // recortes da Visão geral: 5 recortes (3 ramal, 1 cavalete simples, 1 sem tipo) sobre 18 Exec
   assert.equal(await page.textContent('.card-recorte [data-rk=total]'), '5');
   assert.match(await page.textContent('.card-recorte [data-rk=pct]'), /27,8% do Exec \(Total recorte ÷ Exec\)/);
@@ -676,7 +680,7 @@ print(json.dumps({'filtros': r['B5'].value, 'percorrido': r['B8'].value, 'regist
     assert.equal(x.percorrido, 17, 'só julho');
     assert.equal(x.registros, 17);
     assert.match(x.filtros, /Período: 01\/07\/2026 a 31\/07\/2026/);
-    assert.equal(x.abas.length, 6);
+    assert.equal(x.abas.length, 7);
   }
   // sem dados o botão fica desativado
   const vazia = await abrir();

@@ -249,6 +249,15 @@
       linhas: [['Cidade', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes', 'Equipe-dias', 'Produtividade (visitas por equipe-dia)'].map(cab)].concat(agrupar(records, 'cidade').map(linhaGrupo)),
     };
 
+    const categorias = {
+      nome: 'Categorias',
+      colunas: [26, 12, 12, 10, 10, 10, 13, 13, 12],
+      cabecalho: 1,
+      linhas: [['Categoria', 'Percorrido', '% do total', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade'].map(cab)].concat(
+        agrupar(records, 'categoria').map((g) => [g.chave, intCel(g.percorrido), pctCel(s.percorrido ? g.percorrido / s.percorrido : null), intCel(g.exec), intCel(g.exoc), intCel(g.termos), pctCel(g.assertividade), intCel(g.neg), pctCel(g.efetividade)])
+      ),
+    };
+
     const equipes = {
       nome: 'Equipes',
       colunas: [26, 26, 12, 10, 10, 10, 13, 16, 16],
@@ -280,7 +289,7 @@
         }))
       ),
     };
-    return [resumo, mensal, cidades, equipes, frentes, registros];
+    return [resumo, mensal, cidades, categorias, equipes, frentes, registros];
   }
 
 
