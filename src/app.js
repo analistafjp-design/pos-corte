@@ -507,7 +507,8 @@
       for (const k of r.cobertura.indisponiveis) (indisponiveis[k] = indisponiveis[k] || []).push(r.name);
     }
     const semRecorte = ok.filter((r) => r.cobertura.semRecorte).map((r) => r.name);
-    state.cobertura = { indisponiveis, semRecorte };
+    const semMatricula = ok.filter((r) => r.cobertura.semMatricula).map((r) => r.name);
+    state.cobertura = { indisponiveis, semRecorte, semMatricula };
   }
 
   async function lerPastaHandle(auto) {
@@ -975,20 +976,27 @@
     );
   }
 
-  /** Valores negociados: débito informado nas negociações, mês a mês, em faixa de largura total. */
+  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas, cada um em valor e %. */
   function renderValoresNegociados() {
     const s = vm.sum;
-    const item = (rotulo, valor, total) => h('div', { class: 'vn-item' + (total ? ' is-total' : ''), role: 'listitem' },
-      h('span', { class: 'vn-mes', text: rotulo }),
-      h('span', { class: 'vn-valor num', text: brl.format(valor) }));
+    const semNeg = (state.cobertura.indisponiveis || {}).neg || [];
+    const semMat = (state.cobertura.semMatricula || []).filter((n) => !semNeg.includes(n));
+    const avisoDe = (nomes) => (nomes.length ? '⚠ indisponível em ' + nomes.length + ' ' + plural(nomes.length, 'arquivo', 'arquivos') : null);
+    const quadro = (k, rotulo, valor, pct, tip, aviso) => h('div', { class: 'vn-item', role: 'group', tabindex: 0, style: { '--kc': COR.neg }, dataset: { vn: k }, 'aria-label': rotulo + ': ' + valor + ', ' + pct + '. ' + tip, 'data-tip': rotulo + '\n' + tip },
+      h('span', { class: 'vn-mes' }, h('i', { class: 'kdot' }), rotulo),
+      h('div', { class: 'vn-par' },
+        h('div', { class: 'vn-col' }, h('span', { class: 'vn-cab', text: 'Valor' }), h('span', { class: 'vn-valor num', dataset: { vn: 'v' }, text: valor })),
+        h('div', { class: 'vn-col' }, h('span', { class: 'vn-cab', text: '%' }), h('span', { class: 'vn-valor num', dataset: { vn: 'pct' }, text: pct }))),
+      aviso ? h('span', { class: 'kpi-sub', text: aviso }) : null);
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Débito informado nas negociações, por mês: soma de "Valor Total dos Débitos". Não é arrecadação nem valor pago.' }))),
-      vm.months.length
-        ? h('div', { class: 'vn-grid', role: 'list', 'aria-label': 'Valores negociados por mês' }, vm.months.map((m) => item(m.rotulo, m.sum.debito)).concat(item('Total', s.debito, true)))
-        : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
-      s.debitoNaoInformado ? h('p', { class: 'note', dataset: { vn: 'sem-valor' }, text: fmtInt(s.debitoNaoInformado) + ' ' + plural(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).' }) : null
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = matrículas distintas que negociaram; % sobre o Exec.' }))),
+      h('div', { class: 'vn-grid' },
+        quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito total informado de todas as atividades do filtro (' + brl.format(s.debitoTotal) + ').', avisoDe(semNeg)),
+        quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec), 'Matrículas distintas com negociação (' + fmtInt(s.economias) + ') divididas pelo total de Exec (' + fmtInt(s.exec) + ').', avisoDe(semNeg.concat(semMat)))),
+      s.debitoNaoInformado ? h('p', { class: 'note', dataset: { vn: 'sem-valor' }, text: fmtInt(s.debitoNaoInformado) + ' ' + plural(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).' }) : null,
+      s.negSemMatricula ? h('p', { class: 'note', dataset: { vn: 'sem-matricula' }, text: fmtInt(s.negSemMatricula) + ' ' + plural(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).' }) : null
     );
   }
 
@@ -1400,7 +1408,9 @@
       h('h3', { text: 'Negociações e Sem Desdobro' }),
       h('ul', null,
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
-        li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.')),
+        li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
+        li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações. O % é esse valor dividido pela soma do mesmo campo em todas as atividades do filtro (débito total informado). Negociação sem valor informado não entra na soma.'),
+        li(h('strong', { text: 'Economias recuperadas' }), ': matrículas distintas com negociação (a mesma matrícula conta uma vez; zeros à esquerda e espaços são ignorados). O % é esse número dividido pelo total de Exec. Negociação sem matrícula não entra na contagem.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,
         li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),

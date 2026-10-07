@@ -1088,6 +1088,7 @@
         semRecurso: !has('recurso'),
         semChaveId: !has('id'),
         semRecorte: !has('recorteFez'),
+        semMatricula: !has('matricula'),
       },
     };
   }
@@ -1452,9 +1453,13 @@
    * Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec (null quando não há Exec).
    * Equipes = recursos distintos que trabalharam; equipeDias = pares (equipe, dia) com atividade;
    * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
+   * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoTotal`
+   * (soma do mesmo campo em todas as atividades do conjunto). Economias recuperadas = `economias` (matrículas distintas
+   * que negociaram; negociação sem matrícula fica em `negSemMatricula`); `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0 };
+    const matriculasNeg = new Set();
     const equipes = new Set();
     const dias = new Set();
     const equipeDias = new Set();
@@ -1463,11 +1468,15 @@
       if (r.exec) s.exec++;
       else if (r.exoc) s.exoc++;
       else s.outros++;
+      if (r.valor != null) s.debitoTotal += r.valor;
       if (r.neg) {
         s.neg++;
         if (r.valor == null) s.debitoNaoInformado++;
         else s.debito += r.valor;
         if (r.semDesdobro) s.semDesdobro++;
+        const mat = chaveNorm(r.matricula);
+        if (mat) matriculasNeg.add(mat);
+        else s.negSemMatricula++;
       }
       if (r.termo) {
         s.termos++;
@@ -1491,6 +1500,9 @@
     s.equipeDias = equipeDias.size;
     s.assertividade = s.exec ? s.termos / s.exec : null;
     s.efetividade = s.exec ? s.neg / s.exec : null;
+    s.economias = matriculasNeg.size;
+    s.economiasSobreExec = s.exec ? s.economias / s.exec : null;
+    s.debitoPct = s.debitoTotal ? s.debito / s.debitoTotal : null;
     s.recorteSobreExec = s.exec ? s.recortes / s.exec : null;
     s.produtividade = s.equipeDias ? s.atividades / s.equipeDias : null;
     s.equipesPorDia = s.dias ? s.equipeDias / s.dias : null;

@@ -112,7 +112,8 @@ A comparação de cabeçalhos ignora maiúsculas, acentos e pontuação.
 | Negociações | `Negociou O Débito? = Sim` (espaços nas pontas e caixa ignorados). Códigos, texto livre, valor ou desdobro não criam negociação. |
 | Negociações Sem Desdobro | Negociação com `Serviço adicionais resposta` vazio, nulo ou só espaços. **Subconjunto** das negociações (não somar). |
 | Termos aplicados (irregularidade identificada) | `Serviço adicionais resposta` contém o código completo `110013` (Serviços) ou `310013` (VCG) em qualquer posição. |
-| Débito das negociações | Soma de `Valor Total dos Débitos` das negociações no filtro. É o **débito informado**; não é arrecadação nem valor pago. |
+| Débito das negociações (valor negociado) | Soma de `Valor Total dos Débitos` das negociações no filtro. É o **débito informado**; não é arrecadação nem valor pago. O % mostrado ao lado é esse valor ÷ a soma de `Valor Total dos Débitos` de todas as atividades do filtro (débito total informado). |
+| Economias recuperadas | Matrículas **distintas** com negociação no filtro (mesma matrícula conta uma vez; zeros à esquerda e espaços ignorados; negociação sem matrícula não conta). O % é economias recuperadas ÷ total de Exec. Definição indicada pelo usuário; sem a coluna `Matrícula` o indicador aparece como indisponível. |
 
 ### Status considerados
 
@@ -201,7 +202,7 @@ Exec + Exoc = 8.136 porque essa base só tem esses dois status; em outras bases 
 - **Exportar Excel**: baixa um `.xlsx` (sem bibliotecas externas) com as planilhas Resumo, Mensal, Produtividade por cidade, Equipes, Frentes e Registros do filtro atual. Textos iniciados por `=`, `+`, `-` ou `@` ficam como texto, não como fórmula.
 - **Exportar PDF**: abre a impressão do navegador com o layout da Visão geral em A4 paisagem (cerca de 3 páginas); escolha "Salvar como PDF". O PDF não é gerado por biblioteca própria.
 - Abas: **Visão geral**, **Analítico** (auditoria linha a linha, busca e CSV) e **Arquivos e regras** (arquivos lidos, prioridade "só completa", conferências, frentes sem mapeamento e, recolhidos, colunas/nomes alternativos e regras).
-- **Valores negociados** logo abaixo de "Recortes realizados", em largura total: o débito informado de cada mês e o total (com aviso quando há negociação sem valor informado). Depois, gráfico separado de negociações e termos com a mesma escala, resultados por cidade, pós-corte por categoria e rankings por frente e equipe ("Mostrar todos"). A produção mensal, a distribuição dos status e a tabela de valores mensais saíram da Visão geral; a planilha Mensal do Excel continua trazendo os valores por mês.
+- **Valores negociados** logo abaixo de "Recortes realizados", em largura total: dois quadros, **Valor negociado** (débito informado das negociações) e **Economias recuperadas** (matrículas distintas que negociaram), cada um em valor e % (com aviso quando há negociação sem valor informado ou sem matrícula). Depois, gráfico separado de negociações e termos com a mesma escala, resultados por cidade, pós-corte por categoria e rankings por frente e equipe ("Mostrar todos"). A produção mensal, a distribuição dos status e a tabela de valores mensais saíram da Visão geral; a planilha Mensal do Excel continua trazendo os valores por mês.
 - Cores fixas por indicador (paleta validada quanto a daltonismo); valores sempre em texto ao lado das barras; dica com os valores ao passar o mouse ou focar por teclado.
 - Filtros valem para cartões, gráficos, analítico e exportação; o foco do teclado é mantido ao filtrar.
 - Analítico com 50 linhas por página, detalhe expansível com os 19 campos e exportação de **todas** as linhas filtradas.
