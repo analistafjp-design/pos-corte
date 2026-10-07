@@ -75,14 +75,15 @@ test('estado inicial: sem dados incorporados, com instruções e sem erros', asy
   await page.context().close();
 });
 
-test('importar Excel: cartões, gráficos e tabela mensal calculados a partir dos registros', async () => {
+test('importar Excel: cartões, valores negociados e gráficos calculados a partir dos registros', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
   assert.deepEqual(await kpis(page), KPIS_PEQUENO);
   assert.match(await statusTitulo(page), /Base carregada: 19 atividades de 1 arquivo/);
-  // sub-textos
-  assert.match(await kpiTexto(page, 'neg'), /Débito informado: R\$\s2\.535,06/);
-  assert.match(await kpiTexto(page, 'termos'), /110013 Serviços: 6 · 310013 VCG: 2/);
+  // legendas dos cartões removidas: só rótulo e valor (o débito informado fica em "Valores negociados")
+  assert.equal(await page.locator('.kpi .kpi-sub').count(), 0, 'cartões sem legenda');
+  assert.doesNotMatch(await kpiTexto(page, 'neg'), /Débito informado/);
+  assert.doesNotMatch(await kpiTexto(page, 'termos'), /110013 Serviços|Irregularidade identificada/);
   // pós-corte por categoria: todos os 19 registros do fixture são da categoria Residencial
   assert.match(await page.textContent('[data-fk=cat-topo]'), /Categoria com mais pós-corte: Residencial — 19 \(100% do percorrido\)/);
   const cats = await page.$$eval('.card-categorias tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent.trim())));
@@ -94,17 +95,25 @@ test('importar Excel: cartões, gráficos e tabela mensal calculados a partir do
   assert.match(await page.textContent('.card-recorte .rc-row[data-tipo="CAVALETE SIMPLES"]'), /Corte no Cavalete Simples.*20,0% · 1/);
   assert.match(await page.textContent('.card-recorte .rc-row[data-tipo="NÃO INFORMADO"]'), /Tipo não informado.*20,0% · 1/);
   assert.equal(await page.locator('[data-fk="kpi:semDesdobro"]').count(), 0, 'sem card de desdobro na visão geral');
-  // tabela mensal
-  const linhas = await page.$$eval('section[aria-labelledby=h-tm] .table-wrap tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
-  assert.deepEqual(linhas.map((l) => l[0]), ['jul/2026', 'ago/2026', 'set/2026']);
-  assert.equal(linhas[0][1], '17');
-  const total = await page.$$eval('section[aria-labelledby=h-tm] .table-wrap tfoot td', (tds) => tds.map((c) => c.textContent));
-  // Mês | Percorrido | Exec | Exoc | Termos | Assertividade | Negociações | Efetividade | Sem Desdobro | Equipes | Débito
-  assert.deepEqual([total[0], total[1], total[2], total[3], total[4], total[6], total[8], total[9]], ['Total', '19', '18', '1', '7', '5', '2', '3']);
-  assert.equal(total[5], '38,9%');
-  assert.equal(total[7], '27,8%');
-  // gráficos com legenda e alternativa em tabela
-  assert.ok(await page.locator('.legend').first().isVisible());
+  // visuais e tabela mensal retirados da Visão geral
+  for (const id of ['h-mensal', 'h-status', 'h-tm']) assert.equal(await page.locator('#' + id).count(), 0, id + ' removido');
+  assert.equal(await page.locator('.colchart, .card-status, .card-mensal').count(), 0);
+  assert.equal(await page.locator('#view-geral .mini-sub', { hasText: '"Fez o corte novamente" = Sim' }).count(), 0, 'legenda do recorte removida');
+  // valores negociados: logo abaixo de "Recortes realizados", em largura total, só com o débito informado por mês
+  const ordem = await page.$$eval('#view-geral > .stack > *', (els) => els.map((e) => e.className));
+  const iRec = ordem.findIndex((c) => /card-recorte/.test(c));
+  assert.ok(/card-valores/.test(ordem[iRec + 1]), 'valores negociados logo após os recortes: ' + ordem.join(' | '));
+  const larg = await page.$$eval('.card-recorte, .card-valores', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
+  assert.equal(larg[0], larg[1], 'mesma largura do bloco de recortes (tela inteira)');
+  const vn = await page.$$eval('.card-valores .vn-item', (els) => els.map((e) => [e.querySelector('.vn-mes').textContent, e.querySelector('.vn-valor').textContent.replace(/\s/g, ' ')]));
+  // as 5 negociações do fixture são todas de julho (pequeno_esperados.json: porMes); ago e set sem negociação
+  const esp = JSON.parse(fs.readFileSync(fx('pequeno_esperados.json'), 'utf8'));
+  assert.equal(esp.porMes['2026-07'].neg, esp.neg);
+  assert.deepEqual(vn, [['jul/2026', 'R$ 2.535,06'], ['ago/2026', 'R$ 0,00'], ['set/2026', 'R$ 0,00'], ['Total', 'R$ 2.535,06']]);
+  assert.equal(esp.debito, 2535.06);
+  assert.equal(await page.locator('.card-valores table').count(), 0, 'sem a tabela de indicadores mensais');
+  // negociações e termos por mês continuam, com legenda
+  assert.ok(await page.locator('.card-negtermo .legend').isVisible());
   // rankings conciliam com o total
   for (const id of ['h-frente', 'h-recurso']) {
     const soma = await page.$$eval(`section[aria-labelledby=${id}] .rank-list .rv`, (els) => els.reduce((a, e) => a + parseInt(e.firstChild.textContent.replace(/\./g, ''), 10), 0));
@@ -120,17 +129,17 @@ test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
   // clicar no mês filtra e clicar de novo limpa
-  await page.click('.cc-col[data-fk="mes:2026-07"]');
+  await page.click('.mgroup[data-fk="mesnt:2026-07"]');
   assert.deepEqual((await kpis(page))[0], '17');
   assert.match(await page.textContent('#chips'), /Período: 01\/07\/2026 a 31\/07\/2026/);
   assert.equal(await page.inputValue('#f-from'), '2026-07-01');
-  await page.click('.cc-col[data-fk="mes:2026-07"]');
+  await page.click('.mgroup[data-fk="mesnt:2026-07"]');
   assert.equal((await kpis(page))[0], '19');
   // agosto mostra somente agosto
   await page.fill('#f-from', '2026-08-01');
   await page.fill('#f-to', '2026-08-31');
   assert.deepEqual(await kpis(page), ['1', '1', '0', '0', '0']);
-  assert.equal(await page.locator('.cc-col[data-fk^="mes:"]').count(), 1);
+  assert.equal(await page.locator('.mgroup[data-fk^="mesnt:"]').count(), 1);
   await page.click('#chips button.ghost');
   assert.deepEqual(await kpis(page), KPIS_PEQUENO);
   // clicar em item de ranking filtra pela frente; chip remove
@@ -155,9 +164,8 @@ test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   await page.click('#chips button.ghost');
   // seletor do indicador dos gráficos
   await page.selectOption('#f-ind', 'termos');
-  assert.match(await page.textContent('#h-mensal'), /Termos aplicados/);
-  const mensal = await page.$$eval('section[aria-labelledby=h-mensal] .cc-val', (els) => els.map((e) => e.textContent));
-  assert.deepEqual(mensal, ['7', '0', '0']);
+  assert.match(await page.textContent('section[aria-labelledby=h-frente] .hint'), /^Termos · 7 no filtro/);
+  assert.match(await page.textContent('section[aria-labelledby=h-recurso] .hint'), /^Termos · 7 no filtro/);
   await page.selectOption('#f-ind', 'atividades');
   semErros(page);
   await page.context().close();
@@ -615,23 +623,25 @@ test('cartões em destaque: percorrido, exec, exoc, equipes, assertividade e efe
   const page = await abrir();
   await importar(page, PEQUENO);
   const t = (k) => kpiTexto(page, k);
-  assert.match(await t('atividades'), /Percorrido.*19.*Exec \+ Exoc/);
-  assert.match(await t('exec'), /Total de Exec.*18.*Finalizada/);
-  assert.match(await t('exoc'), /Total de Exoc.*1.*Encerrada com Ocorrência/);
-  assert.match(await t('equipes'), /Equipes que trabalharam.*3/);
-  assert.match(await t('assertividade'), /Assertividade.*38,9%.*Termos ÷ Exec.*7 ÷ 18/);
-  assert.match(await t('efetividade'), /Efetividade.*27,8%.*Negociações ÷ Exec.*5 ÷ 18/);
-  // equipes de um único dia (3 equipes em 03/07/2026)
+  assert.equal(await t('atividades'), 'Percorrido19');
+  assert.equal(await t('exec'), 'Total de Exec18');
+  assert.equal(await t('exoc'), 'Total de Exoc1');
+  assert.equal(await t('equipes'), 'Equipes que trabalharam3');
+  assert.equal(await t('assertividade'), 'Assertividade38,9%');
+  assert.equal(await t('efetividade'), 'Efetividade27,8%');
+  assert.match(await page.getAttribute('[data-fk="kpi:equipes"]', 'data-tip'), /no período filtrado/);
+  // equipes de um único dia (3 equipes em 03/07/2026): o valor muda e a dica passa a falar do dia
   await page.fill('#f-from', '2026-07-03');
   await page.fill('#f-to', '2026-07-03');
-  assert.match(await t('equipes'), /3.*no dia 03\/07\/2026/);
+  assert.equal(await t('equipes'), 'Equipes que trabalharam3');
+  assert.match(await page.getAttribute('[data-fk="kpi:equipes"]', 'data-tip'), /no dia filtrado/);
   await page.fill('#f-from', '2026-08-10');
   await page.fill('#f-to', '2026-08-10');
-  assert.match(await t('equipes'), /1.*no dia 10\/08\/2026/);
+  assert.equal(await t('equipes'), 'Equipes que trabalharam1');
   // sem Exec no filtro: divisão protegida
   await page.fill('#f-from', '2026-09-28');
   await page.fill('#f-to', '2026-09-28');
-  assert.match(await t('assertividade'), /0,0%|—/);
+  assert.match(await t('assertividade'), /Assertividade(0,0%|—)/);
   // cartões informativos não abrem o analítico; os de indicador abrem
   await page.click('#chips button.ghost');
   await page.click('[data-fk="kpi:equipes"]');
@@ -705,7 +715,7 @@ test('exportar PDF: o botão abre a impressão da Visão geral e o layout de imp
   // layout de impressão
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
   await page.emulateMedia({ media: 'print' });
-  for (const sel of ['.topbar', '.actions', '.filters', '#nav-tabs', '#view-analitico', '.card-status']) {
+  for (const sel of ['.topbar', '.actions', '.filters', '#nav-tabs', '#view-analitico']) {
     assert.equal(await page.locator(sel).first().isVisible(), false, sel + ' oculto na impressão');
   }
   assert.ok(await page.locator('#print-head').isVisible());
@@ -731,11 +741,11 @@ test('nome do painel e abas: Pós-Corte Interior; Visão geral, Analítico e Arq
 test('teclado: cartão e barras acessíveis; foco preservado após filtrar', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
-  await page.focus('.cc-col[data-fk="mes:2026-07"]');
+  await page.focus('.mgroup[data-fk="mesnt:2026-07"]');
   await page.keyboard.press('Enter');
-  assert.equal(await page.evaluate(() => document.activeElement.dataset.fk), 'mes:2026-07', 'foco mantido depois de re-renderizar');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.fk), 'mesnt:2026-07', 'foco mantido depois de re-renderizar');
   assert.equal((await kpis(page))[0], '17');
-  assert.equal(await page.getAttribute('.cc-col[data-fk="mes:2026-07"]', 'aria-pressed'), 'true');
+  assert.equal(await page.getAttribute('.mgroup[data-fk="mesnt:2026-07"]', 'aria-pressed'), 'true');
   await page.keyboard.press('Space');
   assert.equal((await kpis(page))[0], '19');
   await page.focus('.kpi[data-fk="kpi:exoc"]');

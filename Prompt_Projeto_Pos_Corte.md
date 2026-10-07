@@ -110,7 +110,7 @@ Houve a falha `Cannot read properties of null (reading 'getElementsByTagName')`.
 
 ## Interface e gráficos
 
-Visual moderno e profissional, identidade AnalistaFJP; navegação Visão geral / Analítico / Base e regras; cartões de atividades, Exec, Exoc, negociações, termos e Sem Desdobro; barras horizontais com rótulos completos; produção mensal e rankings por frente, cidade e equipe; gráfico separado de negociações e termos com a mesma escala; tabela dos valores mensais; layout responsivo sem sobreposição; mouse, teclado e toque. Cores por indicador validadas para daltonismo (`validate_palette`). Não acrescente metas, previsões, arrecadação ou funcionalidades fictícias.
+Visual moderno e profissional, identidade AnalistaFJP; navegação Visão geral / Analítico / Base e regras; cartões de atividades, Exec, Exoc, negociações, termos e Sem Desdobro; barras horizontais com rótulos completos; rankings por frente, cidade e equipe; gráfico separado de negociações e termos com a mesma escala; valores negociados por mês (débito informado) abaixo dos recortes; layout responsivo sem sobreposição; mouse, teclado e toque. Cores por indicador validadas para daltonismo (`validate_palette`). Não acrescente metas, previsões, arrecadação ou funcionalidades fictícias.
 
 ## Indicadores em evidência e exportação
 
