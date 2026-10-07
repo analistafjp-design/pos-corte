@@ -2156,8 +2156,9 @@ window.FRENTES_PADRAO = [
    * Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec (null quando não há Exec).
    * Equipes = recursos distintos que trabalharam; equipeDias = pares (equipe, dia) com atividade;
    * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
-   * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoTotal`
-   * (soma do mesmo campo em todas as atividades do conjunto). Matrículas que negociaram = `matriculasNeg` (distintas;
+   * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoExec`
+   * (soma do mesmo campo nas atividades Exec do conjunto): a mesma mecânica da Efetividade (negociações ÷ Exec), em
+   * valor, por atividade. Matrículas que negociaram = `matriculasNeg` (distintas;
    * negociação sem matrícula fica em `negSemMatricula`). Economias recuperadas = `economias`: soma do TOTAL_ECO do
    * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez. Matrícula que negociou é,
    * no mínimo, 1 economia: sem total aproveitável no Cadastro ela conta 1 (`economiasPeloMinimo`), seja por não estar
@@ -2165,7 +2166,7 @@ window.FRENTES_PADRAO = [
    * ou por não haver Cadastro carregado (`economiasSemArquivo`). `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasDoAvulso: 0, economiasDoCadastro: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoExec: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasDoAvulso: 0, economiasDoCadastro: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
     const matriculasNeg = new Map();
     const equipes = new Set();
     const dias = new Set();
@@ -2175,7 +2176,7 @@ window.FRENTES_PADRAO = [
       if (r.exec) s.exec++;
       else if (r.exoc) s.exoc++;
       else s.outros++;
-      if (r.valor != null) s.debitoTotal += r.valor;
+      if (r.exec && r.valor != null) s.debitoExec += r.valor;
       if (r.neg) {
         s.neg++;
         if (r.valor == null) s.debitoNaoInformado++;
@@ -2223,7 +2224,7 @@ window.FRENTES_PADRAO = [
       else s.economiasSemArquivo++;
     }
     s.economiasSobreExec = s.exec ? s.economias / s.exec : null;
-    s.debitoPct = s.debitoTotal ? s.debito / s.debitoTotal : null;
+    s.debitoPct = s.debitoExec ? s.debito / s.debitoExec : null;
     s.recorteSobreExec = s.exec ? s.recortes / s.exec : null;
     s.produtividade = s.equipeDias ? s.atividades / s.equipeDias : null;
     s.equipesPorDia = s.dias ? s.equipeDias / s.dias : null;
@@ -4424,9 +4425,9 @@ window.FRENTES_PADRAO = [
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias das matrículas que negociaram (Serviço avulso do mês, ou Cadastro quando o avulso não tem a matrícula), cada matrícula uma vez e no mínimo 1 por matrícula; % sobre o Exec.' }))),
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito informado das atividades Exec, a mesma base da Efetividade. Economias recuperadas = total de economias das matrículas que negociaram (Serviço avulso do mês, ou Cadastro quando o avulso não tem a matrícula), cada matrícula uma vez e no mínimo 1 por matrícula; % sobre o Exec.' }))),
       h('div', { class: 'vn-grid' },
-        quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito total informado de todas as atividades do filtro (' + brl.format(s.debitoTotal) + ').', avisoDe(semNeg)),
+        quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito informado das atividades Exec do filtro (' + brl.format(s.debitoExec) + '), a mesma base da Efetividade (negociações ÷ Exec).', avisoDe(semNeg)),
         quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec),
           'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): ' + (avu ? 'do Serviço avulso em ' + fmtInt(s.economiasDoAvulso) + ', ' : '') + (cad ? 'do Cadastro em ' + fmtInt(s.economiasDoCadastro) + ', ' : '') + '1 economia (mínimo) em ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
           temFonte ? avisoDe(semNeg.concat(semMat)) : '⚠ sem Cadastro nem Serviço avulso: 1 economia por matrícula')),
@@ -4857,7 +4858,7 @@ window.FRENTES_PADRAO = [
       h('ul', null,
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
         li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
-        li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações. O % é esse valor dividido pela soma do mesmo campo em todas as atividades do filtro (débito total informado). Negociação sem valor informado não entra na soma.'),
+        li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações. O % é esse valor dividido pela soma do mesmo campo nas atividades Exec do filtro, a mesma base da Efetividade (negociações ÷ Exec), por atividade. Negociação sem valor informado não entra na soma.'),
         li(h('strong', { text: 'Economias recuperadas' }), ': total de economias das matrículas distintas com negociação (cruzamento pela matrícula; zeros à esquerda e espaços são ignorados), cada matrícula uma vez. A fonte é, nesta ordem: o ', h('strong', { text: 'Serviço avulso' }), ' (CSV do faturamento, um por mês; colunas ', h('code', { text: 'N. da Ligacao' }), ' e ', h('code', { text: 'Qtd. Economia ...' }), ', somadas) e, quando a matrícula não está nele, o ', h('strong', { text: 'Cadastro' }), ' (colunas ', h('code', { text: 'NUM_LIGACAO' }), ' e ', h('code', { text: 'TOTAL_ECO' }), '). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está em nenhum dos dois (ou está sem total) e a que aparece mais de uma vez no mesmo mês (total desconsiderado) contam 1 cada; sem esses arquivos na pasta, todas contam 1. Com vários meses, vale o total do mês da negociação (coluna Referencia de Leitura do avulso ou Mês/Ano do Cadastro; sem a coluna, o mês do nome do arquivo); a matrícula só é desconsiderada se repetir dentro do mesmo mês, e se ela não tiver aquele mês vale o mês mais próximo. Várias negociações na mesma matrícula contam uma vez só (por isso as economias podem ficar abaixo do número de negociações). O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,

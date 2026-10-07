@@ -62,8 +62,8 @@ function conferirEsperados(records, esp, { cidade = true, matricula = true } = {
   assert.equal(s.t31, esp.t31, '310013');
   assert.equal(s.negETermo, esp.negETermo, 'negociação e termo na mesma atividade');
   assert.ok(Math.abs(s.debito - esp.debito) < 0.005, `débito ${s.debito} vs ${esp.debito}`);
-  assert.ok(Math.abs(s.debitoTotal - esp.debitoTotal) < 0.005, `débito total informado ${s.debitoTotal} vs ${esp.debitoTotal}`);
-  assert.ok(Math.abs(s.debitoPct - esp.debito / esp.debitoTotal) < 1e-9, 'valor negociado ÷ débito total informado');
+  assert.ok(Math.abs(s.debitoExec - esp.debitoExec) < 0.005, `débito informado das Exec ${s.debitoExec} vs ${esp.debitoExec}`);
+  assert.ok(Math.abs(s.debitoPct - esp.debito / esp.debitoExec) < 1e-9, 'valor negociado ÷ débito das Exec (base da Efetividade)');
   if (matricula) {
     assert.equal(s.matriculasNeg, esp.matriculasNeg, 'matrículas distintas que negociaram');
     assert.equal(s.negSemMatricula, esp.negSemMatricula, 'negociações sem matrícula');
@@ -111,7 +111,7 @@ test('negociação: somente "Sim" (espaços e caixa ignorados)', () => {
   assert.equal(PC.classify('Finalizada', 'Sim', '110013;').neg, true);
 });
 
-test('valor negociado e economias recuperadas: débito ÷ débito total informado; TOTAL_ECO do Cadastro das matrículas distintas que negociaram', () => {
+test('valor negociado e economias recuperadas: débito ÷ débito das Exec (mesma base da Efetividade); TOTAL_ECO das matrículas distintas que negociaram', () => {
   const r = (o) => Object.assign({ exec: true, exoc: false, neg: false, valor: null, matricula: '', eco: null, ecoMotivo: 'nao' }, o);
   const recs = [
     r({ neg: true, valor: 100, matricula: '00123', eco: 3, ecoMotivo: 'ok' }),
@@ -120,14 +120,15 @@ test('valor negociado e economias recuperadas: débito ÷ débito total informad
     r({ neg: true, valor: 10, matricula: '' }), // sem matrícula: fora das economias
     r({ neg: true, valor: 5, matricula: '999', ecoMotivo: 'sem' }), // não achada no Cadastro
     r({ neg: true, valor: 1, matricula: '77', eco: 12, ecoMotivo: 'ok' }),
-    r({ neg: false, valor: 200, matricula: '123', eco: 3, ecoMotivo: 'ok' }), // sem negociação: entra só no débito total
-    r({ exec: false, exoc: true, neg: false, valor: null, matricula: '789' }),
+    r({ neg: false, valor: 200, matricula: '123', eco: 3, ecoMotivo: 'ok' }), // sem negociação: entra só no débito das Exec
+    r({ exec: false, exoc: true, neg: false, valor: 1000, matricula: '789' }), // Exoc: o débito dela fica fora da base do %
   ];
   const s = PC.summarize(recs);
   assert.equal(s.neg, 6);
   assert.ok(Math.abs(s.debito - 166.5) < 1e-9, 'valor negociado');
-  assert.ok(Math.abs(s.debitoTotal - 366.5) < 1e-9, 'débito total informado de todas as atividades');
-  assert.ok(Math.abs(s.debitoPct - 166.5 / 366.5) < 1e-9);
+  assert.ok(Math.abs(s.debitoExec - 366.5) < 1e-9, 'débito informado só das atividades Exec (os R$ 1.000 da Exoc não entram)');
+  assert.ok(Math.abs(s.debitoPct - 166.5 / 366.5) < 1e-9, 'valor negociado ÷ débito das Exec');
+  assert.ok(Math.abs(s.efetividade - s.neg / s.exec) < 1e-12, 'mesma mecânica da Efetividade: negociações ÷ Exec, em quantidade');
   assert.equal(s.debitoNaoInformado, 1);
   assert.equal(s.matriculasNeg, 4, '123 (duas vezes), 456, 999 e 77');
   assert.equal(s.economias, 17, 'TOTAL_ECO de 123 (3, uma vez) + 77 (12) + 1 de 456 (repetida no Cadastro) + 1 de 999 (fora do Cadastro)');

@@ -360,7 +360,7 @@ def esperados(rows, frentes=FRENTES):
 
     rows = [r for r in rows if em_escopo(r) and r["Status da Atividade"] in STATUS_CONTADOS]  # só serviços dos 9 códigos e status contados
     out = {"atividades": 0, "exec": 0, "exoc": 0, "neg": 0, "termos": 0, "semDesdobro": 0, "t11": 0, "t31": 0,
-           "debito": 0.0, "debitoTotal": 0.0, "matriculasNeg": 0, "negSemMatricula": 0, "negETermo": 0, "porMes": {}, "porFrente": {}, "porCidade": {}, "porEquipe": {}}
+           "debito": 0.0, "debitoTotal": 0.0, "debitoExec": 0.0, "matriculasNeg": 0, "negSemMatricula": 0, "negETermo": 0, "porMes": {}, "porFrente": {}, "porCidade": {}, "porEquipe": {}}
     mats_neg = set()  # matrículas distintas que negociaram
 
     for r in rows:
@@ -385,6 +385,8 @@ def esperados(rows, frentes=FRENTES):
             v = float(re.sub(r"[^\d,]", "", v).replace(",", ".") or 0)
         if v is not None:
             out["debitoTotal"] += v  # débito informado de todas as atividades (negociadas ou não)
+            if st == "finalizada":
+                out["debitoExec"] += v  # só das Exec: a base do % do valor negociado, igual à da Efetividade
         if neg and v is not None:
             out["debito"] += v
         if neg:
@@ -402,6 +404,7 @@ def esperados(rows, frentes=FRENTES):
         out["porEquipe"][r["Recurso"]] = out["porEquipe"].get(r["Recurso"], 0) + 1
     out["debito"] = round(out["debito"], 2)
     out["debitoTotal"] = round(out["debitoTotal"], 2)
+    out["debitoExec"] = round(out["debitoExec"], 2)
     out["matriculasNeg"] = len(mats_neg)
     # equipes que trabalharam, equipe-dias e produtividade (visitas por equipe por dia), calculados à parte do painel
     vistos = [r for r in rows]
