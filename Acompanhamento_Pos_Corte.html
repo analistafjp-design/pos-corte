@@ -2734,6 +2734,8 @@ window.FRENTES_PADRAO = [
   async function readServicoAvulso(file, opts) {
     opts = opts || {};
     let texto = await lerTextoCsv(file);
+    // vazio (0 bytes ou só espaços) não é "outro CSV": é arquivo vazio ou ainda sincronizando, e precisa aparecer como erro
+    if (!file.size || texto.trim() === '') throw new PcError('EMPTY', 'O arquivo está vazio. Se ele está no OneDrive, espere terminar de sincronizar (ícone verde) e use Atualizar.');
     let delim = null;
     const sep = /^sep=(.)[ \t]*(?:\r?\n|$)/i.exec(texto);
     if (sep) { delim = sep[1]; texto = texto.slice(sep[0].length); }

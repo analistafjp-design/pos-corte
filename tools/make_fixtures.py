@@ -717,6 +717,7 @@ def main():
     escrever_avulso(out / "Servico_avulso_07-2026.csv", av07)
     escrever_avulso(out / "Servico_avulso_08-2026.csv", av08, cp1252=True, sep_linha=False, com_mes=False)
     (out / "outro_relatorio.csv").write_text("a;b;c\r\n1;2;3\r\n", encoding="utf-8")  # CSV que não é o Serviço avulso: deve ser ignorado
+    (out / "vazio.csv").write_bytes(b"")  # CSV vazio (ou ainda sincronizando): precisa aparecer como erro, não ser ignorado
     lin_av = [(m, res + com + ind + pub + oth, mes) for m, res, com, ind, pub, oth, _, mes in av07] + \
              [(m, res + com + ind + pub + oth, "08/2026") for m, res, com, ind, pub, oth, _, _ in av08]
     cad_pq = [(m, t, "10/2026") for m, t in cad_pequeno]  # Cadastro_pequeno tem Mês/Ano = 10/2026 em todas as linhas
