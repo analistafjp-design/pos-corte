@@ -277,6 +277,8 @@ test('Serviço avulso (CSV do faturamento): lê N. da Ligacao e soma Qtd. Econom
   assert.equal(a08.colunaMes, '');
   // CSV que não é o Serviço avulso: erro próprio (o painel ignora)
   await assert.rejects(lerCsv('outro_relatorio.csv'), (er) => er instanceof PC.PcError && er.code === 'AVULSO_SEM_COLUNAS');
+  // CSV vazio (0 bytes) ou só com espaços: erro de arquivo vazio, não "outro CSV" ignorado em silêncio
+  await assert.rejects(lerCsv('vazio.csv'), (er) => er instanceof PC.PcError && er.code === 'EMPTY' && /vazio.*sincronizar/.test(er.message));
   // delimitador, aspas e linha sep= também em texto qualquer
   assert.deepEqual(PC.parseCsv('a;"b;c";"d ""x"" e"\r\n1;2;3', ';'), [['a', 'b;c', 'd "x" e'], ['1', '2', '3']]);
   assert.equal(PC.mesDoNome('Servico_avulso_10-2026.csv'), '2026-10');

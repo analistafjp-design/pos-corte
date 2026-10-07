@@ -198,6 +198,13 @@ test('Serviço avulso (CSV): vale primeiro, o Cadastro completa o que faltar, e 
   assert.match(await statusTitulo(page), /Base carregada: 19 atividades de 1 arquivo/);
   assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o CSV não vira atividade');
   assert.deepEqual(await economias(), ['4', '22,2%']);
+  // CSV vazio (ou ainda sincronizando no OneDrive): aparece como erro, não é ignorado em silêncio
+  await page.setInputFiles('#inp-files', [PEQUENO, AV07, fx('vazio.csv')]);
+  await page.waitForFunction(() => /Importação parcial/.test(document.querySelector('#status').textContent));
+  assert.match(await statusTexto(page), /Não importado: vazio\.csv — O arquivo está vazio\. Se ele está no OneDrive, espere terminar de sincronizar/);
+  assert.deepEqual(await economias(), ['4', '22,2%'], 'o resto continua valendo');
+  await page.setInputFiles('#inp-files', [PEQUENO, AV07, fx('outro_relatorio.csv')]);
+  await page.waitForFunction(() => /CSV ignorado/.test(document.querySelector('#status').textContent) && !/Importação parcial/.test(document.querySelector('#status').textContent));
   assert.equal(await page.locator('.card-valores [data-vn=economias] .kpi-sub').count(), 0);
   assert.match(await page.getAttribute('.card-valores [data-vn=economias]', 'data-tip'), /do Serviço avulso em 1, 1 economia \(mínimo\) em 0/);
   // avulso + Cadastro: o avulso continua valendo (4); o Cadastro só entra onde o avulso não tem a matrícula
