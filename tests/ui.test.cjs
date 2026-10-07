@@ -191,6 +191,67 @@ test('Cadastro: pasta "Cadastro" com o arquivo no nome original (data (16).xlsx)
   await page.context().close();
 });
 
+test('botão "Baixar matrículas fora do Cadastro": só aparece quando há matrícula fora; o Excel traz as mesmas matrículas da nota e respeita o filtro', { timeout: 120000 }, async () => {
+  const cp = require('node:child_process');
+  const py = cp.spawnSync('python3', ['-c', 'import openpyxl'], { encoding: 'utf8' });
+  const lerXlsx = (arq) => JSON.parse(cp.spawnSync('python3', ['-c', `
+import openpyxl, json, sys
+wb = openpyxl.load_workbook(sys.argv[1])
+ws = wb['Fora do Cadastro']
+linhas = [[c.value for c in row] for row in ws.iter_rows(min_row=2)]
+print(json.dumps({'abas': wb.sheetnames, 'mats': sorted(str(l[0]) for l in linhas), 'cidades': sorted({l[1] for l in linhas}), 'neg': sum(l[3] for l in linhas), 'valor': round(sum(l[4] for l in linhas), 2), 'resumo': wb['Resumo']['B5'].value}))`, arq], { encoding: 'utf8' }).stdout);
+  const page = await abrir();
+  // sem Cadastro: nada a baixar (o quadro já avisa que o arquivo não foi encontrado)
+  await importar(page, PEQUENO);
+  assert.equal(await page.locator('[data-act=baixar-fora-cadastro]').count(), 0, 'sem Cadastro não há botão');
+  // Cadastro que cobre as matrículas negociadas (pequeno): nada fora, sem botão
+  await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
+  await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));
+  assert.equal(await page.locator('[data-act=baixar-fora-cadastro]').count(), 0, 'nenhuma matrícula fora do Cadastro');
+  // base grande com o Cadastro que deixa matrículas de fora
+  await page.setInputFiles('#inp-files', [fx('grande_sintetico.xlsx'), fx('Cadastro_grande.xlsx')]);
+  await page.waitForFunction(() => /Cadastro: 651 matrículas usadas/.test(document.querySelector('#status').textContent), null, { timeout: 90000 });
+  const e = JSON.parse(fs.readFileSync(fx('grande_esperados.json'), 'utf8')).cadastro;
+  const nota = async () => Number((/^([\d.]+) matrículas? negociadas? fora do Cadastro/.exec(await page.textContent('.card-valores [data-vn=sem-cadastro]')) || [])[1].replace(/\./g, ''));
+  assert.equal(await nota(), e.negSemCadastro);
+  const btn = page.locator('[data-act=baixar-fora-cadastro]');
+  assert.equal(await btn.count(), 1);
+  assert.match(await btn.textContent(), /Baixar matrículas fora do Cadastro \(Excel\)/);
+  const baixa = async () => {
+    const [dl] = await Promise.all([page.waitForEvent('download'), btn.click()]);
+    assert.match(dl.suggestedFilename(), /^matriculas-fora-do-cadastro_\d{8}\.xlsx$/);
+    const arq = require('node:path').join(require('node:os').tmpdir(), 'pc-fora-' + process.pid + '-' + Date.now() + '.xlsx');
+    await dl.saveAs(arq);
+    assert.equal(fs.readFileSync(arq).subarray(0, 2).toString(), 'PK');
+    return arq;
+  };
+  const arq1 = await baixa();
+  if (py.status === 0) {
+    const x = lerXlsx(arq1);
+    assert.deepEqual(x.abas, ['Resumo', 'Fora do Cadastro']);
+    assert.deepEqual(x.mats, e.foraLista.slice().sort(), 'as mesmas matrículas da contagem independente');
+    assert.equal(x.neg, e.foraNegociacoes);
+    assert.ok(Math.abs(x.valor - e.foraValor) < 0.005);
+    assert.equal(x.resumo, 'nenhum');
+  }
+  fs.unlinkSync(arq1);
+  // com filtro de cidade o arquivo tem exatamente as matrículas da nota
+  await page.selectOption('#f-cidade', 'Cidade Norte');
+  await page.waitForFunction(() => document.querySelector('.card-valores [data-vn=sem-cadastro]'));
+  const n = await nota();
+  assert.ok(n > 0 && n < e.negSemCadastro, 'o filtro reduz a lista: ' + n);
+  const arq2 = await baixa();
+  if (py.status === 0) {
+    const x = lerXlsx(arq2);
+    assert.equal(x.mats.length, n, 'o Excel tem tantas matrículas quanto a nota do filtro');
+    assert.deepEqual(x.cidades, ['Cidade Norte']);
+    assert.match(x.resumo, /Cidade: Cidade Norte/);
+  }
+  fs.unlinkSync(arq2);
+  semErros(page);
+  await page.context().close();
+});
+
 test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);

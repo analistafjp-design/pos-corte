@@ -985,6 +985,25 @@
     );
   }
 
+  /** Excel com as matrículas que negociaram e não estão no Cadastro (no filtro atual), para completar o Cadastro. */
+  async function baixarForaDoCadastro() {
+    try {
+      const lista = PC.matriculasForaDoCadastro(vm.filtered);
+      const sheets = window.PosCorteExport.montarExportForaCadastro(lista, {
+        geradoEm: new Date(),
+        cadastro: state.cadastro ? state.cadastro.name : '',
+        periodo: vm.min ? PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max) : 'sem datas',
+        filtros: textoFiltros(),
+        repetidasNoCadastro: vm.sum.economiasRepetidas,
+        semMatricula: vm.sum.negSemMatricula,
+      });
+      const bytes = await window.PosCorteExport.toXlsx(sheets);
+      baixarBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'matriculas-fora-do-cadastro_' + ymdLocal(Date.now()).replace(/-/g, '') + '.xlsx');
+    } catch (err) {
+      setStatus({ kind: 'error', title: 'Não foi possível gerar o Excel', detail: (err && err.message) || String(err) });
+    }
+  }
+
   /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (via Cadastro), cada um em valor e %. */
   function renderValoresNegociados() {
     const s = vm.sum;
@@ -1012,6 +1031,8 @@
       s.debitoNaoInformado ? nota('sem-valor', mats(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).') : null,
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
       cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): não entram nas economias recuperadas.') : null,
+      cad && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
+        h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro' }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas fora do Cadastro (Excel)' }))) : null,
       cad && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no Cadastro e ' + plural(s.economiasRepetidas, 'foi desconsiderada', 'foram desconsideradas') + '.') : null
     );
   }

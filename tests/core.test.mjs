@@ -226,6 +226,78 @@ test('Cadastro: economias recuperadas = soma do TOTAL_ECO das matrículas distin
   }
 });
 
+test('matrículas fora do Cadastro: uma linha por matrícula negociada que não entra nas economias (cidade, negociações, valor, última data)', () => {
+  const r = (o) => Object.assign({ neg: true, valor: null, matricula: '', cidade: 'A', categoria: 'R', data: '2026-07-01', ecoMotivo: 'sem' }, o);
+  const lista = PC.matriculasForaDoCadastro([
+    r({ matricula: '00123', valor: 100, data: '2026-07-01', cidade: 'Zeta' }),
+    r({ matricula: ' 123 ', valor: 50.5, data: '2026-08-15', cidade: 'Beta', categoria: 'C' }), // mesma matrícula: junta e vale a cidade da última
+    r({ matricula: '99', cidade: 'Beta' }),
+    r({ matricula: '1000', cidade: 'Beta' }),
+    r({ matricula: '5', ecoMotivo: 'rep' }), // repetida no Cadastro: não entra na lista
+    r({ matricula: '6', ecoMotivo: 'ok' }), // está no Cadastro
+    r({ matricula: '7', neg: false }), // sem negociação
+    r({ matricula: '' }), // sem matrícula
+    r({ matricula: '8', ecoMotivo: 'nao' }), // sem Cadastro carregado: nada a listar
+  ]);
+  assert.deepEqual(lista.map((g) => [g.matricula, g.cidade, g.categoria, g.negociacoes, g.valor, g.ultima]), [
+    ['99', 'Beta', 'R', 1, 0, '2026-07-01'],
+    ['00123', 'Beta', 'C', 2, 150.5, '2026-08-15'],
+    ['1000', 'Beta', 'R', 1, 0, '2026-07-01'],
+  ], 'ordenadas por cidade e depois pela matrícula numérica (99, 123, 1000); a matrícula aparece como veio na atividade');
+  assert.deepEqual(PC.matriculasForaDoCadastro([]), []);
+});
+
+test('matrículas fora do Cadastro: lista conferida com a contagem independente e Excel que abre em outro leitor', { skip: !fs.existsSync(fx('Cadastro_grande.xlsx')) && 'gere as planilhas' }, async (t) => {
+  for (const [base, cadFx, espFx] of [['pequeno_xlsxwriter.xlsx', 'Cadastro_pequeno.xlsx', 'pequeno_esperados.json'], ['grande_sintetico.xlsx', 'Cadastro_grande.xlsx', 'grande_esperados.json']]) {
+    const res = await ler(fx(base));
+    PC.applyCadastro(res.records, await PC.readCadastro(arquivo(fx(cadFx)), {}));
+    const lista = PC.matriculasForaDoCadastro(res.records);
+    const e = json(espFx).cadastro;
+    assert.deepEqual(lista.map((g) => g.chave).sort(), e.foraLista, base + ' matrículas fora do Cadastro');
+    assert.equal(lista.length, e.negSemCadastro);
+    assert.equal(lista.reduce((a, g) => a + g.negociacoes, 0), e.foraNegociacoes, base + ' negociações dessas matrículas');
+    assert.ok(Math.abs(lista.reduce((a, g) => a + g.valor, 0) - e.foraValor) < 0.005, base + ' valor negociado dessas matrículas');
+    assert.equal(lista.length, PC.summarize(res.records).economiasSemCadastro, 'a lista tem tantas matrículas quanto a nota do painel');
+  }
+  // Excel da lista (base grande)
+  const py = spawnSync('python3', ['-c', 'import openpyxl'], { encoding: 'utf8' });
+  if (py.status !== 0) return t.skip('python3 com openpyxl não disponível');
+  const res = await ler(fx('grande_sintetico.xlsx'));
+  PC.applyCadastro(res.records, await PC.readCadastro(arquivo(fx('Cadastro_grande.xlsx')), {}));
+  const lista = PC.matriculasForaDoCadastro(res.records);
+  const sheets = EX.montarExportForaCadastro(lista, { geradoEm: new Date(2026, 9, 7, 10, 5), cadastro: 'data (16).xlsx', periodo: '02/01/2026 a 28/09/2026', filtros: 'nenhum', repetidasNoCadastro: 28, semMatricula: 0 });
+  assert.deepEqual(sheets.map((s) => s.nome), ['Resumo', 'Fora do Cadastro']);
+  const arq = path.join(os.tmpdir(), 'pc-fora-cad-' + process.pid + '.xlsx');
+  fs.writeFileSync(arq, await EX.toXlsx(sheets));
+  const o = spawnSync('python3', ['-c', `
+import openpyxl, json, sys
+wb = openpyxl.load_workbook(sys.argv[1])
+ws = wb['Fora do Cadastro']; r = wb['Resumo']
+hdr = [c.value for c in ws[1]]
+linhas = [[c.value for c in row] for row in ws.iter_rows(min_row=2)]
+print(json.dumps({'abas': wb.sheetnames, 'hdr': hdr, 'n': len(linhas), 'tipos': sorted({type(l[0]).__name__ for l in linhas}),
+  'mats': sorted(str(l[0]) for l in linhas), 'neg': sum(l[3] for l in linhas), 'valor': round(sum(l[4] for l in linhas), 2),
+  'cidades': [l[1] for l in linhas], 'fmt_valor': ws.cell(2, 5).number_format, 'fmt_data': ws.cell(2, 6).number_format,
+  'freeze': ws.freeze_panes, 'resumo': {str(row[0].value): row[1].value for row in r.iter_rows(min_row=7) if row[0].value}}, default=str))`, arq], { encoding: 'utf8' });
+  fs.unlinkSync(arq);
+  assert.equal(o.status, 0, o.stderr);
+  const x = JSON.parse(o.stdout);
+  const e = json('grande_esperados.json').cadastro;
+  assert.deepEqual(x.abas, ['Resumo', 'Fora do Cadastro']);
+  assert.deepEqual(x.hdr, ['Matrícula', 'Cidade', 'Categoria', 'Negociações', 'Valor negociado (R$)', 'Última negociação', 'TOTAL_ECO (a preencher)']);
+  assert.equal(x.n, e.foraLista.length);
+  assert.deepEqual(x.mats, e.foraLista.slice().sort(), 'mesmas matrículas da contagem independente');
+  assert.deepEqual(x.tipos, ['int'], 'matrícula como número, igual ao Cadastro');
+  assert.equal(x.neg, e.foraNegociacoes);
+  assert.ok(Math.abs(x.valor - e.foraValor) < 0.005);
+  assert.deepEqual(x.cidades, x.cidades.slice().sort((a, b) => a.localeCompare(b, 'pt-BR')), 'ordenado por cidade');
+  assert.match(x.fmt_valor, /R\$/);
+  assert.match(x.fmt_data, /d|D/);
+  assert.equal(x.freeze, 'A2');
+  assert.equal(x.resumo['Matrículas fora do Cadastro'], e.foraLista.length);
+  assert.equal(x.resumo['Matrículas repetidas no Cadastro'], 28);
+});
+
 test('sem desdobro: negociação com serviço adicional vazio/nulo/espaços', () => {
   const c = (neg, s, hasServ) => PC.classify('Finalizada', neg, s, hasServ);
   assert.equal(c('Sim', '').semDesdobro, true);

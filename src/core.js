@@ -1958,6 +1958,35 @@
   }
 
   /**
+   * Matrículas que negociaram e ficam fora das economias recuperadas por não estarem no Cadastro (ou estarem sem
+   * TOTAL_ECO): uma linha por matrícula, com cidade, categoria, nº de negociações, valor negociado e a data da última
+   * negociação. Ordenadas por cidade e matrícula. Serve para o usuário completar o Cadastro; as repetidas no Cadastro
+   * e as negociações sem matrícula não entram.
+   */
+  function matriculasForaDoCadastro(records) {
+    const m = new Map();
+    for (const r of records) {
+      if (!r.neg || r.ecoMotivo !== 'sem') continue;
+      const chave = chaveNorm(r.matricula);
+      if (!chave) continue;
+      let g = m.get(chave);
+      if (!g) m.set(chave, (g = { chave, matricula: String(r.matricula).trim(), cidade: '', categoria: '', negociacoes: 0, valor: 0, ultima: '' }));
+      g.negociacoes++;
+      if (r.valor != null) g.valor += r.valor;
+      const d = r.data || '';
+      if (d > g.ultima) {
+        g.ultima = d;
+        if (r.cidade) g.cidade = r.cidade;
+        if (r.categoria) g.categoria = r.categoria;
+      } else {
+        if (!g.cidade) g.cidade = r.cidade || '';
+        if (!g.categoria) g.categoria = r.categoria || '';
+      }
+    }
+    return [...m.values()].sort((a, b) => a.cidade.localeCompare(b.cidade, 'pt-BR') || a.chave.length - b.chave.length || a.chave.localeCompare(b.chave));
+  }
+
+  /**
    * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pela Matrícula e
    * só com os serviços de pós-corte (110010-110012, 210010-210012, 310010-310012). Havendo data da base, conta
    * apenas atividade realizada a partir dela; sem data, qualquer data. De cada matrícula vale a atividade mais recente.
@@ -2016,6 +2045,6 @@
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell, agrupar,
     dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
-    ehCadastro, readCadastro, readFileAuto, applyCadastro,
+    ehCadastro, readCadastro, readFileAuto, applyCadastro, matriculasForaDoCadastro,
   };
 });

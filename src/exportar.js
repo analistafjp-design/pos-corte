@@ -337,5 +337,49 @@
     };
     return [resumo, faltam];
   }
-  return { toXlsx, montarExport, montarExportBase, criarZip, crc32, isoParaSerial };
+  /**
+   * Excel das matrículas que negociaram e estão fora do Cadastro (para completar o Cadastro): resumo e a lista.
+   * `lista` vem de matriculasForaDoCadastro; `info`: { geradoEm, cadastro, periodo, filtros, repetidasNoCadastro, semMatricula }.
+   */
+  function montarExportForaCadastro(lista, info) {
+    info = info || {};
+    const dt = info.geradoEm instanceof Date ? info.geradoEm : new Date();
+    const dtTxt = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+    const negociacoes = lista.reduce((a, g) => a + g.negociacoes, 0);
+    const valor = lista.reduce((a, g) => a + g.valor, 0);
+    const resumo = {
+      nome: 'Resumo',
+      colunas: [38, 24, 90],
+      linhas: [
+        [{ v: 'Pós-Corte Interior — Matrículas negociadas fora do Cadastro', f: 'titulo' }],
+        [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
+        [{ v: 'Cadastro usado', f: 'negrito' }, info.cadastro || '—'],
+        [{ v: 'Período dos dados', f: 'negrito' }, info.periodo || '—'],
+        [{ v: 'Filtros aplicados', f: 'negrito' }, info.filtros || 'nenhum'],
+        [],
+        [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
+        ['Matrículas fora do Cadastro', intCel(lista.length), 'Matrículas distintas com negociação no filtro que não estão no Cadastro ou estão sem TOTAL_ECO; por isso não entram nas economias recuperadas (aba "Fora do Cadastro")'],
+        ['Negociações dessas matrículas', intCel(negociacoes), 'Negociou O Débito? = Sim, nessas matrículas e no filtro'],
+        ['Valor negociado dessas matrículas', { v: valor, f: 'brl' }, 'Soma de Valor Total dos Débitos dessas negociações (débito informado; não é arrecadação nem valor pago)'],
+        ['Matrículas repetidas no Cadastro', intCel(info.repetidasNoCadastro || 0), 'Negociadas e presentes mais de uma vez no Cadastro: foram desconsideradas e não estão na lista'],
+        ['Negociações sem matrícula', intCel(info.semMatricula || 0), 'Sem matrícula não dá para buscar no Cadastro; não estão na lista'],
+        [],
+        [{ v: 'Como usar', f: 'negrito' }, 'Busque o TOTAL_ECO de cada matrícula da aba "Fora do Cadastro" (a última coluna é para anotar) e inclua no Cadastro. Na próxima leitura elas passam a entrar nas economias recuperadas.'],
+      ],
+    };
+    const aba = {
+      nome: 'Fora do Cadastro',
+      colunas: [16, 28, 22, 13, 20, 18, 22],
+      cabecalho: 1,
+      linhas: [['Matrícula', 'Cidade', 'Categoria', 'Negociações', 'Valor negociado (R$)', 'Última negociação', 'TOTAL_ECO (a preencher)'].map(cab)].concat(
+        lista.map((g) => [
+          /^[1-9]\d{0,14}$/.test(g.matricula) ? Number(g.matricula) : g.matricula, // número como no Cadastro; com zeros à esquerda ou letras, texto
+          g.cidade, g.categoria, intCel(g.negociacoes), { v: g.valor, f: 'brl' },
+          g.ultima ? { v: isoParaSerial(g.ultima), f: 'data' } : '', null,
+        ])
+      ),
+    };
+    return [resumo, aba];
+  }
+  return { toXlsx, montarExport, montarExportBase, montarExportForaCadastro, criarZip, crc32, isoParaSerial };
 });
