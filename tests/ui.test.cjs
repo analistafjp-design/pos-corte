@@ -948,10 +948,37 @@ test('exportar PDF: o botão abre a impressão da Visão geral e o layout de imp
   await page.emulateMedia({ media: 'screen' });
   assert.ok(await page.locator('.card-recorte').isVisible(), 'na tela o bloco de Recortes realizados continua');
   await page.emulateMedia({ media: 'print' });
+  // aproveita a largura da folha: valores negociados (e categorias) à esquerda, negociações e termos à direita, na mesma altura
+  await page.setViewportSize({ width: 1054, height: 745 }); // área útil de uma folha A4 paisagem com margem de 9 mm
+  const caixa = (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, r: r.right, b: r.bottom }; });
+  const [val, neg, cat] = [await caixa('.card-valores'), await caixa('.card-negtermo'), await caixa('.card-categorias')];
+  assert.ok(neg.x > val.r - 1, 'negociações e termos à direita dos valores negociados');
+  assert.ok(Math.abs(neg.y - val.y) < 2, 'mesma linha');
+  assert.ok(cat.y >= val.b - 1 && cat.r <= neg.x + 1, 'categorias logo abaixo dos valores negociados, sem invadir o gráfico');
+  const tab = await page.$eval('.card-categorias table', (t) => t.getBoundingClientRect().right);
+  assert.ok(tab <= cat.r, 'a tabela de categorias cabe na meia folha: ' + tab + ' <= ' + cat.r);
+  assert.equal(await page.locator('.vn-acoes').count() === 0 || !(await page.locator('.vn-acoes').first().isVisible()), true, 'o botão de baixar não vai para o PDF');
+  // tabelas longas podem continuar na página seguinte (em vez de deixar a folha vazia); as linhas não se partem
+  assert.equal(await page.$eval('.card-cidades', (e) => getComputedStyle(e).breakInside), 'auto');
+  assert.equal(await page.$eval('.card-cidades tbody tr', (e) => getComputedStyle(e).breakInside), 'avoid');
   const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true });
   assert.equal(pdf.subarray(0, 4).toString(), '%PDF');
   const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
   assert.ok(paginas >= 1 && paginas <= 4, 'páginas: ' + paginas);
+  semErros(page);
+  await page.context().close();
+});
+
+test('exportar PDF: a base grande ocupa as folhas (2 ou 3 páginas) e a tabela de cidades continua na seguinte', { timeout: 120000 }, async () => {
+  const page = await abrir();
+  await importar(page, [fx('grande_sintetico.xlsx'), fx('Cadastro_grande.xlsx')]);
+  // simula uma lista longa de cidades (as 11 da base sintética repetidas 3 vezes)
+  await page.evaluate(() => { const tb = document.querySelector('.card-cidades tbody'); const linhas = [...tb.rows]; for (let i = 0; i < 2; i++) linhas.forEach((r) => tb.appendChild(r.cloneNode(true))); });
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await page.emulateMedia({ media: 'print' });
+  const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true });
+  const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+  assert.ok(paginas >= 2 && paginas <= 3, 'páginas: ' + paginas + ' (antes, cada bloco deixava a folha pela metade e eram 4 ou mais)');
   semErros(page);
   await page.context().close();
 });

@@ -313,7 +313,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 @page { size: A4 landscape; margin: 9mm; }
 @media print {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-bases, #view-base, .expander, .card-recorte { display: none !important; }
+  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-bases, #view-base, .expander, .card-recorte, .vn-acoes { display: none !important; }
   .app { display: block; }
   .main-col { max-width: none; }
   .grp-title { display: none; }
@@ -335,6 +335,19 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
   /* disposição: todos os blocos em largura total */
   #view-geral > .stack { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
   #view-geral > .stack > * { grid-column: 1 / -1; }
+  /* aproveita a largura da folha: valores negociados e pós-corte por categoria à esquerda, negociações e termos à direita */
+  #view-geral > .stack > .kpi-groups { grid-row: 1; }
+  #view-geral > .stack > .card-valores { grid-column: 1; grid-row: 2; }
+  #view-geral > .stack > .card-categorias { grid-column: 1; grid-row: 3; }
+  #view-geral > .stack > .card-negtermo { grid-column: 2; grid-row: 2 / span 2; }
+  /* tabelas longas continuam na página seguinte, com o cabeçalho repetido, em vez de deixar a folha vazia */
+  .card-cidades { break-inside: auto; }
+  .card-cidades .card-head, .card-categorias .card-head { break-after: avoid; }
+  tfoot { display: table-row-group; }
+  /* a tabela de categorias divide a linha com o gráfico: barra e cabeçalhos mais enxutos para caber na meia folha */
+  .card-categorias .prodbar { width: max(2px, calc(var(--r, 1) * 38px)) !important; }
+  .card-categorias thead th { font-size: 9px; letter-spacing: 0; }
+  .card-categorias th, .card-categorias td { padding: 3px 4px; }
   .main-col { zoom: 0.8; }
   /* versão compacta para caber em poucas páginas */
   .card { padding: 9px 11px; }
@@ -4437,7 +4450,7 @@ window.FRENTES_PADRAO = [
   function renderCidades() {
     const linhas = PC.agrupar(vm.filtered, 'cidade');
     const cab = ['Cidade', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes'];
-    return h('section', { class: 'card', 'aria-labelledby': 'h-cidades' },
+    return h('section', { class: 'card card-cidades', 'aria-labelledby': 'h-cidades' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-cidades', text: 'Resultados por cidade' }),
         h('p', { class: 'hint', text: 'Clique em uma cidade para filtrar.' }))),
@@ -4479,7 +4492,7 @@ window.FRENTES_PADRAO = [
         h('tbody', null, linhas.map((g, i) => h('tr', { class: i === 0 ? 'is-top' : '', dataset: { cat: g.chave } },
           h('th', { scope: 'row', text: g.chave }),
           h('td', { class: 'n', 'data-tip': g.chave + '\n' + fmtInt(g.percorrido) + ' percorridas (' + fmtPct(g.percorrido, total) + ' do total)' },
-            h('span', { class: 'prod' }, h('span', { class: 'prodbar catbar', style: { width: Math.max((g.percorrido / max) * 90, 2) + 'px' } }), h('strong', { text: fmtInt(g.percorrido) }))),
+            h('span', { class: 'prod' }, h('span', { class: 'prodbar catbar', style: { width: Math.max((g.percorrido / max) * 90, 2) + 'px', '--r': g.percorrido / max } }), h('strong', { text: fmtInt(g.percorrido) }))),
           h('td', { class: 'n', text: fmtPct(g.percorrido, total) }),
           [fmtInt(g.exec), fmtInt(g.exoc), fmtInt(g.termos), fmtPctVal(g.assertividade), fmtInt(g.neg), fmtPctVal(g.efetividade)].map((v) => h('td', { class: 'n', text: v }))))),
         h('tfoot', null, h('tr', null,
