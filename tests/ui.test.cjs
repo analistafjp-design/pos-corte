@@ -100,7 +100,7 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   for (const id of ['h-mensal', 'h-status', 'h-tm']) assert.equal(await page.locator('#' + id).count(), 0, id + ' removido');
   assert.equal(await page.locator('.colchart, .card-status, .card-mensal').count(), 0);
   assert.equal(await page.locator('#view-geral .mini-sub', { hasText: '"Fez o corte novamente" = Sim' }).count(), 0, 'legenda do recorte removida');
-  // valores negociados: logo abaixo de "Recortes realizados", em largura total, com valor negociado e economias recuperadas (valor e %)
+  // valores negociados: logo abaixo de "Recortes realizados", em largura total, com valor negociado (só o valor) e economias recuperadas (valor e %)
   const ordem = await page.$$eval('#view-geral > .stack > *', (els) => els.map((e) => e.className));
   const iRec = ordem.findIndex((c) => /card-recorte/.test(c));
   assert.ok(/card-valores/.test(ordem[iRec + 1]), 'valores negociados logo após os recortes: ' + ordem.join(' | '));
@@ -114,11 +114,11 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   const esp = JSON.parse(fs.readFileSync(fx('pequeno_esperados.json'), 'utf8'));
   const pct = (v) => (v * 100).toFixed(1).replace('.', ',') + '%';
   assert.equal(esp.debito, 2535.06);
-  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', pct(esp.debito / esp.debitoExec)]);
-  // base = débito das atividades Exec (R$ 3.835,06; a Exoc, R$ 100, fica de fora), como a Efetividade usa só o Exec; contagem independente em pequeno_esperados.json
-  assert.equal(esp.debitoExec, 3835.06);
-  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '66,1%']);
-  assert.match(await page.getAttribute('.card-valores [data-vn=valor]', 'data-tip'), /dividido pelo débito informado das atividades Exec do filtro \(R\$\s3\.835,06\), a mesma base da Efetividade \(negociações ÷ Exec\)/);
+  // o valor negociado não tem percentual: só o valor (o % existe apenas nas economias recuperadas)
+  assert.deepEqual(await vn('valor'), ['R$ 2.535,06']);
+  assert.equal(await page.locator('.card-valores [data-vn=valor] [data-vn=pct]').count(), 0, 'valor negociado sem %');
+  assert.equal(await page.locator('.card-valores [data-vn=economias] [data-vn=pct]').count(), 1, 'economias recuperadas seguem com %');
+  assert.doesNotMatch(await page.getAttribute('.card-valores [data-vn=valor]', 'data-tip'), /%|dividido/);
   // sem o arquivo Cadastro, cada matrícula que negociou conta o mínimo de 1 economia (as 5 negociações são da matrícula 1001) e o aviso diz isso
   assert.equal(esp.neg, 5);
   assert.equal(esp.matriculasNeg, 1);
@@ -133,7 +133,7 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   assert.deepEqual(await vn('economias'), [String(esp.cadastro.economias), pct(esp.cadastro.economias / esp.exec)]);
   assert.deepEqual(await vn('economias'), ['3', '16,7%']);
   assert.equal(await page.locator('.card-valores [data-vn=economias] .kpi-sub').count(), 0, 'sem aviso quando o Cadastro está carregado');
-  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '66,1%'], 'valor negociado não muda com o Cadastro');
+  assert.deepEqual(await vn('valor'), ['R$ 2.535,06'], 'valor negociado não muda com o Cadastro');
   assert.match(await page.textContent('#status'), /1 repetida desconsiderada/);
   assert.equal(await page.locator('.card-valores [data-act=baixar-fora-cadastro], .card-valores [data-vn=cadastro-repetida]').count(), 0, 'a matrícula negociada está no Cadastro');
   assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o Cadastro não vira atividade nem muda os cartões');
@@ -941,6 +941,13 @@ test('exportar PDF: o botão abre a impressão da Visão geral e o layout de imp
   assert.ok(await page.locator('#print-head').isVisible());
   assert.match(await page.textContent('#print-head'), /Pós-Corte Interior.*Período dos dados: 03\/07\/2026 a 28\/09\/2026.*Filtros: nenhum/);
   assert.ok(await page.locator('.kpi-groups').isVisible());
+  // "Recortes realizados" fica fora do PDF; os demais blocos (inclusive Valores negociados) continuam
+  assert.equal(await page.locator('.card-recorte').isVisible(), false, 'Recortes realizados oculto na impressão');
+  assert.ok(await page.locator('.card-valores').isVisible(), 'Valores negociados segue no PDF');
+  assert.ok(await page.locator('.card-negtermo').isVisible());
+  await page.emulateMedia({ media: 'screen' });
+  assert.ok(await page.locator('.card-recorte').isVisible(), 'na tela o bloco de Recortes realizados continua');
+  await page.emulateMedia({ media: 'print' });
   const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true });
   assert.equal(pdf.subarray(0, 4).toString(), '%PDF');
   const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;

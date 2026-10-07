@@ -305,7 +305,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 @page { size: A4 landscape; margin: 9mm; }
 @media print {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-bases, #view-base, .expander { display: none !important; }
+  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-bases, #view-base, .expander, .card-recorte { display: none !important; }
   .app { display: block; }
   .main-col { max-width: none; }
   .grp-title { display: none; }
