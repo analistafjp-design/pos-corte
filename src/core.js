@@ -1462,7 +1462,7 @@
    * ou por não haver Cadastro carregado (`economiasSemArquivo`). `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasDoAvulso: 0, economiasDoCadastro: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
     const matriculasNeg = new Map();
     const equipes = new Set();
     const dias = new Set();
@@ -1506,7 +1506,13 @@
     s.efetividade = s.exec ? s.neg / s.exec : null;
     s.matriculasNeg = matriculasNeg.size;
     for (const r of matriculasNeg.values()) {
-      if (r.ecoMotivo === 'ok') { s.economias += Math.max(1, r.eco); s.economiasMatriculas++; continue; }
+      if (r.ecoMotivo === 'ok') {
+        s.economias += Math.max(1, r.eco);
+        s.economiasMatriculas++;
+        if (r.ecoFonte === 'avulso') s.economiasDoAvulso++;
+        else s.economiasDoCadastro++;
+        continue;
+      }
       s.economias += 1; // sem total no Cadastro: no mínimo 1 economia por matrícula que negociou
       s.economiasPeloMinimo++;
       if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
@@ -1813,7 +1819,7 @@
   /* ------------------------------------------------------------------ */
 
   const CAD_TOTAL = new Set(['total eco', 'total economias', 'total de economias', 'qtd economias', 'total economia']);
-  const CAD_MES = new Set(['mes ano', 'ano mes', 'mes', 'competencia', 'referencia', 'mes referencia', 'mes de referencia']);
+  const CAD_MES = new Set(['mes ano', 'ano mes', 'mes', 'competencia', 'referencia', 'mes referencia', 'mes de referencia', 'referencia de leitura', 'referencia leitura', 'ref leitura']);
 
   /** "10/2026", "10-2026", "2026-10" ou uma data (ISO) viram "2026-10"; texto que não é mês/ano vira "". */
   function mesCadastro(v) {
@@ -1967,43 +1973,197 @@
     };
   }
 
+  /* ---------- Serviço avulso (CSV de faturamento: tudo que faturou, com as quantidades de economia) ---------- */
+
+  const AVULSO_MATRICULA = new Set([...BASE_MATRICULA, 'n da ligacao', 'numero da ligacao', 'num da ligacao']);
+  const SEM_COLUNAS_AVULSO = 'AVULSO_SEM_COLUNAS';
+
+  /** "avulso" no nome do arquivo ou de uma pasta do caminho. */
+  const ehAvulso = (caminho) => /avulso/.test(norm(caminho));
+
+  /** Mês ("AAAA-MM") no nome do arquivo, como "Servico_avulso_10-2026.csv"; "" se não houver. */
+  function mesDoNome(caminho) {
+    const n = String(caminho || '').replace(/^.*[\\/]/, '');
+    let m = /(?:^|[^0-9])(\d{1,2})[-_. ](20\d{2})(?![0-9])/.exec(n);
+    if (m && +m[1] >= 1 && +m[1] <= 12) return m[2] + '-' + pad2(+m[1]);
+    m = /(?:^|[^0-9])(20\d{2})[-_. ](\d{1,2})(?![0-9])/.exec(n);
+    if (m && +m[2] >= 1 && +m[2] <= 12) return m[1] + '-' + pad2(+m[2]);
+    return '';
+  }
+
+  /** CSV com aspas (RFC 4180): devolve linhas de campos. */
+  function parseCsv(texto, delim) {
+    const linhas = [];
+    let linha = [], campo = '', aspas = false;
+    for (let i = 0; i < texto.length; i++) {
+      const c = texto[i];
+      if (aspas) {
+        if (c === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else aspas = false; }
+        else campo += c;
+      } else if (c === '"' && campo === '') aspas = true;
+      else if (c === delim) { linha.push(campo); campo = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && texto[i + 1] === '\n') i++;
+        linha.push(campo); campo = ''; linhas.push(linha); linha = [];
+      } else campo += c;
+    }
+    if (campo !== '' || linha.length) { linha.push(campo); linhas.push(linha); }
+    return linhas;
+  }
+
+  /** Texto do CSV: UTF-8 (com ou sem BOM) ou, se não for UTF-8 válido, Windows-1252 (Excel em português). */
+  async function lerTextoCsv(file) {
+    const buf = await file.slice(0, file.size).arrayBuffer();
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^﻿/, '');
+    } catch (_) {
+      return new TextDecoder('windows-1252').decode(buf);
+    }
+  }
+
   /**
-   * Anota em cada registro o total de economias da matrícula no Cadastro: r.eco (número ou null) e r.ecoMotivo:
-   * 'ok' (achada uma vez no mês, com total), 'rep' (repetida no mesmo mês do Cadastro: desconsiderada), 'sem' (não
-   * achada ou sem total) e 'nao' (nenhum Cadastro carregado). Sem `cad`, tudo fica 'nao'.
-   * Com vários meses no Cadastro vale o do mês da atividade (r.mes); se a matrícula não tiver aquele mês, o mês mais
-   * próximo (empate: o mais antigo); sem data na atividade, o mais recente. Cadastro de um mês só vale para todos.
+   * Lê o CSV de Serviço avulso (o que foi faturado no mês): a ligação (matrícula, "N. da Ligacao"), as quantidades de
+   * economia ("Qtd. Economia Residencial/Comercial/..."), somadas no total da ligação, e o mês ("Referencia de Leitura"
+   * ou, sem a coluna, o do nome do arquivo). Nome, endereço e demais colunas não são guardados. Uma matrícula pode ter
+   * várias linhas (serviços diferentes); como no Cadastro, matrícula repetida no mesmo mês é desconsiderada.
+   * Devolve o mesmo formato do Cadastro com tipo 'avulso'.
    */
-  function applyCadastro(records, cad) {
-    let indice = null;
-    if (cad) {
+  async function readServicoAvulso(file, opts) {
+    opts = opts || {};
+    let texto = await lerTextoCsv(file);
+    let delim = null;
+    const sep = /^sep=(.)[ \t]*(?:\r?\n|$)/i.exec(texto);
+    if (sep) { delim = sep[1]; texto = texto.slice(sep[0].length); }
+    if (!delim) {
+      const l1 = texto.split(/\r?\n/, 1)[0];
+      delim = [';', '\t', ','].map((d) => [d, l1.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+    }
+    const csv = parseCsv(texto, delim);
+    let h = -1, colMat = -1, colMes = -1, colsEco = [], nomeMat = '', nomeMes = '', candidato = null;
+    for (let i = 0; i < Math.min(csv.length, MAX_HEADER_SCAN_ROWS) && h < 0; i++) {
+      const hs = csv[i].map((x) => normHeader(x));
+      const m = hs.findIndex((x) => AVULSO_MATRICULA.has(x));
+      const tot = hs.findIndex((x) => CAD_TOTAL.has(x));
+      const eco = hs.map((x, j) => (/^qtd eco/.test(x) ? j : -1)).filter((j) => j >= 0);
+      if (m >= 0 && (tot >= 0 || eco.length)) {
+        h = i; colMat = m; nomeMat = trimStr(csv[i][m]);
+        colsEco = tot >= 0 ? [tot] : eco;
+        colMes = hs.findIndex((x) => CAD_MES.has(x));
+        if (colMes >= 0) nomeMes = trimStr(csv[i][colMes]);
+      } else if (!candidato && csv[i].filter((x) => trimStr(x)).length >= 2) candidato = csv[i].map(trimStr).filter(Boolean);
+    }
+    if (h < 0) {
+      throw new PcError(SEM_COLUNAS_AVULSO, 'O CSV de Serviço avulso precisa ter a coluna da ligação (N. da Ligacao) e as quantidades de economia (Qtd. Economia ...).' + (candidato ? ' Colunas encontradas: ' + candidato.slice(0, 12).join(', ') + '.' : ''));
+    }
+    const mesNome = mesDoNome(opts.path || file.name);
+    const grupos = new Map();
+    const matriculas = new Set();
+    let linhas = 0, semMatricula = 0, truncado = false;
+    for (let i = h + 1; i < csv.length; i++) {
+      const r = csv[i];
+      if (!r.some((x) => trimStr(x) !== '')) continue;
+      if (linhas + semMatricula >= MAX_LINHAS_BASE) { truncado = true; break; }
+      const mat = chaveNorm(r[colMat]);
+      if (!mat) { semMatricula++; continue; }
+      linhas++;
+      matriculas.add(mat);
+      let total = 0, algum = false, valido = true;
+      for (const j of colsEco) {
+        const t = trimStr(r[j]);
+        if (t === '') continue;
+        if (/^\d+(?:[.,]0+)?$/.test(t)) { total += parseInt(t, 10); algum = true; } else valido = false;
+      }
+      const mes = (colMes >= 0 ? mesCadastro(r[colMes]) : '') || mesNome;
+      const k = mat + '|' + mes;
+      const g = grupos.get(k);
+      if (g) g.n++;
+      else grupos.set(k, { mat, mes, n: 1, total: algum && valido ? total : null });
+      if (opts.onProgress && (i & 4095) === 0) opts.onProgress({ phase: 'Lendo o Serviço avulso', fraction: i / csv.length });
+    }
+    const itens = [];
+    const meses = new Set();
+    let repetidas = 0, linhasRepetidas = 0, semTotal = 0, usadas = 0;
+    for (const g of grupos.values()) {
+      itens.push([g.mat, g.mes, g.total, g.n]);
+      if (g.mes) meses.add(g.mes);
+      if (g.n > 1) { repetidas++; linhasRepetidas += g.n; }
+      else if (g.total == null) semTotal++;
+      else usadas++;
+    }
+    return {
+      tipo: 'avulso', aba: '', colunaMatricula: nomeMat, colunaTotal: colsEco.map((j) => trimStr(csv[h][j])).join(' + '), colunaMes: nomeMes,
+      linhas: linhas + semMatricula, semMatricula, distintas: matriculas.size, repetidas, linhasRepetidas,
+      semTotal, usadas, meses: [...meses].sort(), itens, truncado, warnings: [],
+    };
+  }
+
+  /**
+   * Junta os arquivos de Serviço avulso lidos (um por mês) numa fonte só. Havendo mais de um arquivo do mesmo mês, vale
+   * o mais recente. Devolve null sem arquivos; `arquivos`, `nomes` e `descartados` descrevem o que foi usado.
+   */
+  function mesclarAvulsos(lista) {
+    if (!lista || !lista.length) return null;
+    const porMes = new Map();
+    for (const a of lista.slice().sort((x, y) => (x.lastModified || 0) - (y.lastModified || 0))) porMes.set((a.meses || []).join(','), a);
+    const usados = [...porMes.values()];
+    const itens = [];
+    const mats = new Set();
+    const meses = new Set();
+    const soma = { linhas: 0, semMatricula: 0, repetidas: 0, linhasRepetidas: 0, semTotal: 0, usadas: 0 };
+    for (const a of usados) {
+      for (const it of a.itens) { itens.push(it); mats.add(it[0]); }
+      for (const m of a.meses) meses.add(m);
+      for (const k of Object.keys(soma)) soma[k] += a[k] || 0;
+    }
+    return Object.assign({ tipo: 'avulso', arquivos: usados.length, nomes: usados.map((a) => a.name), descartados: lista.length - usados.length, distintas: mats.size, meses: [...meses].sort(), itens, truncado: usados.some((a) => a.truncado) }, soma);
+  }
+
+  /**
+   * Anota em cada registro o total de economias da matrícula nas fontes (Serviço avulso e/ou Cadastro, na ordem em que
+   * vierem): r.eco (número ou null), r.ecoFonte ('avulso' | 'cadastro' | '') e r.ecoMotivo:
+   * 'ok' (achada uma vez no mês, com total), 'rep' (repetida no mesmo mês e sem total em outra fonte: desconsiderada),
+   * 'sem' (não achada ou sem total) e 'nao' (nenhuma fonte carregada). A primeira fonte com total aproveitável vale;
+   * matrícula repetida numa fonte passa para a próxima.
+   * Com vários meses numa fonte vale o do mês da atividade (r.mes); se a matrícula não tiver aquele mês, o mês mais
+   * próximo (empate: o mais antigo); sem data na atividade, o mais recente. Fonte de um mês só vale para todos.
+   */
+  function applyCadastro(records, fontes) {
+    const lista = !fontes ? [] : Array.isArray(fontes) ? fontes.filter(Boolean) : [fontes];
+    const idx = lista.map((fonte) => {
       // resultado gravado por uma versão anterior (um período só): unicas e repetidasLista
-      const itens = cad.itens || [].concat((cad.unicas || []).map(([m, t]) => [m, '', t, 1]), (cad.repetidasLista || []).map((m) => [m, '', null, 2]));
-      indice = new Map();
+      const itens = fonte.itens || [].concat((fonte.unicas || []).map(([m, t]) => [m, '', t, 1]), (fonte.repetidasLista || []).map((m) => [m, '', null, 2]));
+      const indice = new Map();
       for (const [mat, mes, total, n] of itens) {
         let l = indice.get(mat);
         if (!l) indice.set(mat, (l = []));
         l.push({ mes, ord: ordMes(mes), total, n });
       }
-    }
-    const escolhe = (lista, mes) => {
-      if (lista.length === 1) return lista[0];
+      return { tipo: fonte.tipo || 'cadastro', indice };
+    });
+    const escolhe = (l, mes) => {
+      if (l.length === 1) return l[0];
       const alvo = ordMes(mes);
       let melhor = null, dist = Infinity;
-      for (const e of lista) {
+      for (const e of l) {
         const d = alvo >= 0 ? Math.abs(e.ord - alvo) : -e.ord;
         if (d < dist || (d === dist && e.ord < melhor.ord)) { melhor = e; dist = d; }
       }
       return melhor;
     };
     for (const r of records) {
-      if (!cad) { r.eco = null; r.ecoMotivo = 'nao'; continue; }
-      const lista = indice.get(chaveNorm(r.matricula));
-      const e = lista ? escolhe(lista, r.mes) : null;
-      if (!e) { r.eco = null; r.ecoMotivo = 'sem'; }
-      else if (e.n > 1) { r.eco = null; r.ecoMotivo = 'rep'; }
-      else if (e.total == null) { r.eco = null; r.ecoMotivo = 'sem'; }
-      else { r.eco = e.total; r.ecoMotivo = 'ok'; }
+      if (!idx.length) { r.eco = null; r.ecoMotivo = 'nao'; r.ecoFonte = ''; continue; }
+      const mat = chaveNorm(r.matricula);
+      let motivo = 'sem', eco = null, origem = '';
+      for (const f of idx) {
+        const l = f.indice.get(mat);
+        if (!l) continue;
+        const e = escolhe(l, r.mes);
+        if (e.n > 1) { motivo = 'rep'; continue; }
+        if (e.total == null) continue;
+        motivo = 'ok'; eco = e.total; origem = f.tipo;
+        break;
+      }
+      r.eco = eco; r.ecoMotivo = motivo; r.ecoFonte = origem;
     }
   }
 
@@ -2096,5 +2256,6 @@
     toCsv, csvCell, agrupar,
     dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
     ehCadastro, readCadastro, readFileAuto, applyCadastro, matriculasForaDoCadastro,
+    ehAvulso, readServicoAvulso, mesclarAvulsos, mesDoNome, parseCsv,
   };
 });

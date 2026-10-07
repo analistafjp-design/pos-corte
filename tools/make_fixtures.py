@@ -241,6 +241,65 @@ def esperados_cadastro_meses(linhas):
     }
 
 
+AVULSO_CAB = ["N. da Ligacao", "Nome Cliente", "Categoria", "Qtd. Economia Residencial", "Qtd. Economia Comercial", "Qtd. Economia Industrial",
+              "Qtd. Economia Publica", "Qtd. Economia Outros", "Rubrica", "Valor Parcela", "Referencia de Leitura", "Situacao Ligacao"]
+
+
+def escrever_avulso(path, linhas, cp1252=False, bom=True, sep_linha=True, com_mes=True):
+    """CSV de Serviço avulso SINTÉTICO, como o export real (separador ";", CRLF, opcionalmente BOM e linha "sep=;").
+    linhas: (matrícula, residencial, comercial, industrial, pública, outros, rubrica, "MM/AAAA")."""
+    import csv
+    import io
+    cab = AVULSO_CAB if com_mes else [c for c in AVULSO_CAB if c != "Referencia de Leitura"]
+    buf = io.StringIO(newline="")
+    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    if sep_linha:
+        buf.write("sep=;\r\n")
+    w.writerow(cab)
+    for i, (mat, res, com, ind, pub, outros, rubrica, mes) in enumerate(linhas):
+        lin = [mat, f"Cliente sintético {i}", "RESIDENCIAL", res, com, ind, pub, outros, rubrica, "12,34", mes, "C-Cortada"]
+        if not com_mes:
+            del lin[AVULSO_CAB.index("Referencia de Leitura")]
+        w.writerow(lin)
+    texto = buf.getvalue()
+    dados = texto.encode("cp1252") if cp1252 else texto.encode("utf-8")
+    if bom and not cp1252:
+        dados = b"\xef\xbb\xbf" + dados
+    path.write_bytes(dados)
+
+
+def consulta_fontes(fontes, mat, mes):
+    """Contagem independente com várias fontes de total de economias, na ordem de prioridade (Serviço avulso, depois Cadastro).
+    Cada fonte: lista de (matrícula, total ou None, "MM/AAAA"). Em cada uma vale o mês exato ou o mais próximo (empate: o mais antigo);
+    matrícula repetida no mês é desconsiderada e passa para a próxima fonte; a primeira com total aproveitável vale."""
+    def ordem(ym):
+        a, m = ym.split("-")
+        return int(a) * 12 + int(m) - 1
+
+    alvo = ordem(mes)
+    motivo = "sem"
+    for linhas in fontes:
+        grupos = {}
+        for m, tot, mes_l in linhas:
+            k = chave_mat(m)
+            if not k:
+                continue
+            ym = f"{mes_l[3:]}-{mes_l[:2]}"
+            g = grupos.setdefault((k, ym), {"n": 0, "total": tot})
+            g["n"] += 1
+        cand = [(ym, g) for (k, ym), g in grupos.items() if k == chave_mat(mat)]
+        if not cand:
+            continue
+        ym, g = min(cand, key=lambda c: (abs(ordem(c[0]) - alvo), ordem(c[0])))
+        if g["n"] > 1:
+            motivo = "rep"
+            continue
+        if g["total"] is None:
+            continue
+        return ("ok", g["total"])
+    return (motivo, None)
+
+
 def negociacoes_por_matricula(rows, mats):
     """Nº de negociações e valor informado (só negociações com valor) das matrículas pedidas, no escopo dos esperados."""
     n = collections.Counter()
@@ -649,6 +708,27 @@ def main():
                  (None, 9, "07/2026")]
     escrever_cadastro(out / "Cadastro_meses.xlsx", cad_meses)
     (out / "cadastro_meses_esperados.json").write_text(json.dumps(esperados_cadastro_meses(cad_meses), ensure_ascii=False, indent=1))
+    # Serviço avulso (CSV do faturamento): 07/2026 como o export real (UTF-8 com BOM, linha "sep=;"); 08/2026 em Windows-1252, sem BOM,
+    # sem a linha "sep=;" e sem a coluna do mês (o mês vem do nome do arquivo). 1001 vale 4 em julho e 5 em agosto (o Cadastro dá 3 em out/2026).
+    av07 = [("1001", 2, 2, 0, 0, 0, "COBRANÇA DE PARCELAS", "07/2026"), ("2002", 1, 0, 0, 0, 0, "CORTE NO CAVALETE", "07/2026"),
+            ("2002", 1, 0, 0, 0, 0, "RELIGACAO NO CAVALETE", "07/2026"), ("3003", 1, 0, 0, 0, 0, "CORTE NO REGISTRO", "07/2026"),
+            ("7777", 3, 2, 0, 0, 0, "COBRANÇA DE PARCELAS", "07/2026"), ("00004", 2, 0, 0, 0, 0, "CORTE NO REGISTRO", "07/2026")]
+    av08 = [("1001", 3, 2, 0, 0, 0, "COBRANÇA DE PARCELAS", None), ("3003", 2, 0, 0, 0, 0, "RELIGAÇÃO NO CAVALETE", None)]
+    escrever_avulso(out / "Servico_avulso_07-2026.csv", av07)
+    escrever_avulso(out / "Servico_avulso_08-2026.csv", av08, cp1252=True, sep_linha=False, com_mes=False)
+    (out / "outro_relatorio.csv").write_text("a;b;c\r\n1;2;3\r\n", encoding="utf-8")  # CSV que não é o Serviço avulso: deve ser ignorado
+    lin_av = [(m, res + com + ind + pub + oth, mes) for m, res, com, ind, pub, oth, _, mes in av07] + \
+             [(m, res + com + ind + pub + oth, "08/2026") for m, res, com, ind, pub, oth, _, _ in av08]
+    cad_pq = [(m, t, "10/2026") for m, t in cad_pequeno]  # Cadastro_pequeno tem Mês/Ano = 10/2026 em todas as linhas
+    consultas = []
+    for m in ["1001", "2002", "3003", "7777", "00004", "5005", "9999"]:
+        for mes in ["2026-01", "2026-07", "2026-08", "2026-09", "2026-12"]:
+            motivo, tot = consulta_fontes([lin_av, cad_pq], m, mes)
+            consultas.append({"mat": m, "mes": mes, "motivo": motivo, "eco": tot})
+    (out / "avulso_esperados.json").write_text(json.dumps({
+        "07": {"linhas": 6, "distintas": 5, "repetidas": 1, "linhasRepetidas": 2, "semTotal": 0, "usadas": 4, "meses": ["2026-07"]},
+        "08": {"linhas": 2, "distintas": 2, "repetidas": 0, "linhasRepetidas": 0, "semTotal": 0, "usadas": 2, "meses": ["2026-08"]},
+        "consultas": consultas}, ensure_ascii=False, indent=1))
     esp_p = esperados(rows)
     esp_p["cadastro"] = esperados_cadastro(cad_pequeno, matriculas_neg(rows), rows)
     (out / "pequeno_esperados.json").write_text(json.dumps(esp_p, ensure_ascii=False, indent=1))

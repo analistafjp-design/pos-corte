@@ -106,6 +106,8 @@
     records: [],
     files: [], // resultados da última leitura (válidos e com erro)
     consolidado: null,
+    avulso: null, // Serviço avulso (CSV do faturamento, um por mês) já juntado: matrícula/mês -> total de economias
+    avulsos: 0, // quantos arquivos de Serviço avulso havia na pasta
     cadastro: null, // resultado da leitura do arquivo "Cadastro" (matrícula -> total de economias)
     cadastros: 0, // quantos arquivos "Cadastro" havia na pasta
     cobertura: {},
@@ -318,6 +320,15 @@
   const LIMITE_BYTES = 800 * 1048576;
   const isXlsx = (n) => /\.xlsx$/i.test(n);
   const isFormatoAntigo = (n) => /\.(xls|xlsb|xlsm)$/i.test(n);
+  const isCsv = (n) => /\.csv$/i.test(n);
+
+  /** Frase do status sobre uma fonte de economias (Serviço avulso ou Cadastro): quantas matrículas valeram e quantas repetiram. */
+  function detalheFonte(rotulo, f) {
+    const multi = f.meses && f.meses.length > 1;
+    return rotulo + (multi ? ' de ' + f.meses.length + ' meses' : '') + ': ' + fmtInt(f.usadas) + ' ' +
+      (multi ? plural(f.usadas, 'registro de matrícula por mês usado', 'registros de matrícula por mês usados') : plural(f.usadas, 'matrícula usada', 'matrículas usadas')) +
+      (f.repetidas ? ', ' + fmtInt(f.repetidas) + ' ' + (multi ? plural(f.repetidas, 'repetido no mesmo mês desconsiderado', 'repetidos no mesmo mês desconsiderados') : plural(f.repetidas, 'repetida desconsiderada', 'repetidas desconsideradas')) : '') + '. ';
+  }
 
   /**
    * Lê os arquivos, consolida e atualiza o painel.
@@ -334,7 +345,7 @@
       const ignoradosFormato = [];
       for (const e of entries) {
         if (e.name.startsWith('~$')) continue; // temporários do Excel
-        if (isXlsx(e.name)) xlsx.push(e);
+        if (isXlsx(e.name) || isCsv(e.name)) xlsx.push(e); // .csv: só o Serviço avulso é lido; outros CSV são ignorados
         else if (isFormatoAntigo(e.name)) ignoradosFormato.push(e.path);
       }
       if (!xlsx.length) {
@@ -388,6 +399,8 @@
 
       const ok = [];
       const cadastros = [];
+      const avulsos = [];
+      const ignoradosCsv = [];
       const novos = [];
       const leitura = { lidos: 0, salvos: 0, memoria: 0 };
       let ultimoProgresso = 0;
@@ -414,8 +427,18 @@
               ultimoProgresso = Date.now();
               setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo + ' — ' + p.phase + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / metas.length });
             };
-            // o arquivo "Cadastro" (matrícula e total de economias) tem leitor próprio; os demais são as atividades
-            res = await PC.readFileAuto(file, { path: e.path, aliases: state.aliases, onProgress });
+            if (isCsv(e.name)) {
+              // CSV de Serviço avulso (o que foi faturado, com as quantidades de economia); outro CSV qualquer é ignorado
+              try {
+                res = await PC.readServicoAvulso(file, { path: e.path, onProgress });
+              } catch (err) {
+                if (!(err instanceof PC.PcError) || err.code !== 'AVULSO_SEM_COLUNAS') throw err;
+                res = { tipo: 'csv-ignorado' };
+              }
+            } else {
+              // o arquivo "Cadastro" (matrícula e total de economias) tem leitor próprio; os demais são as atividades
+              res = await PC.readFileAuto(file, { path: e.path, aliases: state.aliases, onProgress });
+            }
             res.path = e.path;
             res.name = e.name;
             res.size = file.size;
@@ -431,6 +454,8 @@
         }
         res.origem = m.origem;
         if (res.tipo === 'cadastro') cadastros.push(res);
+        else if (res.tipo === 'avulso') avulsos.push(res);
+        else if (res.tipo === 'csv-ignorado') ignoradosCsv.push(e.path);
         else ok.push(res);
       }
       for (const k of [...state.cache.keys()]) if (!chaves.includes(k)) state.cache.delete(k);
@@ -463,7 +488,9 @@
       cadastros.sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0)); // vale o mais recente
       state.cadastro = cadastros[0] || null;
       state.cadastros = cadastros.length;
-      PC.applyCadastro(cons.records, state.cadastro);
+      state.avulso = PC.mesclarAvulsos(avulsos);
+      state.avulsos = avulsos.length;
+      PC.applyCadastro(cons.records, [state.avulso, state.cadastro]); // o Serviço avulso (faturado) vale primeiro; o Cadastro completa o que faltar
       state.records = cons.records;
       state.consolidado = cons;
       state.files = ok.map((r) => ({ ok: true, res: r })).concat(falhas.map((f) => ({ ok: false, path: f.path, motivo: f.motivo })));
@@ -483,6 +510,9 @@
       indisp.forEach(([k, nomes]) => itens.push(IND[k].curto + ' não pôde ser calculado em: ' + nomes.join(', ')));
       if (cadastros.length > 1) itens.push('Há ' + cadastros.length + ' arquivos "Cadastro": foi usado o mais recente (' + cadastros[0].name + ').');
       if (state.cadastro && state.cadastro.truncado) itens.push('Cadastro com muitas linhas: só as primeiras 300.000 foram lidas.');
+      if (state.avulso && state.avulso.truncado) itens.push('Serviço avulso com muitas linhas: só as primeiras 300.000 de cada arquivo foram lidas.');
+      if (state.avulso && state.avulso.descartados) itens.push('Há mais de um arquivo de Serviço avulso do mesmo mês: vale o mais recente de cada mês.');
+      ignoradosCsv.forEach((p) => itens.push('CSV ignorado (não é o Serviço avulso: faltam N. da Ligacao e Qtd. Economia): ' + p));
       if (cons.semChave) itens.push(fmtInt(cons.semChave) + ' ' + plural(cons.semChave, 'linha', 'linhas') + ' sem chave de deduplicação completa (ID da Atividade ausente e Protocolo/Matrícula/Código/Data/Recurso incompleto): não são unidas a linhas de outros arquivos; se houver arquivos acumulados sobrepostos, as contagens podem duplicar.');
       const nAvisos = ok.reduce((a, r) => a + r.warnings.length, 0);
       const parcial = falhas.length > 0;
@@ -497,11 +527,8 @@
           'Lidos do arquivo agora: ' + leitura.lidos + ' · reaproveitados (já lidos antes): ' + (leitura.salvos + leitura.memoria) + '. ' +
           (cons.anuladas ? fmtInt(cons.anuladas) + ' ' + plural(cons.anuladas, 'atividade fora de Finalizada/Encerrada com Ocorrência', 'atividades fora de Finalizada/Encerrada com Ocorrência') + ' não contam. ' : '') +
           (cons.duplicatas ? fmtInt(cons.duplicatas) + ' ' + plural(cons.duplicatas, 'duplicata removida', 'duplicatas removidas') + '. ' : '') +
-          (state.cadastro
-            ? (state.cadastro.meses && state.cadastro.meses.length > 1
-              ? 'Cadastro de ' + state.cadastro.meses.length + ' meses: ' + fmtInt(state.cadastro.usadas) + ' ' + plural(state.cadastro.usadas, 'registro de matrícula por mês usado', 'registros de matrícula por mês usados') + (state.cadastro.repetidas ? ', ' + fmtInt(state.cadastro.repetidas) + ' ' + plural(state.cadastro.repetidas, 'repetido no mesmo mês desconsiderado', 'repetidos no mesmo mês desconsiderados') : '') + '. '
-              : 'Cadastro: ' + fmtInt(state.cadastro.usadas) + ' ' + plural(state.cadastro.usadas, 'matrícula usada', 'matrículas usadas') + (state.cadastro.repetidas ? ', ' + fmtInt(state.cadastro.repetidas) + ' ' + plural(state.cadastro.repetidas, 'repetida desconsiderada', 'repetidas desconsideradas') : '') + '. ')
-            : '') +
+          (state.avulso ? detalheFonte('Serviço avulso', state.avulso) : '') +
+          (state.cadastro ? detalheFonte('Cadastro', state.cadastro) : '') +
           (nAvisos ? nAvisos + ' ' + plural(nAvisos, 'aviso de leitura', 'avisos de leitura') + ' em "Base e regras". ' : ''),
         items: itens,
       });
@@ -989,13 +1016,18 @@
     );
   }
 
-  /** Excel com as matrículas que negociaram e não estão no Cadastro (no filtro atual), para completar o Cadastro. */
+  /** "fora do Cadastro", "fora do Serviço avulso" ou "fora do Serviço avulso e do Cadastro", conforme as fontes carregadas. */
+  const foraDeFontes = () => (state.avulso && state.cadastro ? 'fora do Serviço avulso e do Cadastro' : state.avulso ? 'fora do Serviço avulso' : 'fora do Cadastro');
+
+  /** Excel com as matrículas que negociaram e não têm total de economias nas fontes (no filtro atual), para completá-las. */
   async function baixarForaDoCadastro() {
     try {
       const lista = PC.matriculasForaDoCadastro(vm.filtered);
       const sheets = window.PosCorteExport.montarExportForaCadastro(lista, {
         geradoEm: new Date(),
-        cadastro: state.cadastro ? state.cadastro.name : '',
+        cadastro: [].concat(state.avulso ? state.avulso.nomes : [], state.cadastro ? [state.cadastro.name] : []).join(' + '),
+        fora: foraDeFontes(),
+        soCadastro: !state.avulso,
         periodo: vm.min ? PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max) : 'sem datas',
         filtros: textoFiltros(),
         repetidasNoCadastro: vm.sum.economiasRepetidas,
@@ -1008,10 +1040,14 @@
     }
   }
 
-  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (via Cadastro), cada um em valor e %. */
+  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (Serviço avulso e/ou Cadastro), cada um em valor e %. */
   function renderValoresNegociados() {
     const s = vm.sum;
+    const avu = state.avulso;
     const cad = state.cadastro;
+    const temFonte = Boolean(avu || cad);
+    const fora = foraDeFontes();
+    const nomeFontes = avu && cad ? 'Serviço avulso ou no Cadastro' : avu ? 'Serviço avulso' : 'Cadastro';
     const semNeg = (state.cobertura.indisponiveis || {}).neg || [];
     const semMat = (state.cobertura.semMatricula || []).filter((n) => !semNeg.includes(n));
     const avisoDe = (nomes) => (nomes.length ? '⚠ indisponível em ' + nomes.length + ' ' + plural(nomes.length, 'arquivo', 'arquivos') : null);
@@ -1027,19 +1063,19 @@
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias (TOTAL_ECO do arquivo Cadastro) das matrículas que negociaram, cada matrícula uma vez e no mínimo 1 por matrícula (quando o Cadastro não tem o total); % sobre o Exec.' }))),
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias das matrículas que negociaram (Serviço avulso do mês, ou Cadastro quando o avulso não tem a matrícula), cada matrícula uma vez e no mínimo 1 por matrícula; % sobre o Exec.' }))),
       h('div', { class: 'vn-grid' },
         quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito total informado de todas as atividades do filtro (' + brl.format(s.debitoTotal) + ').', avisoDe(semNeg)),
         quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec),
-          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): TOTAL_ECO do Cadastro em ' + fmtInt(s.economiasMatriculas) + ' e 1 economia (mínimo) nas outras ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
-          cad ? avisoDe(semNeg.concat(semMat)) : '⚠ sem arquivo Cadastro: 1 economia por matrícula')),
+          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): ' + (avu ? 'do Serviço avulso em ' + fmtInt(s.economiasDoAvulso) + ', ' : '') + (cad ? 'do Cadastro em ' + fmtInt(s.economiasDoCadastro) + ', ' : '') + '1 economia (mínimo) em ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
+          temFonte ? avisoDe(semNeg.concat(semMat)) : '⚠ sem Cadastro nem Serviço avulso: 1 economia por matrícula')),
       s.debitoNaoInformado ? nota('sem-valor', mats(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).') : null,
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
       negRepetidas > 0 ? nota('negociacoes-repetidas', mats(negRepetidas, 'negociação repetida', 'negociações repetidas') + ' na mesma matrícula ' + plural(negRepetidas, 'conta', 'contam') + ' uma economia só: ' + mats(s.neg, 'negociação', 'negociações') + ' em ' + mats(s.matriculasNeg, 'matrícula distinta', 'matrículas distintas') + '. Por isso as economias recuperadas podem ficar abaixo das negociações.') : null,
-      cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): ' + plural(s.economiasSemCadastro, 'conta', 'contam') + ' 1 economia cada, o mínimo, até o total entrar no Cadastro.') : null,
-      cad && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
-        h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro' }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas fora do Cadastro (Excel)' }))) : null,
-      cad && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no Cadastro: o total ' + plural(s.economiasRepetidas, 'dela foi desconsiderado e ela conta', 'delas foi desconsiderado e elas contam') + ' 1 economia ' + plural(s.economiasRepetidas, '', 'cada') + ' (o mínimo).') : null
+      temFonte && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada ' + fora, 'matrículas negociadas ' + fora) + ' (ou sem total de economias): ' + plural(s.economiasSemCadastro, 'conta', 'contam') + ' 1 economia cada, o mínimo, até o total entrar no arquivo.') : null,
+      temFonte && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
+        h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro' }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas ' + fora + ' (Excel)' }))) : null,
+      temFonte && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no ' + nomeFontes + ': o total ' + plural(s.economiasRepetidas, 'dela foi desconsiderado e ela conta', 'delas foi desconsiderado e elas contam') + ' 1 economia ' + plural(s.economiasRepetidas, '', 'cada') + ' (o mínimo).') : null
     );
   }
 
@@ -1358,10 +1394,14 @@
       add('Nesta leitura', state.leitura.lidos + ' lidos do arquivo · ' + (state.leitura.salvos + state.leitura.memoria) + ' reaproveitados');
     }
     if (c && c.semChave) add('Linhas sem chave completa', fmtInt(c.semChave) + ' (nunca são unidas a outras)');
+    const avu = state.avulso;
+    add('Serviço avulso (economias)', avu
+      ? avu.nomes.join(', ') + ' — ' + fmtInt(avu.linhas) + ' linhas · ' + fmtInt(avu.distintas) + ' matrículas distintas' + (avu.meses.length ? ' · ' + (avu.meses.length > 1 ? avu.meses.length + ' meses (' + PC.monthLabel(avu.meses[0]) + ' a ' + PC.monthLabel(avu.meses[avu.meses.length - 1]) + ')' : 'mês ' + PC.monthLabel(avu.meses[0])) : '') + ' · ' + fmtInt(avu.repetidas) + ' ' + plural(avu.repetidas, 'matrícula repetida no mesmo mês', 'matrículas repetidas no mesmo mês') + ' (' + fmtInt(avu.linhasRepetidas) + ' linhas) desconsideradas · ' + fmtInt(avu.usadas) + ' usadas' + (avu.semTotal ? ' · ' + fmtInt(avu.semTotal) + ' sem quantidade de economia' : '') + (avu.descartados ? ' · ' + avu.descartados + ' arquivo(s) do mesmo mês ignorado(s): vale o mais recente' : '')
+      : 'não encontrado (coloque na pasta o CSV do Serviço avulso, com N. da Ligacao e Qtd. Economia ..., um por mês)');
     const cad = state.cadastro;
     add('Cadastro (economias)', cad
       ? cad.name + ' — aba "' + cad.aba + '" · ' + fmtInt(cad.linhas) + ' linhas · ' + fmtInt(cad.distintas) + ' matrículas distintas' + (cad.meses && cad.meses.length ? ' · ' + (cad.meses.length > 1 ? cad.meses.length + ' meses (' + PC.monthLabel(cad.meses[0]) + ' a ' + PC.monthLabel(cad.meses[cad.meses.length - 1]) + ')' : 'mês ' + PC.monthLabel(cad.meses[0])) : '') + ' · ' + fmtInt(cad.repetidas) + ' ' + (cad.meses && cad.meses.length > 1 ? plural(cad.repetidas, 'matrícula repetida no mesmo mês', 'matrículas repetidas no mesmo mês') : 'repetidas') + ' (' + fmtInt(cad.linhasRepetidas) + ' linhas) desconsideradas · ' + fmtInt(cad.usadas) + ' usadas' + (cad.semTotal ? ' · ' + fmtInt(cad.semTotal) + ' sem TOTAL_ECO' : '') + (state.cadastros > 1 ? ' · há ' + state.cadastros + ' arquivos Cadastro: vale o mais recente' : '')
-      : 'não encontrado (coloque na pasta o arquivo Cadastro, com as colunas NUM_LIGACAO e TOTAL_ECO)');
+      : 'não encontrado (coloque na pasta o arquivo Cadastro, com as colunas NUM_LIGACAO e TOTAL_ECO; vale como reserva do Serviço avulso)');
     if (state.records.length) {
       let mn = '', mx = '';
       for (const r of state.records) if (r.data) { if (!mn || r.data < mn) mn = r.data; if (!mx || r.data > mx) mx = r.data; }
@@ -1457,7 +1497,7 @@
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
         li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
         li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações. O % é esse valor dividido pela soma do mesmo campo em todas as atividades do filtro (débito total informado). Negociação sem valor informado não entra na soma.'),
-        li(h('strong', { text: 'Economias recuperadas' }), ': soma do ', h('code', { text: 'TOTAL_ECO' }), ' do arquivo ', h('strong', { text: 'Cadastro' }), ' (cruzado pela matrícula, coluna ', h('code', { text: 'NUM_LIGACAO' }), ') das matrículas distintas com negociação; cada matrícula conta uma vez (zeros à esquerda e espaços são ignorados). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está no Cadastro (ou está sem TOTAL_ECO) e a que aparece mais de uma vez nele (total desconsiderado) contam 1 cada; sem o arquivo Cadastro na pasta, todas contam 1. Se o Cadastro trouxer a coluna Mês/Ano (um arquivo com vários meses), vale o total do mês da negociação, e a matrícula só é desconsiderada se repetir dentro do mesmo mês; se a matrícula não tiver aquele mês, vale o mês mais próximo. Várias negociações na mesma matrícula contam uma vez só (por isso as economias podem ficar abaixo do número de negociações). O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
+        li(h('strong', { text: 'Economias recuperadas' }), ': total de economias das matrículas distintas com negociação (cruzamento pela matrícula; zeros à esquerda e espaços são ignorados), cada matrícula uma vez. A fonte é, nesta ordem: o ', h('strong', { text: 'Serviço avulso' }), ' (CSV do faturamento, um por mês; colunas ', h('code', { text: 'N. da Ligacao' }), ' e ', h('code', { text: 'Qtd. Economia ...' }), ', somadas) e, quando a matrícula não está nele, o ', h('strong', { text: 'Cadastro' }), ' (colunas ', h('code', { text: 'NUM_LIGACAO' }), ' e ', h('code', { text: 'TOTAL_ECO' }), '). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está em nenhum dos dois (ou está sem total) e a que aparece mais de uma vez no mesmo mês (total desconsiderado) contam 1 cada; sem esses arquivos na pasta, todas contam 1. Com vários meses, vale o total do mês da negociação (coluna Referencia de Leitura do avulso ou Mês/Ano do Cadastro; sem a coluna, o mês do nome do arquivo); a matrícula só é desconsiderada se repetir dentro do mesmo mês, e se ela não tiver aquele mês vale o mês mais próximo. Várias negociações na mesma matrícula contam uma vez só (por isso as economias podem ficar abaixo do número de negociações). O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,
         li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),
