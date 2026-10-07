@@ -134,6 +134,13 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   assert.match(await page.textContent('#status'), /1 repetida desconsiderada/);
   assert.equal(await page.locator('.card-valores [data-vn=sem-cadastro], .card-valores [data-vn=cadastro-repetida]').count(), 0, 'a matrícula negociada está no Cadastro');
   assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o Cadastro não vira atividade nem muda os cartões');
+  // 5 negociações da mesma matrícula: 4 repetidas contam uma vez só, e a nota explica por que as economias podem ficar abaixo das negociações
+  const repetidas = esp.neg - esp.negSemMatricula - esp.matriculasNeg;
+  assert.equal(repetidas, 4);
+  assert.equal(
+    await page.textContent('.card-valores [data-vn=negociacoes-repetidas]'),
+    '4 negociações repetidas na mesma matrícula contam uma economia só: 5 negociações em 1 matrícula distinta. Por isso as economias recuperadas podem ficar abaixo das negociações.'
+  );
   // negociações e termos por mês continuam, com legenda
   assert.ok(await page.locator('.card-negtermo .legend').isVisible());
   // rankings conciliam com o total
@@ -216,6 +223,7 @@ print(json.dumps({'abas': wb.sheetnames, 'mats': sorted(str(l[0]) for l in linha
   const e = JSON.parse(fs.readFileSync(fx('grande_esperados.json'), 'utf8')).cadastro;
   const nota = async () => Number((/^([\d.]+) matrículas? negociadas? fora do Cadastro/.exec(await page.textContent('.card-valores [data-vn=sem-cadastro]')) || [])[1].replace(/\./g, ''));
   assert.equal(await nota(), e.negSemCadastro);
+  assert.equal(await page.locator('.card-valores [data-vn=negociacoes-repetidas]').count(), 0, 'cada negociação é de uma matrícula diferente: nada repetido para explicar');
   const btn = page.locator('[data-act=baixar-fora-cadastro]');
   assert.equal(await btn.count(), 1);
   assert.match(await btn.textContent(), /Baixar matrículas fora do Cadastro \(Excel\)/);

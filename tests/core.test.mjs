@@ -140,6 +140,7 @@ test('valor negociado e economias recuperadas: débito ÷ débito total informad
   assert.equal(s.exec, 7);
   assert.ok(Math.abs(s.economiasSobreExec - 17 / 7) < 1e-9);
   assert.ok(s.economias >= s.matriculasNeg, 'nunca menos de 1 economia por matrícula que negociou');
+  assert.equal(s.neg - s.negSemMatricula - s.matriculasNeg, 1, 'negociações = matrículas distintas + repetidas na mesma matrícula (123 duas vezes) + sem matrícula');
   // sem débito informado e sem Exec: divisões protegidas
   const vazio = PC.summarize([r({ exec: false, exoc: true, neg: true, matricula: '1', eco: 2, ecoMotivo: 'ok' })]);
   assert.equal(vazio.debitoPct, null);
@@ -232,6 +233,7 @@ test('Cadastro: economias recuperadas = soma do TOTAL_ECO das matrículas distin
     // conciliação: toda matrícula que negociou está em exatamente uma das situações
     assert.equal(s.economiasMatriculas + s.economiasRepetidas + s.economiasSemCadastro, s.matriculasNeg);
     assert.equal(s.economiasMatriculas + s.economiasPeloMinimo, s.matriculasNeg);
+    assert.equal(s.neg - s.negSemMatricula - s.matriculasNeg, esp.neg - esp.negSemMatricula - esp.matriculasNeg, base + ' negociações repetidas na mesma matrícula (contagem independente)');
     // sem Cadastro carregado: cada matrícula que negociou conta o mínimo de 1
     PC.applyCadastro(res.records, null);
     const sem = PC.summarize(res.records);
