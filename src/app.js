@@ -1079,7 +1079,7 @@
   function renderCidades() {
     const linhas = PC.agrupar(vm.filtered, 'cidade');
     const cab = ['Cidade', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Equipes'];
-    return h('section', { class: 'card card-cidades', 'aria-labelledby': 'h-cidades' },
+    return h('section', { class: 'card', 'aria-labelledby': 'h-cidades' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-cidades', text: 'Resultados por cidade' }),
         h('p', { class: 'hint', text: 'Clique em uma cidade para filtrar.' }))),
@@ -1121,7 +1121,7 @@
         h('tbody', null, linhas.map((g, i) => h('tr', { class: i === 0 ? 'is-top' : '', dataset: { cat: g.chave } },
           h('th', { scope: 'row', text: g.chave }),
           h('td', { class: 'n', 'data-tip': g.chave + '\n' + fmtInt(g.percorrido) + ' percorridas (' + fmtPct(g.percorrido, total) + ' do total)' },
-            h('span', { class: 'prod' }, h('span', { class: 'prodbar catbar', style: { width: Math.max((g.percorrido / max) * 90, 2) + 'px', '--r': g.percorrido / max } }), h('strong', { text: fmtInt(g.percorrido) }))),
+            h('span', { class: 'prod' }, h('span', { class: 'prodbar catbar', style: { width: Math.max((g.percorrido / max) * 90, 2) + 'px' } }), h('strong', { text: fmtInt(g.percorrido) }))),
           h('td', { class: 'n', text: fmtPct(g.percorrido, total) }),
           [fmtInt(g.exec), fmtInt(g.exoc), fmtInt(g.termos), fmtPctVal(g.assertividade), fmtInt(g.neg), fmtPctVal(g.efetividade)].map((v) => h('td', { class: 'n', text: v }))))),
         h('tfoot', null, h('tr', null,

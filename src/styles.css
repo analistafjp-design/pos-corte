@@ -305,7 +305,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 @page { size: A4 landscape; margin: 9mm; }
 @media print {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-bases, #view-base, .expander, .card-recorte, .vn-acoes { display: none !important; }
+  .topbar, .srcline, .actions, .filters, .skip, #status, #chips, #tip, .more, .kpi-go, #view-analitico, #view-bases, #view-base, .expander, .card-recorte { display: none !important; }
   .app { display: block; }
   .main-col { max-width: none; }
   .grp-title { display: none; }
@@ -327,19 +327,6 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
   /* disposição: todos os blocos em largura total */
   #view-geral > .stack { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
   #view-geral > .stack > * { grid-column: 1 / -1; }
-  /* aproveita a largura da folha: valores negociados e pós-corte por categoria à esquerda, negociações e termos à direita */
-  #view-geral > .stack > .kpi-groups { grid-row: 1; }
-  #view-geral > .stack > .card-valores { grid-column: 1; grid-row: 2; }
-  #view-geral > .stack > .card-categorias { grid-column: 1; grid-row: 3; }
-  #view-geral > .stack > .card-negtermo { grid-column: 2; grid-row: 2 / span 2; }
-  /* tabelas longas continuam na página seguinte, com o cabeçalho repetido, em vez de deixar a folha vazia */
-  .card-cidades { break-inside: auto; }
-  .card-cidades .card-head, .card-categorias .card-head { break-after: avoid; }
-  tfoot { display: table-row-group; }
-  /* a tabela de categorias divide a linha com o gráfico: barra e cabeçalhos mais enxutos para caber na meia folha */
-  .card-categorias .prodbar { width: max(2px, calc(var(--r, 1) * 38px)) !important; }
-  .card-categorias thead th { font-size: 9px; letter-spacing: 0; }
-  .card-categorias th, .card-categorias td { padding: 3px 4px; }
   .main-col { zoom: 0.8; }
   /* versão compacta para caber em poucas páginas */
   .card { padding: 9px 11px; }
