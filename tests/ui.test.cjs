@@ -135,15 +135,12 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   assert.equal(await page.locator('.card-valores [data-vn=economias] .kpi-sub').count(), 0, 'sem aviso quando o Cadastro está carregado');
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '66,1%'], 'valor negociado não muda com o Cadastro');
   assert.match(await page.textContent('#status'), /1 repetida desconsiderada/);
-  assert.equal(await page.locator('.card-valores [data-vn=sem-cadastro], .card-valores [data-vn=cadastro-repetida]').count(), 0, 'a matrícula negociada está no Cadastro');
+  assert.equal(await page.locator('.card-valores [data-act=baixar-fora-cadastro], .card-valores [data-vn=cadastro-repetida]').count(), 0, 'a matrícula negociada está no Cadastro');
   assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o Cadastro não vira atividade nem muda os cartões');
-  // 5 negociações da mesma matrícula: 4 repetidas contam uma vez só, e a nota explica por que as economias podem ficar abaixo das negociações
+  // 5 negociações da mesma matrícula: 4 repetidas contam uma vez só (as economias podem ficar abaixo das negociações) e o bloco não traz legendas explicativas
   const repetidas = esp.neg - esp.negSemMatricula - esp.matriculasNeg;
   assert.equal(repetidas, 4);
-  assert.equal(
-    await page.textContent('.card-valores [data-vn=negociacoes-repetidas]'),
-    '4 negociações repetidas na mesma matrícula contam uma economia só: 5 negociações em 1 matrícula distinta. Por isso as economias recuperadas podem ficar abaixo das negociações.'
-  );
+  assert.equal(await page.locator('.card-valores [data-vn=sem-valor], .card-valores [data-vn=negociacoes-repetidas], .card-valores [data-vn=sem-cadastro]').count(), 0, 'sem as legendas de valor sem informação, negociações repetidas e matrículas fora das fontes');
   // negociações e termos por mês continuam, com legenda
   assert.ok(await page.locator('.card-negtermo .legend').isVisible());
   // rankings conciliam com o total
@@ -242,7 +239,7 @@ test('Cadastro com todos os meses (coluna Mês/Ano): vale o total do mês da neg
   const jul = e.consultas.find((c) => c.mat === '1001' && c.mes === '2026-07');
   assert.deepEqual([jul.motivo, jul.eco], ['ok', 3]);
   assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((x) => x.textContent)), ['3', '16,7%']);
-  assert.equal(await page.locator('.card-valores [data-vn=cadastro-repetida], .card-valores [data-vn=sem-cadastro]').count(), 0, '1001 não é repetida só por aparecer em três meses');
+  assert.equal(await page.locator('.card-valores [data-vn=cadastro-repetida], .card-valores [data-act=baixar-fora-cadastro]').count(), 0, '1001 não é repetida só por aparecer em três meses');
   await page.click('#nav-tabs button[data-view=base]');
   const linha = await page.textContent('dl.kv >> text=Cadastro (economias) >> xpath=following-sibling::dd[1]');
   assert.match(linha, /Cadastro_meses\.xlsx — aba "Export" · 11 linhas · 5 matrículas distintas · 3 meses \(jul\/2026 a set\/2026\) · 1 matrícula repetida no mesmo mês \(2 linhas\) desconsideradas · 7 usadas · 1 sem TOTAL_ECO/);
@@ -288,10 +285,10 @@ print(json.dumps({'abas': wb.sheetnames, 'mats': sorted(str(l[0]) for l in linha
   await page.setInputFiles('#inp-files', [fx('grande_sintetico.xlsx'), fx('Cadastro_grande.xlsx')]);
   await page.waitForFunction(() => /Cadastro: 651 matrículas usadas/.test(document.querySelector('#status').textContent), null, { timeout: 90000 });
   const e = JSON.parse(fs.readFileSync(fx('grande_esperados.json'), 'utf8')).cadastro;
-  const nota = async () => Number((/^([\d.]+) matrículas? negociadas? fora do Cadastro/.exec(await page.textContent('.card-valores [data-vn=sem-cadastro]')) || [])[1].replace(/\./g, ''));
-  assert.equal(await nota(), e.negSemCadastro);
-  assert.equal(await page.locator('.card-valores [data-vn=negociacoes-repetidas]').count(), 0, 'cada negociação é de uma matrícula diferente: nada repetido para explicar');
   const btn = page.locator('[data-act=baixar-fora-cadastro]');
+  const nota = async () => Number(await btn.getAttribute('data-n')); // matrículas fora das fontes, no filtro
+  assert.equal(await nota(), e.negSemCadastro);
+  assert.equal(await page.locator('.card-valores [data-vn=sem-valor], .card-valores [data-vn=negociacoes-repetidas], .card-valores [data-vn=sem-cadastro]').count(), 0, 'sem as legendas de valor sem informação, negociações repetidas e matrículas fora das fontes');
   assert.equal(await btn.count(), 1);
   assert.match(await btn.textContent(), /Baixar matrículas fora do Cadastro \(Excel\)/);
   const baixa = async () => {
@@ -312,15 +309,15 @@ print(json.dumps({'abas': wb.sheetnames, 'mats': sorted(str(l[0]) for l in linha
     assert.equal(x.resumo, 'nenhum');
   }
   fs.unlinkSync(arq1);
-  // com filtro de cidade o arquivo tem exatamente as matrículas da nota
+  // com filtro de cidade o arquivo tem exatamente as matrículas do botão
   await page.selectOption('#f-cidade', 'Cidade Norte');
-  await page.waitForFunction(() => document.querySelector('.card-valores [data-vn=sem-cadastro]'));
+  await page.waitForFunction(() => document.querySelector('.card-valores [data-act=baixar-fora-cadastro]'));
   const n = await nota();
   assert.ok(n > 0 && n < e.negSemCadastro, 'o filtro reduz a lista: ' + n);
   const arq2 = await baixa();
   if (py.status === 0) {
     const x = lerXlsx(arq2);
-    assert.equal(x.mats.length, n, 'o Excel tem tantas matrículas quanto a nota do filtro');
+    assert.equal(x.mats.length, n, 'o Excel tem tantas matrículas quanto o botão informa no filtro');
     assert.deepEqual(x.cidades, ['Cidade Norte']);
     assert.match(x.resumo, /Cidade: Cidade Norte/);
   }
@@ -329,7 +326,7 @@ print(json.dumps({'abas': wb.sheetnames, 'mats': sorted(str(l[0]) for l in linha
   await page.setInputFiles('#inp-files', [fx('grande_sintetico.xlsx'), fx('Servico_avulso_07-2026.csv'), fx('Cadastro_grande.xlsx')]);
   await page.waitForFunction(() => /Serviço avulso: .*Cadastro: 651 matrículas usadas/.test(document.querySelector('#status').textContent), null, { timeout: 90000 });
   assert.match(await btn.textContent(), /Baixar matrículas fora do Serviço avulso e do Cadastro \(Excel\)/);
-  const n3 = Number((/^([\d.]+) matrículas? negociadas? fora do Serviço avulso e do Cadastro/.exec(await page.textContent('.card-valores [data-vn=sem-cadastro]')) || [])[1]);
+  const n3 = await nota();
   assert.equal(n3, n, 'o avulso sintético não tem nenhuma matrícula da base grande: a lista continua igual');
   const arq3 = await baixa();
   if (py.status === 0) {
