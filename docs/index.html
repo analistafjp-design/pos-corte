@@ -482,7 +482,7 @@ tr.is-top th { color: var(--brand-2); }
   </div>
 </div>
 
-<input type="file" id="inp-files" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
+<input type="file" id="inp-files" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" multiple hidden>
 <input type="file" id="inp-folder" webkitdirectory multiple hidden>
 
 <script>
@@ -2165,7 +2165,7 @@ window.FRENTES_PADRAO = [
    * ou por não haver Cadastro carregado (`economiasSemArquivo`). `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasDoAvulso: 0, economiasDoCadastro: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
     const matriculasNeg = new Map();
     const equipes = new Set();
     const dias = new Set();
@@ -2209,7 +2209,13 @@ window.FRENTES_PADRAO = [
     s.efetividade = s.exec ? s.neg / s.exec : null;
     s.matriculasNeg = matriculasNeg.size;
     for (const r of matriculasNeg.values()) {
-      if (r.ecoMotivo === 'ok') { s.economias += Math.max(1, r.eco); s.economiasMatriculas++; continue; }
+      if (r.ecoMotivo === 'ok') {
+        s.economias += Math.max(1, r.eco);
+        s.economiasMatriculas++;
+        if (r.ecoFonte === 'avulso') s.economiasDoAvulso++;
+        else s.economiasDoCadastro++;
+        continue;
+      }
       s.economias += 1; // sem total no Cadastro: no mínimo 1 economia por matrícula que negociou
       s.economiasPeloMinimo++;
       if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
@@ -2516,6 +2522,18 @@ window.FRENTES_PADRAO = [
   /* ------------------------------------------------------------------ */
 
   const CAD_TOTAL = new Set(['total eco', 'total economias', 'total de economias', 'qtd economias', 'total economia']);
+  const CAD_MES = new Set(['mes ano', 'ano mes', 'mes', 'competencia', 'referencia', 'mes referencia', 'mes de referencia', 'referencia de leitura', 'referencia leitura', 'ref leitura']);
+
+  /** "10/2026", "10-2026", "2026-10" ou uma data (ISO) viram "2026-10"; texto que não é mês/ano vira "". */
+  function mesCadastro(v) {
+    const t = trimStr(v);
+    let m = /^(\d{1,2})[/.\-](\d{4})$/.exec(t);
+    if (m && +m[1] >= 1 && +m[1] <= 12) return m[2] + '-' + pad2(+m[1]);
+    m = /^(\d{4})[/.\-](\d{1,2})(?:[/.\-]\d{1,2})?(?:[ T].*)?$/.exec(t);
+    if (m && +m[2] >= 1 && +m[2] <= 12) return m[1] + '-' + pad2(+m[2]);
+    return '';
+  }
+  const ordMes = (ym) => (ym ? +ym.substring(0, 4) * 12 + +ym.substring(5, 7) - 1 : -1);
 
   /** Dica de que o arquivo é o cadastro de economias: "cadastro" no nome do arquivo ou de uma pasta do caminho (sem acento, qualquer caixa). */
   function ehCadastro(caminho) {
@@ -2562,10 +2580,13 @@ window.FRENTES_PADRAO = [
   }
 
   /**
-   * Lê o arquivo Cadastro: só as colunas da matrícula (NUM_LIGACAO) e do total de economias (TOTAL_ECO); as demais
-   * (nome, endereço etc.) não são lidas nem guardadas. Matrícula que aparece mais de uma vez no arquivo é desconsiderada.
-   * Devolve { tipo: 'cadastro', aba, linhas, distintas, repetidas, linhasRepetidas, semTotal, semMatricula, usadas,
-   * unicas: [[matrícula normalizada, total]], repetidasLista: [matrícula normalizada], truncado }.
+   * Lê o arquivo Cadastro: só as colunas da matrícula (NUM_LIGACAO), do total de economias (TOTAL_ECO) e, se houver, do
+   * mês (Mês/Ano); as demais (nome, endereço etc.) não são lidas nem guardadas. Com várias linhas da mesma matrícula
+   * **no mesmo mês** (ou no arquivo todo, se não houver coluna de mês) a matrícula é desconsiderada naquele mês; a mesma
+   * matrícula em meses diferentes é normal (um arquivo com todos os meses).
+   * Devolve { tipo: 'cadastro', aba, linhas, distintas (matrículas), repetidas e linhasRepetidas (matrícula/mês com mais
+   * de uma linha), semTotal, semMatricula, usadas (matrícula/mês único e com total), meses: ['2026-10'...],
+   * itens: [[matrícula normalizada, 'AAAA-MM' ou '', total ou null, nº de linhas]], truncado }.
    */
   async function readCadastro(file, opts) {
     opts = opts || {};
@@ -2587,10 +2608,10 @@ window.FRENTES_PADRAO = [
 
   async function lerAbaCadastro(wb, sheet, ctx, opts) {
     // 1ª passada: acha o cabeçalho (todas as colunas, só nas primeiras linhas)
-    let colMat = -1, colTot = -1, nomeMat = '', nomeTot = '', scanned = 0, candidato = null;
+    let colMat = -1, colTot = -1, colMes = -1, nomeMat = '', nomeTot = '', nomeMes = '', scanned = 0, candidato = null;
     await scanSheet(wb, sheet, ctx, (n, cols, vals) => {
       scanned++;
-      let m = -1, t = -1, nm = '', nt = '', preenchidas = 0;
+      let m = -1, t = -1, me = -1, nm = '', nt = '', nme = '', preenchidas = 0;
       const nomes = [];
       for (let j = 0; j < n; j++) {
         const txt = trimStr(vals[j]);
@@ -2600,22 +2621,25 @@ window.FRENTES_PADRAO = [
         const h = normHeader(txt);
         if (m < 0 && BASE_MATRICULA.has(h)) { m = cols[j]; nm = txt; }
         if (t < 0 && CAD_TOTAL.has(h)) { t = cols[j]; nt = txt; }
+        if (me < 0 && CAD_MES.has(h)) { me = cols[j]; nme = txt; }
       }
-      if (m >= 0 && t >= 0) { colMat = m; colTot = t; nomeMat = nm; nomeTot = nt; return true; }
+      if (m >= 0 && t >= 0) { colMat = m; colTot = t; colMes = me; nomeMat = nm; nomeTot = nt; nomeMes = nme; return true; }
       if (!candidato && preenchidas >= 2) candidato = nomes;
       if (scanned >= MAX_HEADER_SCAN_ROWS) return true;
     });
     if (colMat < 0) {
       throw new PcError('CAD_SEM_COLUNAS', 'O arquivo Cadastro precisa ter a coluna da matrícula (NUM_LIGACAO) e a do total de economias (TOTAL_ECO) na aba "' + sheet.name.trim() + '".' + (candidato ? ' Colunas encontradas: ' + candidato.slice(0, 12).join(', ') + '.' : ''));
     }
-    // 2ª passada: só as duas colunas; conta quantas vezes cada matrícula aparece
-    const cont = new Map();
+    // 2ª passada: só as colunas usadas; conta quantas linhas cada matrícula tem em cada mês
+    const grupos = new Map();
+    const matriculas = new Set();
     let linhas = 0, semMatricula = 0, truncado = false, visto = false;
     await scanSheet(wb, sheet, ctx, (n, cols, vals) => {
-      let vm = '', vt = '';
+      let vm = '', vt = '', vme = '';
       for (let j = 0; j < n; j++) {
         if (cols[j] === colMat) vm = vals[j];
         else if (cols[j] === colTot) vt = vals[j];
+        else if (cols[j] === colMes) vme = vals[j];
       }
       if (!visto) { // linhas acima do cabeçalho e o próprio cabeçalho
         if (BASE_MATRICULA.has(normHeader(vm)) && CAD_TOTAL.has(normHeader(vt))) visto = true;
@@ -2626,40 +2650,223 @@ window.FRENTES_PADRAO = [
       const mat = chaveNorm(vm);
       if (!mat) { semMatricula++; return; }
       linhas++;
+      matriculas.add(mat);
       const tt = trimStr(vt);
       const total = /^\d+(?:[.,]0+)?$/.test(tt) ? parseInt(tt, 10) : null;
-      const e = cont.get(mat);
-      if (e) e.n++;
-      else cont.set(mat, { n: 1, total });
-    }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo o Cadastro', fraction: f }); }, (c) => c === colMat || c === colTot);
-    const unicas = [], repetidasLista = [];
-    let linhasRepetidas = 0, semTotal = 0;
-    for (const [mat, e] of cont) {
-      if (e.n > 1) { repetidasLista.push(mat); linhasRepetidas += e.n; }
-      else if (e.total == null) semTotal++;
-      else unicas.push([mat, e.total]);
+      const mes = colMes >= 0 ? mesCadastro(vme) : '';
+      const k = mat + '|' + mes;
+      const g = grupos.get(k);
+      if (g) g.n++;
+      else grupos.set(k, { mat, mes, n: 1, total });
+    }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo o Cadastro', fraction: f }); }, (c) => c === colMat || c === colTot || c === colMes);
+    const itens = [];
+    const meses = new Set();
+    let repetidas = 0, linhasRepetidas = 0, semTotal = 0, usadas = 0;
+    for (const g of grupos.values()) {
+      itens.push([g.mat, g.mes, g.total, g.n]);
+      if (g.mes) meses.add(g.mes);
+      if (g.n > 1) { repetidas++; linhasRepetidas += g.n; }
+      else if (g.total == null) semTotal++;
+      else usadas++;
     }
     return {
-      tipo: 'cadastro', aba: sheet.name.trim(), colunaMatricula: nomeMat, colunaTotal: nomeTot,
-      linhas: linhas + semMatricula, semMatricula, distintas: cont.size, repetidas: repetidasLista.length, linhasRepetidas,
-      semTotal, usadas: unicas.length, unicas, repetidasLista, truncado, warnings: [],
+      tipo: 'cadastro', aba: sheet.name.trim(), colunaMatricula: nomeMat, colunaTotal: nomeTot, colunaMes: nomeMes,
+      linhas: linhas + semMatricula, semMatricula, distintas: matriculas.size, repetidas, linhasRepetidas,
+      semTotal, usadas, meses: [...meses].sort(), itens, truncado, warnings: [],
+    };
+  }
+
+  /* ---------- Serviço avulso (CSV de faturamento: tudo que faturou, com as quantidades de economia) ---------- */
+
+  const AVULSO_MATRICULA = new Set([...BASE_MATRICULA, 'n da ligacao', 'numero da ligacao', 'num da ligacao']);
+  const SEM_COLUNAS_AVULSO = 'AVULSO_SEM_COLUNAS';
+
+  /** "avulso" no nome do arquivo ou de uma pasta do caminho. */
+  const ehAvulso = (caminho) => /avulso/.test(norm(caminho));
+
+  /** Mês ("AAAA-MM") no nome do arquivo, como "Servico_avulso_10-2026.csv"; "" se não houver. */
+  function mesDoNome(caminho) {
+    const n = String(caminho || '').replace(/^.*[\\/]/, '');
+    let m = /(?:^|[^0-9])(\d{1,2})[-_. ](20\d{2})(?![0-9])/.exec(n);
+    if (m && +m[1] >= 1 && +m[1] <= 12) return m[2] + '-' + pad2(+m[1]);
+    m = /(?:^|[^0-9])(20\d{2})[-_. ](\d{1,2})(?![0-9])/.exec(n);
+    if (m && +m[2] >= 1 && +m[2] <= 12) return m[1] + '-' + pad2(+m[2]);
+    return '';
+  }
+
+  /** CSV com aspas (RFC 4180): devolve linhas de campos. */
+  function parseCsv(texto, delim) {
+    const linhas = [];
+    let linha = [], campo = '', aspas = false;
+    for (let i = 0; i < texto.length; i++) {
+      const c = texto[i];
+      if (aspas) {
+        if (c === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else aspas = false; }
+        else campo += c;
+      } else if (c === '"' && campo === '') aspas = true;
+      else if (c === delim) { linha.push(campo); campo = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && texto[i + 1] === '\n') i++;
+        linha.push(campo); campo = ''; linhas.push(linha); linha = [];
+      } else campo += c;
+    }
+    if (campo !== '' || linha.length) { linha.push(campo); linhas.push(linha); }
+    return linhas;
+  }
+
+  /** Texto do CSV: UTF-8 (com ou sem BOM) ou, se não for UTF-8 válido, Windows-1252 (Excel em português). */
+  async function lerTextoCsv(file) {
+    const buf = await file.slice(0, file.size).arrayBuffer();
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^﻿/, '');
+    } catch (_) {
+      return new TextDecoder('windows-1252').decode(buf);
+    }
+  }
+
+  /**
+   * Lê o CSV de Serviço avulso (o que foi faturado no mês): a ligação (matrícula, "N. da Ligacao"), as quantidades de
+   * economia ("Qtd. Economia Residencial/Comercial/..."), somadas no total da ligação, e o mês ("Referencia de Leitura"
+   * ou, sem a coluna, o do nome do arquivo). Nome, endereço e demais colunas não são guardados. Uma matrícula pode ter
+   * várias linhas (serviços diferentes); como no Cadastro, matrícula repetida no mesmo mês é desconsiderada.
+   * Devolve o mesmo formato do Cadastro com tipo 'avulso'.
+   */
+  async function readServicoAvulso(file, opts) {
+    opts = opts || {};
+    let texto = await lerTextoCsv(file);
+    let delim = null;
+    const sep = /^sep=(.)[ \t]*(?:\r?\n|$)/i.exec(texto);
+    if (sep) { delim = sep[1]; texto = texto.slice(sep[0].length); }
+    if (!delim) {
+      const l1 = texto.split(/\r?\n/, 1)[0];
+      delim = [';', '\t', ','].map((d) => [d, l1.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+    }
+    const csv = parseCsv(texto, delim);
+    let h = -1, colMat = -1, colMes = -1, colsEco = [], nomeMat = '', nomeMes = '', candidato = null;
+    for (let i = 0; i < Math.min(csv.length, MAX_HEADER_SCAN_ROWS) && h < 0; i++) {
+      const hs = csv[i].map((x) => normHeader(x));
+      const m = hs.findIndex((x) => AVULSO_MATRICULA.has(x));
+      const tot = hs.findIndex((x) => CAD_TOTAL.has(x));
+      const eco = hs.map((x, j) => (/^qtd eco/.test(x) ? j : -1)).filter((j) => j >= 0);
+      if (m >= 0 && (tot >= 0 || eco.length)) {
+        h = i; colMat = m; nomeMat = trimStr(csv[i][m]);
+        colsEco = tot >= 0 ? [tot] : eco;
+        colMes = hs.findIndex((x) => CAD_MES.has(x));
+        if (colMes >= 0) nomeMes = trimStr(csv[i][colMes]);
+      } else if (!candidato && csv[i].filter((x) => trimStr(x)).length >= 2) candidato = csv[i].map(trimStr).filter(Boolean);
+    }
+    if (h < 0) {
+      throw new PcError(SEM_COLUNAS_AVULSO, 'O CSV de Serviço avulso precisa ter a coluna da ligação (N. da Ligacao) e as quantidades de economia (Qtd. Economia ...).' + (candidato ? ' Colunas encontradas: ' + candidato.slice(0, 12).join(', ') + '.' : ''));
+    }
+    const mesNome = mesDoNome(opts.path || file.name);
+    const grupos = new Map();
+    const matriculas = new Set();
+    let linhas = 0, semMatricula = 0, truncado = false;
+    for (let i = h + 1; i < csv.length; i++) {
+      const r = csv[i];
+      if (!r.some((x) => trimStr(x) !== '')) continue;
+      if (linhas + semMatricula >= MAX_LINHAS_BASE) { truncado = true; break; }
+      const mat = chaveNorm(r[colMat]);
+      if (!mat) { semMatricula++; continue; }
+      linhas++;
+      matriculas.add(mat);
+      let total = 0, algum = false, valido = true;
+      for (const j of colsEco) {
+        const t = trimStr(r[j]);
+        if (t === '') continue;
+        if (/^\d+(?:[.,]0+)?$/.test(t)) { total += parseInt(t, 10); algum = true; } else valido = false;
+      }
+      const mes = (colMes >= 0 ? mesCadastro(r[colMes]) : '') || mesNome;
+      const k = mat + '|' + mes;
+      const g = grupos.get(k);
+      if (g) g.n++;
+      else grupos.set(k, { mat, mes, n: 1, total: algum && valido ? total : null });
+      if (opts.onProgress && (i & 4095) === 0) opts.onProgress({ phase: 'Lendo o Serviço avulso', fraction: i / csv.length });
+    }
+    const itens = [];
+    const meses = new Set();
+    let repetidas = 0, linhasRepetidas = 0, semTotal = 0, usadas = 0;
+    for (const g of grupos.values()) {
+      itens.push([g.mat, g.mes, g.total, g.n]);
+      if (g.mes) meses.add(g.mes);
+      if (g.n > 1) { repetidas++; linhasRepetidas += g.n; }
+      else if (g.total == null) semTotal++;
+      else usadas++;
+    }
+    return {
+      tipo: 'avulso', aba: '', colunaMatricula: nomeMat, colunaTotal: colsEco.map((j) => trimStr(csv[h][j])).join(' + '), colunaMes: nomeMes,
+      linhas: linhas + semMatricula, semMatricula, distintas: matriculas.size, repetidas, linhasRepetidas,
+      semTotal, usadas, meses: [...meses].sort(), itens, truncado, warnings: [],
     };
   }
 
   /**
-   * Anota em cada registro o total de economias da matrícula no Cadastro: r.eco (número ou null) e r.ecoMotivo:
-   * 'ok' (achada uma vez, com total), 'rep' (repetida no Cadastro: desconsiderada), 'sem' (não achada ou sem total)
-   * e 'nao' (nenhum Cadastro carregado). Sem `cad`, tudo fica 'nao'.
+   * Junta os arquivos de Serviço avulso lidos (um por mês) numa fonte só. Havendo mais de um arquivo do mesmo mês, vale
+   * o mais recente. Devolve null sem arquivos; `arquivos`, `nomes` e `descartados` descrevem o que foi usado.
    */
-  function applyCadastro(records, cad) {
-    const tot = cad ? new Map(cad.unicas) : null;
-    const rep = cad ? new Set(cad.repetidasLista) : null;
+  function mesclarAvulsos(lista) {
+    if (!lista || !lista.length) return null;
+    const porMes = new Map();
+    for (const a of lista.slice().sort((x, y) => (x.lastModified || 0) - (y.lastModified || 0))) porMes.set((a.meses || []).join(','), a);
+    const usados = [...porMes.values()];
+    const itens = [];
+    const mats = new Set();
+    const meses = new Set();
+    const soma = { linhas: 0, semMatricula: 0, repetidas: 0, linhasRepetidas: 0, semTotal: 0, usadas: 0 };
+    for (const a of usados) {
+      for (const it of a.itens) { itens.push(it); mats.add(it[0]); }
+      for (const m of a.meses) meses.add(m);
+      for (const k of Object.keys(soma)) soma[k] += a[k] || 0;
+    }
+    return Object.assign({ tipo: 'avulso', arquivos: usados.length, nomes: usados.map((a) => a.name), descartados: lista.length - usados.length, distintas: mats.size, meses: [...meses].sort(), itens, truncado: usados.some((a) => a.truncado) }, soma);
+  }
+
+  /**
+   * Anota em cada registro o total de economias da matrícula nas fontes (Serviço avulso e/ou Cadastro, na ordem em que
+   * vierem): r.eco (número ou null), r.ecoFonte ('avulso' | 'cadastro' | '') e r.ecoMotivo:
+   * 'ok' (achada uma vez no mês, com total), 'rep' (repetida no mesmo mês e sem total em outra fonte: desconsiderada),
+   * 'sem' (não achada ou sem total) e 'nao' (nenhuma fonte carregada). A primeira fonte com total aproveitável vale;
+   * matrícula repetida numa fonte passa para a próxima.
+   * Com vários meses numa fonte vale o do mês da atividade (r.mes); se a matrícula não tiver aquele mês, o mês mais
+   * próximo (empate: o mais antigo); sem data na atividade, o mais recente. Fonte de um mês só vale para todos.
+   */
+  function applyCadastro(records, fontes) {
+    const lista = !fontes ? [] : Array.isArray(fontes) ? fontes.filter(Boolean) : [fontes];
+    const idx = lista.map((fonte) => {
+      // resultado gravado por uma versão anterior (um período só): unicas e repetidasLista
+      const itens = fonte.itens || [].concat((fonte.unicas || []).map(([m, t]) => [m, '', t, 1]), (fonte.repetidasLista || []).map((m) => [m, '', null, 2]));
+      const indice = new Map();
+      for (const [mat, mes, total, n] of itens) {
+        let l = indice.get(mat);
+        if (!l) indice.set(mat, (l = []));
+        l.push({ mes, ord: ordMes(mes), total, n });
+      }
+      return { tipo: fonte.tipo || 'cadastro', indice };
+    });
+    const escolhe = (l, mes) => {
+      if (l.length === 1) return l[0];
+      const alvo = ordMes(mes);
+      let melhor = null, dist = Infinity;
+      for (const e of l) {
+        const d = alvo >= 0 ? Math.abs(e.ord - alvo) : -e.ord;
+        if (d < dist || (d === dist && e.ord < melhor.ord)) { melhor = e; dist = d; }
+      }
+      return melhor;
+    };
     for (const r of records) {
-      const mat = cad ? chaveNorm(r.matricula) : '';
-      if (!cad) { r.eco = null; r.ecoMotivo = 'nao'; }
-      else if (mat && tot.has(mat)) { r.eco = tot.get(mat); r.ecoMotivo = 'ok'; }
-      else if (mat && rep.has(mat)) { r.eco = null; r.ecoMotivo = 'rep'; }
-      else { r.eco = null; r.ecoMotivo = 'sem'; }
+      if (!idx.length) { r.eco = null; r.ecoMotivo = 'nao'; r.ecoFonte = ''; continue; }
+      const mat = chaveNorm(r.matricula);
+      let motivo = 'sem', eco = null, origem = '';
+      for (const f of idx) {
+        const l = f.indice.get(mat);
+        if (!l) continue;
+        const e = escolhe(l, r.mes);
+        if (e.n > 1) { motivo = 'rep'; continue; }
+        if (e.total == null) continue;
+        motivo = 'ok'; eco = e.total; origem = f.tipo;
+        break;
+      }
+      r.eco = eco; r.ecoMotivo = motivo; r.ecoFonte = origem;
     }
   }
 
@@ -2752,6 +2959,7 @@ window.FRENTES_PADRAO = [
     toCsv, csvCell, agrupar,
     dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
     ehCadastro, readCadastro, readFileAuto, applyCadastro, matriculasForaDoCadastro,
+    ehAvulso, readServicoAvulso, mesclarAvulsos, mesDoNome, parseCsv,
   };
 });
 
@@ -3106,28 +3314,32 @@ window.FRENTES_PADRAO = [
     const dtTxt = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
     const negociacoes = lista.reduce((a, g) => a + g.negociacoes, 0);
     const valor = lista.reduce((a, g) => a + g.valor, 0);
+    // `fora`: "fora do Cadastro" (padrão), "fora do Serviço avulso" ou "fora do Serviço avulso e do Cadastro"; `soCadastro` false quando há Serviço avulso
+    const fora = info.fora || 'fora do Cadastro';
+    const soCadastro = info.soCadastro !== false;
+    const nomeAba = soCadastro ? 'Fora do Cadastro' : 'Sem total de economias';
     const resumo = {
       nome: 'Resumo',
       colunas: [38, 24, 90],
       linhas: [
-        [{ v: 'Pós-Corte Interior — Matrículas negociadas fora do Cadastro', f: 'titulo' }],
+        [{ v: 'Pós-Corte Interior — Matrículas negociadas ' + fora, f: 'titulo' }],
         [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
-        [{ v: 'Cadastro usado', f: 'negrito' }, info.cadastro || '—'],
+        [{ v: soCadastro ? 'Cadastro usado' : 'Arquivos usados', f: 'negrito' }, info.cadastro || '—'],
         [{ v: 'Período dos dados', f: 'negrito' }, info.periodo || '—'],
         [{ v: 'Filtros aplicados', f: 'negrito' }, info.filtros || 'nenhum'],
         [],
         [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
-        ['Matrículas fora do Cadastro', intCel(lista.length), 'Matrículas distintas com negociação no filtro que não estão no Cadastro ou estão sem TOTAL_ECO; contam 1 economia cada (o mínimo) nas economias recuperadas, até o total entrar no Cadastro (aba "Fora do Cadastro")'],
+        ['Matrículas ' + fora, intCel(lista.length), 'Matrículas distintas com negociação no filtro que não têm total de economias no ' + (soCadastro ? 'Cadastro' : 'Serviço avulso nem no Cadastro') + ' (ou estão sem o total); contam 1 economia cada (o mínimo) nas economias recuperadas, até o total entrar (aba "' + nomeAba + '")'],
         ['Negociações dessas matrículas', intCel(negociacoes), 'Negociou O Débito? = Sim, nessas matrículas e no filtro'],
         ['Valor negociado dessas matrículas', { v: valor, f: 'brl' }, 'Soma de Valor Total dos Débitos dessas negociações (débito informado; não é arrecadação nem valor pago)'],
-        ['Matrículas repetidas no Cadastro', intCel(info.repetidasNoCadastro || 0), 'Negociadas e presentes mais de uma vez no Cadastro: o total delas foi desconsiderado e contam 1 economia cada; não estão na lista'],
-        ['Negociações sem matrícula', intCel(info.semMatricula || 0), 'Sem matrícula não dá para buscar no Cadastro; não estão na lista'],
+        [soCadastro ? 'Matrículas repetidas no Cadastro' : 'Matrículas repetidas no mesmo mês', intCel(info.repetidasNoCadastro || 0), 'Negociadas e presentes mais de uma vez no mesmo mês' + (soCadastro ? ' do Cadastro' : ' (Serviço avulso ou Cadastro)') + ': o total delas foi desconsiderado e contam 1 economia cada; não estão na lista'],
+        ['Negociações sem matrícula', intCel(info.semMatricula || 0), 'Sem matrícula não dá para buscar o total; não estão na lista'],
         [],
-        [{ v: 'Como usar', f: 'negrito' }, 'Busque o TOTAL_ECO de cada matrícula da aba "Fora do Cadastro" (a última coluna é para anotar) e inclua no Cadastro. Na próxima leitura elas passam a entrar com o total real, em vez do mínimo de 1.'],
+        [{ v: 'Como usar', f: 'negrito' }, 'Busque o total de economias de cada matrícula da aba "' + nomeAba + '" (a última coluna é para anotar) e inclua no ' + (soCadastro ? 'Cadastro' : 'Cadastro ou no Serviço avulso do mês') + '. Na próxima leitura elas passam a entrar com o total real, em vez do mínimo de 1.'],
       ],
     };
     const aba = {
-      nome: 'Fora do Cadastro',
+      nome: nomeAba,
       colunas: [16, 28, 22, 13, 20, 18, 22],
       cabecalho: 1,
       linhas: [['Matrícula', 'Cidade', 'Categoria', 'Negociações', 'Valor negociado (R$)', 'Última negociação', 'TOTAL_ECO (a preencher)'].map(cab)].concat(
@@ -3253,6 +3465,8 @@ window.FRENTES_PADRAO = [
     records: [],
     files: [], // resultados da última leitura (válidos e com erro)
     consolidado: null,
+    avulso: null, // Serviço avulso (CSV do faturamento, um por mês) já juntado: matrícula/mês -> total de economias
+    avulsos: 0, // quantos arquivos de Serviço avulso havia na pasta
     cadastro: null, // resultado da leitura do arquivo "Cadastro" (matrícula -> total de economias)
     cadastros: 0, // quantos arquivos "Cadastro" havia na pasta
     cobertura: {},
@@ -3465,6 +3679,15 @@ window.FRENTES_PADRAO = [
   const LIMITE_BYTES = 800 * 1048576;
   const isXlsx = (n) => /\.xlsx$/i.test(n);
   const isFormatoAntigo = (n) => /\.(xls|xlsb|xlsm)$/i.test(n);
+  const isCsv = (n) => /\.csv$/i.test(n);
+
+  /** Frase do status sobre uma fonte de economias (Serviço avulso ou Cadastro): quantas matrículas valeram e quantas repetiram. */
+  function detalheFonte(rotulo, f) {
+    const multi = f.meses && f.meses.length > 1;
+    return rotulo + (multi ? ' de ' + f.meses.length + ' meses' : '') + ': ' + fmtInt(f.usadas) + ' ' +
+      (multi ? plural(f.usadas, 'registro de matrícula por mês usado', 'registros de matrícula por mês usados') : plural(f.usadas, 'matrícula usada', 'matrículas usadas')) +
+      (f.repetidas ? ', ' + fmtInt(f.repetidas) + ' ' + (multi ? plural(f.repetidas, 'repetido no mesmo mês desconsiderado', 'repetidos no mesmo mês desconsiderados') : plural(f.repetidas, 'repetida desconsiderada', 'repetidas desconsideradas')) : '') + '. ';
+  }
 
   /**
    * Lê os arquivos, consolida e atualiza o painel.
@@ -3481,7 +3704,7 @@ window.FRENTES_PADRAO = [
       const ignoradosFormato = [];
       for (const e of entries) {
         if (e.name.startsWith('~$')) continue; // temporários do Excel
-        if (isXlsx(e.name)) xlsx.push(e);
+        if (isXlsx(e.name) || isCsv(e.name)) xlsx.push(e); // .csv: só o Serviço avulso é lido; outros CSV são ignorados
         else if (isFormatoAntigo(e.name)) ignoradosFormato.push(e.path);
       }
       if (!xlsx.length) {
@@ -3535,6 +3758,8 @@ window.FRENTES_PADRAO = [
 
       const ok = [];
       const cadastros = [];
+      const avulsos = [];
+      const ignoradosCsv = [];
       const novos = [];
       const leitura = { lidos: 0, salvos: 0, memoria: 0 };
       let ultimoProgresso = 0;
@@ -3561,8 +3786,18 @@ window.FRENTES_PADRAO = [
               ultimoProgresso = Date.now();
               setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo + ' — ' + p.phase + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / metas.length });
             };
-            // o arquivo "Cadastro" (matrícula e total de economias) tem leitor próprio; os demais são as atividades
-            res = await PC.readFileAuto(file, { path: e.path, aliases: state.aliases, onProgress });
+            if (isCsv(e.name)) {
+              // CSV de Serviço avulso (o que foi faturado, com as quantidades de economia); outro CSV qualquer é ignorado
+              try {
+                res = await PC.readServicoAvulso(file, { path: e.path, onProgress });
+              } catch (err) {
+                if (!(err instanceof PC.PcError) || err.code !== 'AVULSO_SEM_COLUNAS') throw err;
+                res = { tipo: 'csv-ignorado' };
+              }
+            } else {
+              // o arquivo "Cadastro" (matrícula e total de economias) tem leitor próprio; os demais são as atividades
+              res = await PC.readFileAuto(file, { path: e.path, aliases: state.aliases, onProgress });
+            }
             res.path = e.path;
             res.name = e.name;
             res.size = file.size;
@@ -3578,6 +3813,8 @@ window.FRENTES_PADRAO = [
         }
         res.origem = m.origem;
         if (res.tipo === 'cadastro') cadastros.push(res);
+        else if (res.tipo === 'avulso') avulsos.push(res);
+        else if (res.tipo === 'csv-ignorado') ignoradosCsv.push(e.path);
         else ok.push(res);
       }
       for (const k of [...state.cache.keys()]) if (!chaves.includes(k)) state.cache.delete(k);
@@ -3610,7 +3847,9 @@ window.FRENTES_PADRAO = [
       cadastros.sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0)); // vale o mais recente
       state.cadastro = cadastros[0] || null;
       state.cadastros = cadastros.length;
-      PC.applyCadastro(cons.records, state.cadastro);
+      state.avulso = PC.mesclarAvulsos(avulsos);
+      state.avulsos = avulsos.length;
+      PC.applyCadastro(cons.records, [state.avulso, state.cadastro]); // o Serviço avulso (faturado) vale primeiro; o Cadastro completa o que faltar
       state.records = cons.records;
       state.consolidado = cons;
       state.files = ok.map((r) => ({ ok: true, res: r })).concat(falhas.map((f) => ({ ok: false, path: f.path, motivo: f.motivo })));
@@ -3630,6 +3869,9 @@ window.FRENTES_PADRAO = [
       indisp.forEach(([k, nomes]) => itens.push(IND[k].curto + ' não pôde ser calculado em: ' + nomes.join(', ')));
       if (cadastros.length > 1) itens.push('Há ' + cadastros.length + ' arquivos "Cadastro": foi usado o mais recente (' + cadastros[0].name + ').');
       if (state.cadastro && state.cadastro.truncado) itens.push('Cadastro com muitas linhas: só as primeiras 300.000 foram lidas.');
+      if (state.avulso && state.avulso.truncado) itens.push('Serviço avulso com muitas linhas: só as primeiras 300.000 de cada arquivo foram lidas.');
+      if (state.avulso && state.avulso.descartados) itens.push('Há mais de um arquivo de Serviço avulso do mesmo mês: vale o mais recente de cada mês.');
+      ignoradosCsv.forEach((p) => itens.push('CSV ignorado (não é o Serviço avulso: faltam N. da Ligacao e Qtd. Economia): ' + p));
       if (cons.semChave) itens.push(fmtInt(cons.semChave) + ' ' + plural(cons.semChave, 'linha', 'linhas') + ' sem chave de deduplicação completa (ID da Atividade ausente e Protocolo/Matrícula/Código/Data/Recurso incompleto): não são unidas a linhas de outros arquivos; se houver arquivos acumulados sobrepostos, as contagens podem duplicar.');
       const nAvisos = ok.reduce((a, r) => a + r.warnings.length, 0);
       const parcial = falhas.length > 0;
@@ -3644,7 +3886,8 @@ window.FRENTES_PADRAO = [
           'Lidos do arquivo agora: ' + leitura.lidos + ' · reaproveitados (já lidos antes): ' + (leitura.salvos + leitura.memoria) + '. ' +
           (cons.anuladas ? fmtInt(cons.anuladas) + ' ' + plural(cons.anuladas, 'atividade fora de Finalizada/Encerrada com Ocorrência', 'atividades fora de Finalizada/Encerrada com Ocorrência') + ' não contam. ' : '') +
           (cons.duplicatas ? fmtInt(cons.duplicatas) + ' ' + plural(cons.duplicatas, 'duplicata removida', 'duplicatas removidas') + '. ' : '') +
-          (state.cadastro ? 'Cadastro: ' + fmtInt(state.cadastro.usadas) + ' ' + plural(state.cadastro.usadas, 'matrícula usada', 'matrículas usadas') + (state.cadastro.repetidas ? ', ' + fmtInt(state.cadastro.repetidas) + ' ' + plural(state.cadastro.repetidas, 'repetida desconsiderada', 'repetidas desconsideradas') : '') + '. ' : '') +
+          (state.avulso ? detalheFonte('Serviço avulso', state.avulso) : '') +
+          (state.cadastro ? detalheFonte('Cadastro', state.cadastro) : '') +
           (nAvisos ? nAvisos + ' ' + plural(nAvisos, 'aviso de leitura', 'avisos de leitura') + ' em "Base e regras". ' : ''),
         items: itens,
       });
@@ -4132,13 +4375,18 @@ window.FRENTES_PADRAO = [
     );
   }
 
-  /** Excel com as matrículas que negociaram e não estão no Cadastro (no filtro atual), para completar o Cadastro. */
+  /** "fora do Cadastro", "fora do Serviço avulso" ou "fora do Serviço avulso e do Cadastro", conforme as fontes carregadas. */
+  const foraDeFontes = () => (state.avulso && state.cadastro ? 'fora do Serviço avulso e do Cadastro' : state.avulso ? 'fora do Serviço avulso' : 'fora do Cadastro');
+
+  /** Excel com as matrículas que negociaram e não têm total de economias nas fontes (no filtro atual), para completá-las. */
   async function baixarForaDoCadastro() {
     try {
       const lista = PC.matriculasForaDoCadastro(vm.filtered);
       const sheets = window.PosCorteExport.montarExportForaCadastro(lista, {
         geradoEm: new Date(),
-        cadastro: state.cadastro ? state.cadastro.name : '',
+        cadastro: [].concat(state.avulso ? state.avulso.nomes : [], state.cadastro ? [state.cadastro.name] : []).join(' + '),
+        fora: foraDeFontes(),
+        soCadastro: !state.avulso,
         periodo: vm.min ? PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max) : 'sem datas',
         filtros: textoFiltros(),
         repetidasNoCadastro: vm.sum.economiasRepetidas,
@@ -4151,10 +4399,14 @@ window.FRENTES_PADRAO = [
     }
   }
 
-  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (via Cadastro), cada um em valor e %. */
+  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (Serviço avulso e/ou Cadastro), cada um em valor e %. */
   function renderValoresNegociados() {
     const s = vm.sum;
+    const avu = state.avulso;
     const cad = state.cadastro;
+    const temFonte = Boolean(avu || cad);
+    const fora = foraDeFontes();
+    const nomeFontes = avu && cad ? 'Serviço avulso ou no Cadastro' : avu ? 'Serviço avulso' : 'Cadastro';
     const semNeg = (state.cobertura.indisponiveis || {}).neg || [];
     const semMat = (state.cobertura.semMatricula || []).filter((n) => !semNeg.includes(n));
     const avisoDe = (nomes) => (nomes.length ? '⚠ indisponível em ' + nomes.length + ' ' + plural(nomes.length, 'arquivo', 'arquivos') : null);
@@ -4166,21 +4418,23 @@ window.FRENTES_PADRAO = [
       aviso ? h('span', { class: 'kpi-sub', text: aviso }) : null);
     const nota = (k, txt) => h('p', { class: 'note', dataset: { vn: k }, text: txt });
     const mats = (n, um, varios) => fmtInt(n) + ' ' + plural(n, um, varios);
+    const negRepetidas = s.neg - s.negSemMatricula - s.matriculasNeg; // negociações em matrícula que já negociou: contam uma economia só
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias (TOTAL_ECO do arquivo Cadastro) das matrículas que negociaram, cada matrícula uma vez e no mínimo 1 por matrícula (quando o Cadastro não tem o total); % sobre o Exec.' }))),
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias das matrículas que negociaram (Serviço avulso do mês, ou Cadastro quando o avulso não tem a matrícula), cada matrícula uma vez e no mínimo 1 por matrícula; % sobre o Exec.' }))),
       h('div', { class: 'vn-grid' },
         quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito total informado de todas as atividades do filtro (' + brl.format(s.debitoTotal) + ').', avisoDe(semNeg)),
         quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec),
-          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): TOTAL_ECO do Cadastro em ' + fmtInt(s.economiasMatriculas) + ' e 1 economia (mínimo) nas outras ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
-          cad ? avisoDe(semNeg.concat(semMat)) : '⚠ sem arquivo Cadastro: 1 economia por matrícula')),
+          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): ' + (avu ? 'do Serviço avulso em ' + fmtInt(s.economiasDoAvulso) + ', ' : '') + (cad ? 'do Cadastro em ' + fmtInt(s.economiasDoCadastro) + ', ' : '') + '1 economia (mínimo) em ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
+          temFonte ? avisoDe(semNeg.concat(semMat)) : '⚠ sem Cadastro nem Serviço avulso: 1 economia por matrícula')),
       s.debitoNaoInformado ? nota('sem-valor', mats(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).') : null,
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
-      cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): ' + plural(s.economiasSemCadastro, 'conta', 'contam') + ' 1 economia cada, o mínimo, até o total entrar no Cadastro.') : null,
-      cad && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
-        h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro' }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas fora do Cadastro (Excel)' }))) : null,
-      cad && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no Cadastro: o total ' + plural(s.economiasRepetidas, 'dela foi desconsiderado e ela conta', 'delas foi desconsiderado e elas contam') + ' 1 economia ' + plural(s.economiasRepetidas, '', 'cada') + ' (o mínimo).') : null
+      negRepetidas > 0 ? nota('negociacoes-repetidas', mats(negRepetidas, 'negociação repetida', 'negociações repetidas') + ' na mesma matrícula ' + plural(negRepetidas, 'conta', 'contam') + ' uma economia só: ' + mats(s.neg, 'negociação', 'negociações') + ' em ' + mats(s.matriculasNeg, 'matrícula distinta', 'matrículas distintas') + '. Por isso as economias recuperadas podem ficar abaixo das negociações.') : null,
+      temFonte && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada ' + fora, 'matrículas negociadas ' + fora) + ' (ou sem total de economias): ' + plural(s.economiasSemCadastro, 'conta', 'contam') + ' 1 economia cada, o mínimo, até o total entrar no arquivo.') : null,
+      temFonte && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
+        h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro' }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas ' + fora + ' (Excel)' }))) : null,
+      temFonte && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no ' + nomeFontes + ': o total ' + plural(s.economiasRepetidas, 'dela foi desconsiderado e ela conta', 'delas foi desconsiderado e elas contam') + ' 1 economia ' + plural(s.economiasRepetidas, '', 'cada') + ' (o mínimo).') : null
     );
   }
 
@@ -4499,10 +4753,14 @@ window.FRENTES_PADRAO = [
       add('Nesta leitura', state.leitura.lidos + ' lidos do arquivo · ' + (state.leitura.salvos + state.leitura.memoria) + ' reaproveitados');
     }
     if (c && c.semChave) add('Linhas sem chave completa', fmtInt(c.semChave) + ' (nunca são unidas a outras)');
+    const avu = state.avulso;
+    add('Serviço avulso (economias)', avu
+      ? avu.nomes.join(', ') + ' — ' + fmtInt(avu.linhas) + ' linhas · ' + fmtInt(avu.distintas) + ' matrículas distintas' + (avu.meses.length ? ' · ' + (avu.meses.length > 1 ? avu.meses.length + ' meses (' + PC.monthLabel(avu.meses[0]) + ' a ' + PC.monthLabel(avu.meses[avu.meses.length - 1]) + ')' : 'mês ' + PC.monthLabel(avu.meses[0])) : '') + ' · ' + fmtInt(avu.repetidas) + ' ' + plural(avu.repetidas, 'matrícula repetida no mesmo mês', 'matrículas repetidas no mesmo mês') + ' (' + fmtInt(avu.linhasRepetidas) + ' linhas) desconsideradas · ' + fmtInt(avu.usadas) + ' usadas' + (avu.semTotal ? ' · ' + fmtInt(avu.semTotal) + ' sem quantidade de economia' : '') + (avu.descartados ? ' · ' + avu.descartados + ' arquivo(s) do mesmo mês ignorado(s): vale o mais recente' : '')
+      : 'não encontrado (coloque na pasta o CSV do Serviço avulso, com N. da Ligacao e Qtd. Economia ..., um por mês)');
     const cad = state.cadastro;
     add('Cadastro (economias)', cad
-      ? cad.name + ' — aba "' + cad.aba + '" · ' + fmtInt(cad.linhas) + ' linhas · ' + fmtInt(cad.distintas) + ' matrículas distintas · ' + fmtInt(cad.repetidas) + ' repetidas (' + fmtInt(cad.linhasRepetidas) + ' linhas) desconsideradas · ' + fmtInt(cad.usadas) + ' usadas' + (cad.semTotal ? ' · ' + fmtInt(cad.semTotal) + ' sem TOTAL_ECO' : '') + (state.cadastros > 1 ? ' · há ' + state.cadastros + ' arquivos Cadastro: vale o mais recente' : '')
-      : 'não encontrado (coloque na pasta o arquivo Cadastro, com as colunas NUM_LIGACAO e TOTAL_ECO)');
+      ? cad.name + ' — aba "' + cad.aba + '" · ' + fmtInt(cad.linhas) + ' linhas · ' + fmtInt(cad.distintas) + ' matrículas distintas' + (cad.meses && cad.meses.length ? ' · ' + (cad.meses.length > 1 ? cad.meses.length + ' meses (' + PC.monthLabel(cad.meses[0]) + ' a ' + PC.monthLabel(cad.meses[cad.meses.length - 1]) + ')' : 'mês ' + PC.monthLabel(cad.meses[0])) : '') + ' · ' + fmtInt(cad.repetidas) + ' ' + (cad.meses && cad.meses.length > 1 ? plural(cad.repetidas, 'matrícula repetida no mesmo mês', 'matrículas repetidas no mesmo mês') : 'repetidas') + ' (' + fmtInt(cad.linhasRepetidas) + ' linhas) desconsideradas · ' + fmtInt(cad.usadas) + ' usadas' + (cad.semTotal ? ' · ' + fmtInt(cad.semTotal) + ' sem TOTAL_ECO' : '') + (state.cadastros > 1 ? ' · há ' + state.cadastros + ' arquivos Cadastro: vale o mais recente' : '')
+      : 'não encontrado (coloque na pasta o arquivo Cadastro, com as colunas NUM_LIGACAO e TOTAL_ECO; vale como reserva do Serviço avulso)');
     if (state.records.length) {
       let mn = '', mx = '';
       for (const r of state.records) if (r.data) { if (!mn || r.data < mn) mn = r.data; if (!mx || r.data > mx) mx = r.data; }
@@ -4598,7 +4856,7 @@ window.FRENTES_PADRAO = [
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
         li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
         li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações. O % é esse valor dividido pela soma do mesmo campo em todas as atividades do filtro (débito total informado). Negociação sem valor informado não entra na soma.'),
-        li(h('strong', { text: 'Economias recuperadas' }), ': soma do ', h('code', { text: 'TOTAL_ECO' }), ' do arquivo ', h('strong', { text: 'Cadastro' }), ' (cruzado pela matrícula, coluna ', h('code', { text: 'NUM_LIGACAO' }), ') das matrículas distintas com negociação; cada matrícula conta uma vez (zeros à esquerda e espaços são ignorados). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está no Cadastro (ou está sem TOTAL_ECO) e a que aparece mais de uma vez nele (total desconsiderado) contam 1 cada; sem o arquivo Cadastro na pasta, todas contam 1. O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
+        li(h('strong', { text: 'Economias recuperadas' }), ': total de economias das matrículas distintas com negociação (cruzamento pela matrícula; zeros à esquerda e espaços são ignorados), cada matrícula uma vez. A fonte é, nesta ordem: o ', h('strong', { text: 'Serviço avulso' }), ' (CSV do faturamento, um por mês; colunas ', h('code', { text: 'N. da Ligacao' }), ' e ', h('code', { text: 'Qtd. Economia ...' }), ', somadas) e, quando a matrícula não está nele, o ', h('strong', { text: 'Cadastro' }), ' (colunas ', h('code', { text: 'NUM_LIGACAO' }), ' e ', h('code', { text: 'TOTAL_ECO' }), '). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está em nenhum dos dois (ou está sem total) e a que aparece mais de uma vez no mesmo mês (total desconsiderado) contam 1 cada; sem esses arquivos na pasta, todas contam 1. Com vários meses, vale o total do mês da negociação (coluna Referencia de Leitura do avulso ou Mês/Ano do Cadastro; sem a coluna, o mês do nome do arquivo); a matrícula só é desconsiderada se repetir dentro do mesmo mês, e se ela não tiver aquele mês vale o mês mais próximo. Várias negociações na mesma matrícula contam uma vez só (por isso as economias podem ficar abaixo do número de negociações). O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,
         li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),

@@ -347,28 +347,32 @@
     const dtTxt = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
     const negociacoes = lista.reduce((a, g) => a + g.negociacoes, 0);
     const valor = lista.reduce((a, g) => a + g.valor, 0);
+    // `fora`: "fora do Cadastro" (padrão), "fora do Serviço avulso" ou "fora do Serviço avulso e do Cadastro"; `soCadastro` false quando há Serviço avulso
+    const fora = info.fora || 'fora do Cadastro';
+    const soCadastro = info.soCadastro !== false;
+    const nomeAba = soCadastro ? 'Fora do Cadastro' : 'Sem total de economias';
     const resumo = {
       nome: 'Resumo',
       colunas: [38, 24, 90],
       linhas: [
-        [{ v: 'Pós-Corte Interior — Matrículas negociadas fora do Cadastro', f: 'titulo' }],
+        [{ v: 'Pós-Corte Interior — Matrículas negociadas ' + fora, f: 'titulo' }],
         [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
-        [{ v: 'Cadastro usado', f: 'negrito' }, info.cadastro || '—'],
+        [{ v: soCadastro ? 'Cadastro usado' : 'Arquivos usados', f: 'negrito' }, info.cadastro || '—'],
         [{ v: 'Período dos dados', f: 'negrito' }, info.periodo || '—'],
         [{ v: 'Filtros aplicados', f: 'negrito' }, info.filtros || 'nenhum'],
         [],
         [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
-        ['Matrículas fora do Cadastro', intCel(lista.length), 'Matrículas distintas com negociação no filtro que não estão no Cadastro ou estão sem TOTAL_ECO; contam 1 economia cada (o mínimo) nas economias recuperadas, até o total entrar no Cadastro (aba "Fora do Cadastro")'],
+        ['Matrículas ' + fora, intCel(lista.length), 'Matrículas distintas com negociação no filtro que não têm total de economias no ' + (soCadastro ? 'Cadastro' : 'Serviço avulso nem no Cadastro') + ' (ou estão sem o total); contam 1 economia cada (o mínimo) nas economias recuperadas, até o total entrar (aba "' + nomeAba + '")'],
         ['Negociações dessas matrículas', intCel(negociacoes), 'Negociou O Débito? = Sim, nessas matrículas e no filtro'],
         ['Valor negociado dessas matrículas', { v: valor, f: 'brl' }, 'Soma de Valor Total dos Débitos dessas negociações (débito informado; não é arrecadação nem valor pago)'],
-        ['Matrículas repetidas no Cadastro', intCel(info.repetidasNoCadastro || 0), 'Negociadas e presentes mais de uma vez no Cadastro: o total delas foi desconsiderado e contam 1 economia cada; não estão na lista'],
-        ['Negociações sem matrícula', intCel(info.semMatricula || 0), 'Sem matrícula não dá para buscar no Cadastro; não estão na lista'],
+        [soCadastro ? 'Matrículas repetidas no Cadastro' : 'Matrículas repetidas no mesmo mês', intCel(info.repetidasNoCadastro || 0), 'Negociadas e presentes mais de uma vez no mesmo mês' + (soCadastro ? ' do Cadastro' : ' (Serviço avulso ou Cadastro)') + ': o total delas foi desconsiderado e contam 1 economia cada; não estão na lista'],
+        ['Negociações sem matrícula', intCel(info.semMatricula || 0), 'Sem matrícula não dá para buscar o total; não estão na lista'],
         [],
-        [{ v: 'Como usar', f: 'negrito' }, 'Busque o TOTAL_ECO de cada matrícula da aba "Fora do Cadastro" (a última coluna é para anotar) e inclua no Cadastro. Na próxima leitura elas passam a entrar com o total real, em vez do mínimo de 1.'],
+        [{ v: 'Como usar', f: 'negrito' }, 'Busque o total de economias de cada matrícula da aba "' + nomeAba + '" (a última coluna é para anotar) e inclua no ' + (soCadastro ? 'Cadastro' : 'Cadastro ou no Serviço avulso do mês') + '. Na próxima leitura elas passam a entrar com o total real, em vez do mínimo de 1.'],
       ],
     };
     const aba = {
-      nome: 'Fora do Cadastro',
+      nome: nomeAba,
       colunas: [16, 28, 22, 13, 20, 18, 22],
       cabecalho: 1,
       linhas: [['Matrícula', 'Cidade', 'Categoria', 'Negociações', 'Valor negociado (R$)', 'Última negociação', 'TOTAL_ECO (a preencher)'].map(cab)].concat(

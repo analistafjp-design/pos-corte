@@ -168,19 +168,136 @@ def matriculas_neg(rows):
     return ms
 
 
-CAD_CAB = ["NUM_LIGACAO", "NOM_CLIENTE", "CIDADE", "TIPO_FATURAMENTO", "QTD_ECO_RES", "QTD_ECO_COM", "QTD_ECO_IND", "QTD_ECO_PUB", "TOTAL_ECO", "SIT_LIG"]
+CAD_CAB = ["NUM_LIGACAO", "NOM_CLIENTE", "CIDADE", "TIPO_FATURAMENTO", "QTD_ECO_RES", "QTD_ECO_COM", "QTD_ECO_IND", "QTD_ECO_PUB", "TOTAL_ECO", "Mês/Ano", "SIT_LIG"]
 
 
-def escrever_cadastro(path, linhas, nome_aba="Export"):
-    """Cadastro de economias SINTÉTICO (aba Export, colunas parecidas com o export real). linhas: (matrícula, total ou None)."""
+def escrever_cadastro(path, linhas, nome_aba="Export", mes_padrao="10/2026"):
+    """Cadastro de economias SINTÉTICO (aba Export, colunas parecidas com o export real, inclusive Mês/Ano em texto "MM/AAAA").
+    linhas: (matrícula, total ou None) ou (matrícula, total ou None, "MM/AAAA"); sem o mês, vale mes_padrao (o export real traz um só mês)."""
     wb = Workbook()
     ws = wb.active
     ws.title = nome_aba
     ws.append(CAD_CAB)
-    for i, (mat, total) in enumerate(linhas):
+    for i, lin in enumerate(linhas):
+        mat, total = lin[0], lin[1]
+        mes = lin[2] if len(lin) > 2 else mes_padrao
         res = total if total is not None else None
-        ws.append([mat, f"Cliente sintético {i}", "Cidade Norte", "MEDIDO", res, 0 if total is not None else None, 0 if total is not None else None, 0 if total is not None else None, total, "ATIVA"])
+        ws.append([mat, f"Cliente sintético {i}", "Cidade Norte", "MEDIDO", res, 0 if total is not None else None, 0 if total is not None else None, 0 if total is not None else None, total, mes, "ATIVA"])
     wb.save(path)
+
+
+def consulta_cadastro(linhas, mat, mes):
+    """Cadastro com vários meses, contagem independente: (motivo, total) de uma matrícula num mês "AAAA-MM".
+    Vale o mês exato; sem ele, o mais próximo (empate: o mais antigo). Repetida no mesmo mês: "rep"; sem total ou ausente: "sem"."""
+    def ordem(ym):
+        a, m = ym.split("-")
+        return int(a) * 12 + int(m) - 1
+
+    grupos = {}
+    for m, tot, mes_l in linhas:
+        k = chave_mat(m)
+        if not k:
+            continue
+        ym = f"{mes_l[3:]}-{mes_l[:2]}"
+        g = grupos.setdefault((k, ym), {"n": 0, "total": tot})
+        g["n"] += 1
+    cand = [(ym, g) for (k, ym), g in grupos.items() if k == chave_mat(mat)]
+    if not cand:
+        return ("sem", None)
+    alvo = ordem(mes)
+    ym, g = min(cand, key=lambda c: (abs(ordem(c[0]) - alvo), ordem(c[0])))
+    if g["n"] > 1:
+        return ("rep", None)
+    if g["total"] is None:
+        return ("sem", None)
+    return ("ok", g["total"])
+
+
+def esperados_cadastro_meses(linhas):
+    """Estatísticas do Cadastro com vários meses (matrícula/mês é a unidade) e consultas esperadas."""
+    grupos = collections.Counter()
+    total = {}
+    sem_matricula = 0
+    for m, tot, mes_l in linhas:
+        k = chave_mat(m)
+        if not k:
+            sem_matricula += 1
+            continue
+        ym = f"{mes_l[3:]}-{mes_l[:2]}"
+        grupos[(k, ym)] += 1
+        total[(k, ym)] = tot
+    meses = sorted({ym for _, ym in grupos})
+    consultas = []
+    for m in ["1001", "2002", "3003", "00004", "5005", "9999"]:
+        for mes in ["2026-01", "2026-07", "2026-08", "2026-09", "2026-12"]:
+            motivo, tot = consulta_cadastro(linhas, m, mes)
+            consultas.append({"mat": m, "mes": mes, "motivo": motivo, "eco": tot})
+    return {
+        "linhas": sum(grupos.values()) + sem_matricula, "semMatricula": sem_matricula, "distintas": len({k for k, _ in grupos}),
+        "repetidas": sum(1 for n in grupos.values() if n > 1), "linhasRepetidas": sum(n for n in grupos.values() if n > 1),
+        "semTotal": sum(1 for g, n in grupos.items() if n == 1 and total[g] is None),
+        "usadas": sum(1 for g, n in grupos.items() if n == 1 and total[g] is not None),
+        "meses": meses, "consultas": consultas,
+    }
+
+
+AVULSO_CAB = ["N. da Ligacao", "Nome Cliente", "Categoria", "Qtd. Economia Residencial", "Qtd. Economia Comercial", "Qtd. Economia Industrial",
+              "Qtd. Economia Publica", "Qtd. Economia Outros", "Rubrica", "Valor Parcela", "Referencia de Leitura", "Situacao Ligacao"]
+
+
+def escrever_avulso(path, linhas, cp1252=False, bom=True, sep_linha=True, com_mes=True):
+    """CSV de Serviço avulso SINTÉTICO, como o export real (separador ";", CRLF, opcionalmente BOM e linha "sep=;").
+    linhas: (matrícula, residencial, comercial, industrial, pública, outros, rubrica, "MM/AAAA")."""
+    import csv
+    import io
+    cab = AVULSO_CAB if com_mes else [c for c in AVULSO_CAB if c != "Referencia de Leitura"]
+    buf = io.StringIO(newline="")
+    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    if sep_linha:
+        buf.write("sep=;\r\n")
+    w.writerow(cab)
+    for i, (mat, res, com, ind, pub, outros, rubrica, mes) in enumerate(linhas):
+        lin = [mat, f"Cliente sintético {i}", "RESIDENCIAL", res, com, ind, pub, outros, rubrica, "12,34", mes, "C-Cortada"]
+        if not com_mes:
+            del lin[AVULSO_CAB.index("Referencia de Leitura")]
+        w.writerow(lin)
+    texto = buf.getvalue()
+    dados = texto.encode("cp1252") if cp1252 else texto.encode("utf-8")
+    if bom and not cp1252:
+        dados = b"\xef\xbb\xbf" + dados
+    path.write_bytes(dados)
+
+
+def consulta_fontes(fontes, mat, mes):
+    """Contagem independente com várias fontes de total de economias, na ordem de prioridade (Serviço avulso, depois Cadastro).
+    Cada fonte: lista de (matrícula, total ou None, "MM/AAAA"). Em cada uma vale o mês exato ou o mais próximo (empate: o mais antigo);
+    matrícula repetida no mês é desconsiderada e passa para a próxima fonte; a primeira com total aproveitável vale."""
+    def ordem(ym):
+        a, m = ym.split("-")
+        return int(a) * 12 + int(m) - 1
+
+    alvo = ordem(mes)
+    motivo = "sem"
+    for linhas in fontes:
+        grupos = {}
+        for m, tot, mes_l in linhas:
+            k = chave_mat(m)
+            if not k:
+                continue
+            ym = f"{mes_l[3:]}-{mes_l[:2]}"
+            g = grupos.setdefault((k, ym), {"n": 0, "total": tot})
+            g["n"] += 1
+        cand = [(ym, g) for (k, ym), g in grupos.items() if k == chave_mat(mat)]
+        if not cand:
+            continue
+        ym, g = min(cand, key=lambda c: (abs(ordem(c[0]) - alvo), ordem(c[0])))
+        if g["n"] > 1:
+            motivo = "rep"
+            continue
+        if g["total"] is None:
+            continue
+        return ("ok", g["total"])
+    return (motivo, None)
 
 
 def negociacoes_por_matricula(rows, mats):
@@ -585,6 +702,33 @@ def main():
     # "00004" tem zeros à esquerda; 5005 não tem TOTAL_ECO; a última linha não tem matrícula
     cad_pequeno = [(1001, 3), (2002, 4), (2002, 4), (3003, 1), ("00004", 2), (5005, None), (None, 9)]
     escrever_cadastro(out / "Cadastro_pequeno.xlsx", cad_pequeno)
+    # Cadastro com vários meses (um registro por matrícula e mês): o total vale do mês da negociação; repetida só no mesmo mês
+    cad_meses = [(1001, 3, "07/2026"), (1001, 4, "08/2026"), (1001, 4, "09/2026"), (2002, 4, "07/2026"), (2002, 4, "07/2026"),
+                 (2002, 5, "08/2026"), (3003, 2, "08/2026"), ("00004", 2, "07/2026"), (5005, None, "07/2026"), (5005, 6, "09/2026"),
+                 (None, 9, "07/2026")]
+    escrever_cadastro(out / "Cadastro_meses.xlsx", cad_meses)
+    (out / "cadastro_meses_esperados.json").write_text(json.dumps(esperados_cadastro_meses(cad_meses), ensure_ascii=False, indent=1))
+    # Serviço avulso (CSV do faturamento): 07/2026 como o export real (UTF-8 com BOM, linha "sep=;"); 08/2026 em Windows-1252, sem BOM,
+    # sem a linha "sep=;" e sem a coluna do mês (o mês vem do nome do arquivo). 1001 vale 4 em julho e 5 em agosto (o Cadastro dá 3 em out/2026).
+    av07 = [("1001", 2, 2, 0, 0, 0, "COBRANÇA DE PARCELAS", "07/2026"), ("2002", 1, 0, 0, 0, 0, "CORTE NO CAVALETE", "07/2026"),
+            ("2002", 1, 0, 0, 0, 0, "RELIGACAO NO CAVALETE", "07/2026"), ("3003", 1, 0, 0, 0, 0, "CORTE NO REGISTRO", "07/2026"),
+            ("7777", 3, 2, 0, 0, 0, "COBRANÇA DE PARCELAS", "07/2026"), ("00004", 2, 0, 0, 0, 0, "CORTE NO REGISTRO", "07/2026")]
+    av08 = [("1001", 3, 2, 0, 0, 0, "COBRANÇA DE PARCELAS", None), ("3003", 2, 0, 0, 0, 0, "RELIGAÇÃO NO CAVALETE", None)]
+    escrever_avulso(out / "Servico_avulso_07-2026.csv", av07)
+    escrever_avulso(out / "Servico_avulso_08-2026.csv", av08, cp1252=True, sep_linha=False, com_mes=False)
+    (out / "outro_relatorio.csv").write_text("a;b;c\r\n1;2;3\r\n", encoding="utf-8")  # CSV que não é o Serviço avulso: deve ser ignorado
+    lin_av = [(m, res + com + ind + pub + oth, mes) for m, res, com, ind, pub, oth, _, mes in av07] + \
+             [(m, res + com + ind + pub + oth, "08/2026") for m, res, com, ind, pub, oth, _, _ in av08]
+    cad_pq = [(m, t, "10/2026") for m, t in cad_pequeno]  # Cadastro_pequeno tem Mês/Ano = 10/2026 em todas as linhas
+    consultas = []
+    for m in ["1001", "2002", "3003", "7777", "00004", "5005", "9999"]:
+        for mes in ["2026-01", "2026-07", "2026-08", "2026-09", "2026-12"]:
+            motivo, tot = consulta_fontes([lin_av, cad_pq], m, mes)
+            consultas.append({"mat": m, "mes": mes, "motivo": motivo, "eco": tot})
+    (out / "avulso_esperados.json").write_text(json.dumps({
+        "07": {"linhas": 6, "distintas": 5, "repetidas": 1, "linhasRepetidas": 2, "semTotal": 0, "usadas": 4, "meses": ["2026-07"]},
+        "08": {"linhas": 2, "distintas": 2, "repetidas": 0, "linhasRepetidas": 0, "semTotal": 0, "usadas": 2, "meses": ["2026-08"]},
+        "consultas": consultas}, ensure_ascii=False, indent=1))
     esp_p = esperados(rows)
     esp_p["cadastro"] = esperados_cadastro(cad_pequeno, matriculas_neg(rows), rows)
     (out / "pequeno_esperados.json").write_text(json.dumps(esp_p, ensure_ascii=False, indent=1))

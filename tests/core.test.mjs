@@ -140,6 +140,7 @@ test('valor negociado e economias recuperadas: débito ÷ débito total informad
   assert.equal(s.exec, 7);
   assert.ok(Math.abs(s.economiasSobreExec - 17 / 7) < 1e-9);
   assert.ok(s.economias >= s.matriculasNeg, 'nunca menos de 1 economia por matrícula que negociou');
+  assert.equal(s.neg - s.negSemMatricula - s.matriculasNeg, 1, 'negociações = matrículas distintas + repetidas na mesma matrícula (123 duas vezes) + sem matrícula');
   // sem débito informado e sem Exec: divisões protegidas
   const vazio = PC.summarize([r({ exec: false, exoc: true, neg: true, matricula: '1', eco: 2, ecoMotivo: 'ok' })]);
   assert.equal(vazio.debitoPct, null);
@@ -195,11 +196,13 @@ test('Cadastro: lê só matrícula e TOTAL_ECO; matrícula repetida no arquivo �
   assert.equal(cad.aba, 'Export');
   assert.deepEqual([cad.colunaMatricula, cad.colunaTotal], ['NUM_LIGACAO', 'TOTAL_ECO']);
   for (const k of ['linhas', 'semMatricula', 'distintas', 'repetidas', 'linhasRepetidas', 'semTotal', 'usadas']) assert.equal(cad[k], esp[k], k);
-  assert.equal(cad.unicas.reduce((a, [, t]) => a + t, 0), esp.somaUnicas);
-  assert.deepEqual(cad.unicas.map(([m]) => m).sort(), ['1001', '3003', '4'], '00004 normalizada; 2002 (repetida) e 5005 (sem total) ficam de fora');
-  assert.deepEqual(cad.repetidasLista, ['2002']);
-  // só matrícula e total são guardados: nada de nome, cidade etc.
-  assert.ok(cad.unicas.every((x) => x.length === 2 && typeof x[0] === 'string' && typeof x[1] === 'number'));
+  const utilizaveis = (c) => c.itens.filter(([, , t, n]) => n === 1 && t != null);
+  assert.equal(utilizaveis(cad).reduce((a, [, , t]) => a + t, 0), esp.somaUnicas);
+  assert.deepEqual(utilizaveis(cad).map(([m]) => m).sort(), ['1001', '3003', '4'], '00004 normalizada; 2002 (repetida) e 5005 (sem total) ficam de fora');
+  assert.deepEqual(cad.itens.filter(([, , , n]) => n > 1).map(([m]) => m), ['2002']);
+  assert.deepEqual(cad.meses, ['2026-10'], 'o arquivo tem um mês só (Mês/Ano = 10/2026), como o export real');
+  // só matrícula, mês, total e nº de linhas são guardados: nada de nome, cidade etc.
+  assert.ok(cad.itens.every((x) => x.length === 4 && typeof x[0] === 'string' && typeof x[1] === 'string' && (x[2] === null || typeof x[2] === 'number') && typeof x[3] === 'number'));
   assert.ok(!JSON.stringify(cad).includes('Cliente sintético'), 'colunas de nome/endereço não são lidas');
   // arquivo sem as colunas: mensagem clara
   await assert.rejects(PC.readCadastro(arquivo(fx('Cadastro_sem_colunas.xlsx')), {}), (e) => {
@@ -210,6 +213,126 @@ test('Cadastro: lê só matrícula e TOTAL_ECO; matrícula repetida no arquivo �
   });
 });
 
+test('Cadastro com vários meses (Mês/Ano): repetida só conta se repetir no mesmo mês; vale o total do mês da negociação, ou o mês mais próximo', { skip: !fs.existsSync(fx('Cadastro_meses.xlsx')) && 'gere as planilhas' }, async () => {
+  const cad = await PC.readCadastro(arquivo(fx('Cadastro_meses.xlsx')), {});
+  const e = json('cadastro_meses_esperados.json');
+  assert.equal(cad.colunaMes, 'Mês/Ano');
+  for (const k of ['linhas', 'semMatricula', 'distintas', 'repetidas', 'linhasRepetidas', 'semTotal', 'usadas']) assert.equal(cad[k], e[k], k);
+  assert.deepEqual(cad.meses, e.meses);
+  assert.deepEqual(cad.meses, ['2026-07', '2026-08', '2026-09']);
+  assert.equal(cad.repetidas, 1, 'só 2002 em 07/2026 repete no mesmo mês; 1001, em três meses, não é repetida');
+  // consultas conferidas com a contagem independente (Python): mês exato, mês mais próximo, repetida, sem total e ausente
+  const recs = e.consultas.map((c) => ({ matricula: c.mat, mes: c.mes }));
+  PC.applyCadastro(recs, cad);
+  e.consultas.forEach((c, i) => {
+    assert.equal(recs[i].ecoMotivo, c.motivo, `${c.mat} em ${c.mes}`);
+    assert.equal(recs[i].eco, c.eco, `${c.mat} em ${c.mes}: total`);
+  });
+  const q = (mat, mes) => { const r = { matricula: mat, mes }; PC.applyCadastro([r], cad); return [r.ecoMotivo, r.eco]; };
+  assert.deepEqual(q('1001', '2026-07'), ['ok', 3], 'mês exato');
+  assert.deepEqual(q('1001', '2026-08'), ['ok', 4]);
+  assert.deepEqual(q('1001', '2026-12'), ['ok', 4], 'depois do último mês: o mais próximo (09/2026)');
+  assert.deepEqual(q('1001', '2026-01'), ['ok', 3], 'antes do primeiro mês: o mais próximo (07/2026)');
+  assert.deepEqual(q('2002', '2026-07'), ['rep', null], 'repetida no mesmo mês: desconsiderada');
+  assert.deepEqual(q('2002', '2026-08'), ['ok', 5], 'em outro mês a mesma matrícula não repete');
+  assert.deepEqual(q('3003', '2026-07'), ['ok', 2], 'só existe em 08/2026: vale para os outros meses');
+  assert.deepEqual(q('00004', '2026-07'), ['ok', 2], 'zeros à esquerda');
+  assert.deepEqual(q('5005', '2026-07'), ['sem', null], 'sem TOTAL_ECO no mês');
+  assert.deepEqual(q('5005', '2026-09'), ['ok', 6]);
+  assert.deepEqual(q('5005', '2026-08'), ['sem', null], 'empate entre 07 e 09: vale o mais antigo (sem total)');
+  assert.deepEqual(q('9999', '2026-07'), ['sem', null], 'fora do Cadastro');
+  // atividade sem data: vale o mês mais recente do Cadastro
+  assert.deepEqual(q('1001', ''), ['ok', 4]);
+  // pequeno: as 5 negociações (julho, matrícula 1001) valem o total de julho (3), não o de agosto/setembro (4)
+  const res = await ler(fx('pequeno_xlsxwriter.xlsx'));
+  PC.applyCadastro(res.records, cad);
+  const s = PC.summarize(res.records);
+  assert.equal(s.economias, 3);
+  assert.equal(s.economiasMatriculas, 1);
+  // formato gravado por uma versão anterior (um período só) continua funcionando
+  const antigo = { tipo: 'cadastro', unicas: [['1001', 7]], repetidasLista: ['2002'] };
+  const rs = ['1001', '2002', '3003'].map((m) => ({ matricula: m, mes: '2026-07' }));
+  PC.applyCadastro(rs, antigo);
+  assert.deepEqual(rs.map((r) => [r.ecoMotivo, r.eco]), [['ok', 7], ['rep', null], ['sem', null]]);
+});
+
+test('Serviço avulso (CSV do faturamento): lê N. da Ligacao e soma Qtd. Economia; UTF-8 com BOM e "sep=;" ou Windows-1252 sem cabeçalho de mês', { skip: !fs.existsSync(fx('Servico_avulso_07-2026.csv')) && 'gere as planilhas' }, async () => {
+  const e = json('avulso_esperados.json');
+  const lerCsv = (n, path) => PC.readServicoAvulso(arquivo(fx(n)), { path: path || n });
+  const a07 = await lerCsv('Servico_avulso_07-2026.csv');
+  assert.equal(a07.tipo, 'avulso');
+  assert.deepEqual([a07.colunaMatricula, a07.colunaMes], ['N. da Ligacao', 'Referencia de Leitura']);
+  assert.match(a07.colunaTotal, /Qtd\. Economia Residencial \+ Qtd\. Economia Comercial/);
+  for (const k of ['linhas', 'distintas', 'repetidas', 'linhasRepetidas', 'semTotal', 'usadas', 'meses']) assert.deepEqual(a07[k], e['07'][k], '07 ' + k);
+  // total = soma das cinco colunas: 1001 tem 2 residenciais + 2 comerciais; 2002 tem duas linhas (serviços diferentes) e é desconsiderada
+  const it = (c, mat) => c.itens.filter(([m]) => m === mat);
+  assert.deepEqual(it(a07, '1001'), [['1001', '2026-07', 4, 1]]);
+  assert.deepEqual(it(a07, '2002'), [['2002', '2026-07', 1, 2]], 'duas linhas no mesmo mês: nº de linhas 2');
+  assert.deepEqual(it(a07, '4'), [['4', '2026-07', 2, 1]], 'zeros à esquerda');
+  assert.ok(!JSON.stringify(a07).includes('Cliente sintético'), 'nome do cliente não é guardado');
+  // Windows-1252, sem BOM, sem a linha sep=; e sem coluna de mês: o mês vem do nome do arquivo
+  const a08 = await lerCsv('Servico_avulso_08-2026.csv');
+  for (const k of ['linhas', 'distintas', 'repetidas', 'usadas', 'meses']) assert.deepEqual(a08[k], e['08'][k], '08 ' + k);
+  assert.deepEqual(it(a08, '1001'), [['1001', '2026-08', 5, 1]]);
+  assert.equal(a08.colunaMes, '');
+  // CSV que não é o Serviço avulso: erro próprio (o painel ignora)
+  await assert.rejects(lerCsv('outro_relatorio.csv'), (er) => er instanceof PC.PcError && er.code === 'AVULSO_SEM_COLUNAS');
+  // delimitador, aspas e linha sep= também em texto qualquer
+  assert.deepEqual(PC.parseCsv('a;"b;c";"d ""x"" e"\r\n1;2;3', ';'), [['a', 'b;c', 'd "x" e'], ['1', '2', '3']]);
+  assert.equal(PC.mesDoNome('Servico_avulso_10-2026.csv'), '2026-10');
+  assert.equal(PC.mesDoNome('pasta/Avulso 2026-03.csv'), '2026-03');
+  assert.equal(PC.mesDoNome('avulso.csv'), '');
+  assert.equal(PC.ehAvulso('Servico_avulso_10-2026.csv'), true);
+  assert.equal(PC.ehAvulso('Cadastro.xlsx'), false);
+  // vários arquivos: um por mês; havendo dois do mesmo mês, vale o mais recente
+  const novoA08 = { ...a08, lastModified: 9e12, name: 'novo.csv' };
+  const m = PC.mesclarAvulsos([{ ...a07, lastModified: 1, name: 'a07.csv' }, { ...a08, lastModified: 2, name: 'a08.csv' }, novoA08]);
+  assert.deepEqual(m.meses, ['2026-07', '2026-08']);
+  assert.equal(m.arquivos, 2);
+  assert.equal(m.descartados, 1);
+  assert.deepEqual(m.nomes.sort(), ['a07.csv', 'novo.csv']);
+  assert.equal(m.distintas, 5, 'matrículas distintas dos dois meses juntas: 1001, 2002, 3003, 7777 e 4');
+  assert.equal(PC.mesclarAvulsos([]), null);
+});
+
+test('Serviço avulso primeiro, Cadastro de reserva, mínimo de 1: consultas conferidas com a contagem independente (Python)', { skip: !fs.existsSync(fx('Servico_avulso_07-2026.csv')) && 'gere as planilhas' }, async () => {
+  const e = json('avulso_esperados.json');
+  const a07 = await PC.readServicoAvulso(arquivo(fx('Servico_avulso_07-2026.csv')), { path: 'Servico_avulso_07-2026.csv' });
+  const a08 = await PC.readServicoAvulso(arquivo(fx('Servico_avulso_08-2026.csv')), { path: 'Servico_avulso_08-2026.csv' });
+  const cad = await PC.readCadastro(arquivo(fx('Cadastro_pequeno.xlsx')), {});
+  const avulso = PC.mesclarAvulsos([a07, a08]);
+  const recs = e.consultas.map((c) => ({ matricula: c.mat, mes: c.mes }));
+  PC.applyCadastro(recs, [avulso, cad]);
+  e.consultas.forEach((c, i) => {
+    assert.equal(recs[i].ecoMotivo, c.motivo, `${c.mat} em ${c.mes}`);
+    assert.equal(recs[i].eco, c.eco, `${c.mat} em ${c.mes}: total`);
+  });
+  const q = (mat, mes, fontes) => { const r = { matricula: mat, mes }; PC.applyCadastro([r], fontes); return [r.ecoMotivo, r.eco, r.ecoFonte]; };
+  assert.deepEqual(q('1001', '2026-07', [avulso, cad]), ['ok', 4, 'avulso'], 'o avulso (4) vale mais que o Cadastro (3)');
+  assert.deepEqual(q('1001', '2026-08', [avulso, cad]), ['ok', 5, 'avulso'], 'total do mês da negociação');
+  assert.deepEqual(q('1001', '2026-07', [cad]), ['ok', 3, 'cadastro'], 'sem o avulso, o Cadastro');
+  assert.deepEqual(q('2002', '2026-07', [avulso, cad]), ['rep', null, ''], 'repetida no avulso e no Cadastro: desconsiderada');
+  assert.deepEqual(q('7777', '2026-07', [avulso, cad]), ['ok', 5, 'avulso'], 'só no avulso');
+  assert.deepEqual(q('5005', '2026-07', [avulso, cad]), ['sem', null, ''], 'sem total no Cadastro e fora do avulso');
+  assert.deepEqual(q('9999', '2026-07', [avulso, cad]), ['sem', null, ''], 'fora das duas fontes');
+  assert.deepEqual(q('1001', '2026-07', [null, null]), ['nao', null, ''], 'nenhuma fonte carregada');
+  // matrícula repetida no avulso passa para o Cadastro quando lá ela é única
+  const so = { tipo: 'avulso', itens: [['55', '2026-07', 2, 2]] };
+  const so2 = { tipo: 'cadastro', itens: [['55', '2026-07', 9, 1]] };
+  assert.deepEqual(q('55', '2026-07', [so, so2]), ['ok', 9, 'cadastro']);
+  // resumo: o total vem das fontes, na ordem, e o mínimo de 1 completa o resto (negociações de 1001 em julho, 2002 e 9999)
+  const mk = (matricula) => ({ exec: true, exoc: false, neg: true, valor: null, matricula, mes: '2026-07' });
+  const rs = ['1001', '2002', '3003', '9999', '7777'].map(mk);
+  PC.applyCadastro(rs, [avulso, cad]);
+  const s = PC.summarize(rs);
+  assert.equal(s.economias, 4 + 1 + 1 + 1 + 5, '1001 (4) + 2002 (repetida: 1) + 3003 (1) + 9999 (fora: 1) + 7777 (5)');
+  assert.equal(s.economiasDoAvulso, 3);
+  assert.equal(s.economiasDoCadastro, 0);
+  assert.equal(s.economiasPeloMinimo, 2);
+  assert.equal(s.economiasRepetidas, 1);
+  assert.equal(s.economiasSemCadastro, 1);
+});
+
 test('Cadastro: economias recuperadas = soma do TOTAL_ECO das matrículas distintas que negociaram (conferido com contagem independente)', { skip: !fs.existsSync(fx('Cadastro_grande.xlsx')) && 'gere as planilhas' }, async () => {
   for (const [base, cadFx, espFx] of [['pequeno_xlsxwriter.xlsx', 'Cadastro_pequeno.xlsx', 'pequeno_esperados.json'], ['grande_sintetico.xlsx', 'Cadastro_grande.xlsx', 'grande_esperados.json']]) {
     const res = await ler(fx(base));
@@ -217,7 +340,7 @@ test('Cadastro: economias recuperadas = soma do TOTAL_ECO das matrículas distin
     const esp = json(espFx);
     const e = esp.cadastro;
     for (const k of ['linhas', 'semMatricula', 'distintas', 'repetidas', 'linhasRepetidas', 'semTotal', 'usadas']) assert.equal(cad[k], e[k], base + ' ' + k);
-    assert.equal(cad.unicas.reduce((a, [, t]) => a + t, 0), e.somaUnicas, base + ' soma do TOTAL_ECO das únicas');
+    assert.equal(cad.itens.filter(([, , t, n]) => n === 1 && t != null).reduce((a, [, , t]) => a + t, 0), e.somaUnicas, base + ' soma do TOTAL_ECO das únicas');
     PC.applyCadastro(res.records, cad);
     const s = PC.summarize(res.records);
     assert.equal(s.matriculasNeg, esp.matriculasNeg, base + ' matrículas que negociaram');
@@ -232,6 +355,7 @@ test('Cadastro: economias recuperadas = soma do TOTAL_ECO das matrículas distin
     // conciliação: toda matrícula que negociou está em exatamente uma das situações
     assert.equal(s.economiasMatriculas + s.economiasRepetidas + s.economiasSemCadastro, s.matriculasNeg);
     assert.equal(s.economiasMatriculas + s.economiasPeloMinimo, s.matriculasNeg);
+    assert.equal(s.neg - s.negSemMatricula - s.matriculasNeg, esp.neg - esp.negSemMatricula - esp.matriculasNeg, base + ' negociações repetidas na mesma matrícula (contagem independente)');
     // sem Cadastro carregado: cada matrícula que negociou conta o mínimo de 1
     PC.applyCadastro(res.records, null);
     const sem = PC.summarize(res.records);

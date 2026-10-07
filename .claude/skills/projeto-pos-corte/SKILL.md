@@ -11,7 +11,7 @@ description: Visão geral do projeto Pós-Corte Interior (analistafjp-design/pos
   que lê `.xlsx` de uma pasta do OneDrive no navegador. Nenhum dado sai do
   computador do usuário.
 - **Abas:** Visão geral (indicadores sem legendas, recortes, valores negociados
-  e economias recuperadas (via arquivo Cadastro), negociações e termos, cidades, categorias, frentes e equipes), Bases de campo,
+  e economias recuperadas (via Serviço avulso em CSV, com o Cadastro de reserva), negociações e termos, cidades, categorias, frentes e equipes), Bases de campo,
   Analítico e Arquivos e regras.
 - **Código:** `src/` (`core.js`, `app.js`, `exportar.js`, `styles.css`,
   `template.html`, `frentes-padrao.js`); `node build.mjs` gera o HTML e

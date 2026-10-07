@@ -44,11 +44,15 @@ validações).
 - **Indicador sem coluna** aparece como **indisponível**, nunca como zero
   silencioso.
 - **Leia só as 19 colunas usadas** (a lista está no prompt).
-  - Exceção: o arquivo **Cadastro** (colunas `NUM_LIGACAO` e `TOTAL_ECO`; "cadastro"
+  - Exceção 1: o **Serviço avulso** (CSV do faturamento, um por mês), lido só
+    pela matrícula (`N. da Ligacao`), pelas colunas `Qtd. Economia ...` e pelo mês;
+    é a fonte principal das economias recuperadas e o Cadastro completa o que faltar.
+  - Exceção 2: o arquivo **Cadastro** (colunas `NUM_LIGACAO` e `TOTAL_ECO`; "cadastro"
     no nome do arquivo ou da pasta é só dica), lido à parte só pelas
     colunas `NUM_LIGACAO` e `TOTAL_ECO`, para as economias recuperadas. Ele não
-    é base de atividades, só guarda matrícula e total, e matrícula repetida nele
-    é desconsiderada.
+    é base de atividades, só guarda matrícula, total e mês (coluna opcional
+    `Mês/Ano`), e matrícula repetida nele é desconsiderada (dentro do mesmo mês,
+    quando o arquivo tem vários meses).
 - **Bases de campo**: o cruzamento é pela Matrícula e só considera os
   serviços de pós-corte (110010/11/12, 210010/11/12 e 310010/11/12).
 
