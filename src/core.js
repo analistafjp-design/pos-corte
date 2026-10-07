@@ -1453,8 +1453,9 @@
    * Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec (null quando não há Exec).
    * Equipes = recursos distintos que trabalharam; equipeDias = pares (equipe, dia) com atividade;
    * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
-   * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoTotal`
-   * (soma do mesmo campo em todas as atividades do conjunto). Matrículas que negociaram = `matriculasNeg` (distintas;
+   * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoExec`
+   * (soma do mesmo campo nas atividades Exec do conjunto): a mesma mecânica da Efetividade (negociações ÷ Exec), em
+   * valor, por atividade. Matrículas que negociaram = `matriculasNeg` (distintas;
    * negociação sem matrícula fica em `negSemMatricula`). Economias recuperadas = `economias`: soma do TOTAL_ECO do
    * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez. Matrícula que negociou é,
    * no mínimo, 1 economia: sem total aproveitável no Cadastro ela conta 1 (`economiasPeloMinimo`), seja por não estar
@@ -1462,7 +1463,7 @@
    * ou por não haver Cadastro carregado (`economiasSemArquivo`). `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasDoAvulso: 0, economiasDoCadastro: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoExec: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasDoAvulso: 0, economiasDoCadastro: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
     const matriculasNeg = new Map();
     const equipes = new Set();
     const dias = new Set();
@@ -1472,7 +1473,7 @@
       if (r.exec) s.exec++;
       else if (r.exoc) s.exoc++;
       else s.outros++;
-      if (r.valor != null) s.debitoTotal += r.valor;
+      if (r.exec && r.valor != null) s.debitoExec += r.valor;
       if (r.neg) {
         s.neg++;
         if (r.valor == null) s.debitoNaoInformado++;
@@ -1520,7 +1521,7 @@
       else s.economiasSemArquivo++;
     }
     s.economiasSobreExec = s.exec ? s.economias / s.exec : null;
-    s.debitoPct = s.debitoTotal ? s.debito / s.debitoTotal : null;
+    s.debitoPct = s.debitoExec ? s.debito / s.debitoExec : null;
     s.recorteSobreExec = s.exec ? s.recortes / s.exec : null;
     s.produtividade = s.equipeDias ? s.atividades / s.equipeDias : null;
     s.equipesPorDia = s.dias ? s.equipeDias / s.dias : null;

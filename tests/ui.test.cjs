@@ -114,8 +114,11 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   const esp = JSON.parse(fs.readFileSync(fx('pequeno_esperados.json'), 'utf8'));
   const pct = (v) => (v * 100).toFixed(1).replace('.', ',') + '%';
   assert.equal(esp.debito, 2535.06);
-  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', pct(esp.debito / esp.debitoTotal)]);
-  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '64,4%']);
+  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', pct(esp.debito / esp.debitoExec)]);
+  // base = débito das atividades Exec (R$ 3.835,06; a Exoc, R$ 100, fica de fora), como a Efetividade usa só o Exec; contagem independente em pequeno_esperados.json
+  assert.equal(esp.debitoExec, 3835.06);
+  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '66,1%']);
+  assert.match(await page.getAttribute('.card-valores [data-vn=valor]', 'data-tip'), /dividido pelo débito informado das atividades Exec do filtro \(R\$\s3\.835,06\), a mesma base da Efetividade \(negociações ÷ Exec\)/);
   // sem o arquivo Cadastro, cada matrícula que negociou conta o mínimo de 1 economia (as 5 negociações são da matrícula 1001) e o aviso diz isso
   assert.equal(esp.neg, 5);
   assert.equal(esp.matriculasNeg, 1);
@@ -130,7 +133,7 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   assert.deepEqual(await vn('economias'), [String(esp.cadastro.economias), pct(esp.cadastro.economias / esp.exec)]);
   assert.deepEqual(await vn('economias'), ['3', '16,7%']);
   assert.equal(await page.locator('.card-valores [data-vn=economias] .kpi-sub').count(), 0, 'sem aviso quando o Cadastro está carregado');
-  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '64,4%'], 'valor negociado não muda com o Cadastro');
+  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '66,1%'], 'valor negociado não muda com o Cadastro');
   assert.match(await page.textContent('#status'), /1 repetida desconsiderada/);
   assert.equal(await page.locator('.card-valores [data-vn=sem-cadastro], .card-valores [data-vn=cadastro-repetida]').count(), 0, 'a matrícula negociada está no Cadastro');
   assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o Cadastro não vira atividade nem muda os cartões');
