@@ -158,7 +158,6 @@ button.kpi:hover .kpi-go { color: var(--brand-2); }
 .kpi-sub { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
 .grp-title { font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 2px 2px -4px; }
 
-.grid-2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .grid-rank { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .stack { display: grid; gap: 14px; }
 
@@ -271,7 +270,6 @@ tfoot td { font-weight: 700; background: #f7f8fa; }
 @media (min-width: 960px) {
   .filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .filters .field.wide { grid-column: auto; }
-  .grid-2 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
 }
 @media (min-width: 1280px) {
   .kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -320,19 +318,15 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
   .kpi-value { font-size: 24px; }
   .kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .grid-2 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
   .grid-rank { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table-wrap { overflow: visible; max-height: none !important; }
   table { font-size: 10.5px; }
   th, td { padding: 4px 6px; }
   .brow, .mgroup, .rrow, tr { break-inside: avoid; }
   .card h2 { font-size: 14px; }
-  /* disposição: KPIs; produção mensal ao lado de negociações/termos; demais blocos em largura total */
+  /* disposição: todos os blocos em largura total */
   #view-geral > .stack { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
   #view-geral > .stack > * { grid-column: 1 / -1; }
-  #view-geral > .stack > .grid-2 { display: contents; }
-  #view-geral > .stack > .grid-2 > .card-mensal, #view-geral > .stack > .card-negtermo { grid-column: auto; }
-  .card-status { display: none !important; }
   .main-col { zoom: 0.8; }
   /* versão compacta para caber em poucas páginas */
   .card { padding: 9px 11px; }
@@ -402,30 +396,6 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
   .tabs button { white-space: normal; text-align: center; flex: 1 1 auto; line-height: 1.2; padding: 7px 6px; font-size: 13px; }
 }
 
-/* ---------- Gráfico de colunas com linha (produção mensal) ---------- */
-.cc-wrap { overflow-x: auto; padding-bottom: 2px; }
-.colchart { min-width: 240px; }
-.cc-area { position: relative; height: 300px; }
-.cc-grid { position: absolute; left: 0; right: 0; top: 28px; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
-.cc-grid i { display: block; height: 1px; background: var(--line); }
-.cc-cols { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }
-.cc-col { display: flex; flex-direction: column; background: transparent; border: 0; padding: 0; min-width: 0; border-radius: 8px; color: inherit; text-align: center; }
-button.cc-col { cursor: pointer; }
-.cc-col:hover { background: rgba(30, 79, 214, 0.06); }
-.cc-col.is-active { background: var(--brand-tint); }
-.cc-plot { flex: 1 1 auto; margin-top: 28px; display: flex; align-items: flex-end; justify-content: center; min-height: 0; }
-.cc-stack { width: min(60%, 46px); display: flex; flex-direction: column-reverse; border-radius: 6px 6px 0 0; overflow: hidden; }
-.cc-stack i { display: block; background: var(--c); min-height: 2px; margin-top: 1px; }
-.cc-stack i:last-child { margin-top: 0; }
-.cc-label { height: 30px; line-height: 30px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
-.cc-col.is-active .cc-label { font-weight: 700; color: var(--brand-2); }
-.cc-over { position: absolute; left: 0; right: 0; top: 28px; bottom: 30px; pointer-events: none; }
-.cc-over svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.cc-over polyline { fill: none; stroke: #334155; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.cc-pt { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #334155; transform: translate(-50%, 50%); }
-.cc-val { position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -4px); font-size: 12.5px; font-weight: 700; white-space: nowrap; color: var(--ink); background: rgba(255, 255, 255, 0.85); border-radius: 4px; padding: 0 3px; }
-@media print { .cc-area { height: 210px; } .cc-wrap { overflow: visible; } .colchart { min-width: 0 !important; } }
-
 /* ---------- Recortes da base ---------- */
 .recorte { display: grid; gap: 14px 24px; grid-template-columns: minmax(0, 1fr); background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
 .recorte-res { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -437,6 +407,13 @@ button.cc-col { cursor: pointer; }
 .rc-val { font-weight: 700; white-space: nowrap; }
 @media (min-width: 720px) { .recorte { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); } }
 @media (max-width: 480px) { .rc-row { grid-template-columns: minmax(0, 1fr) auto; } .rc-track { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ---------- Valores negociados (débito informado por mês) ---------- */
+.vn-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.vn-item { background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vn-item.is-total { background: var(--brand-tint); border-color: #c9d7f8; }
+.vn-mes { font-size: 12px; font-weight: 600; color: var(--muted); }
+.vn-valor { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; white-space: nowrap; }
 
 /* ---------- Pós-corte por categoria ---------- */
 .destaque { margin: 0 0 12px; padding: 10px 14px; background: var(--brand-tint); border: 1px solid #c9d7f8; border-radius: 10px; color: var(--ink); }

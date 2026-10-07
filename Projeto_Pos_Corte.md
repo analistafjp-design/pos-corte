@@ -196,12 +196,12 @@ Exec + Exoc = 8.136 porque essa base só tem esses dois status; em outras bases 
 ## 10. Interface
 
 - Navegação: **Visão geral**, **Analítico**, **Base e regras** (menu lateral no computador; barra inferior no celular).
-- Cartões em destaque, em dois grupos: **Percorrido, Total de Exec, Total de Exoc, Equipes que trabalharam** e **Termos, Assertividade, Negociações, Efetividade, Sem Desdobro** (com o débito informado e 110013/310013). Assertividade, Efetividade e Equipes são informativos; os demais abrem o Analítico.
+- Cartões em destaque, em dois grupos: **Percorrido, Total de Exec, Total de Exoc, Equipes que trabalharam** e **Termos, Assertividade, Negociações, Efetividade, Sem Desdobro**, só com rótulo e valor (sem legendas). Assertividade, Efetividade e Equipes são informativos; os demais abrem o Analítico.
 - **Produtividade por cidade**: tabela com percorrido, Exec, Exoc, termos, assertividade, negociações, efetividade, equipes, equipe-dias e produtividade; clicar na cidade filtra.
 - **Exportar Excel**: baixa um `.xlsx` (sem bibliotecas externas) com as planilhas Resumo, Mensal, Produtividade por cidade, Equipes, Frentes e Registros do filtro atual. Textos iniciados por `=`, `+`, `-` ou `@` ficam como texto, não como fórmula.
 - **Exportar PDF**: abre a impressão do navegador com o layout da Visão geral em A4 paisagem (cerca de 3 páginas); escolha "Salvar como PDF". O PDF não é gerado por biblioteca própria.
 - Abas: **Visão geral**, **Analítico** (auditoria linha a linha, busca e CSV) e **Arquivos e regras** (arquivos lidos, prioridade "só completa", conferências, frentes sem mapeamento e, recolhidos, colunas/nomes alternativos e regras).
-- Produção mensal em barras horizontais (Exec/Exoc/Outros empilhados quando o indicador é Atividades), distribuição dos status, gráfico separado de negociações e termos com a mesma escala, tabela mensal e rankings por frente, cidade e equipe ("Mostrar todos").
+- **Valores negociados** logo abaixo de "Recortes realizados", em largura total: o débito informado de cada mês e o total (com aviso quando há negociação sem valor informado). Depois, gráfico separado de negociações e termos com a mesma escala, resultados por cidade, pós-corte por categoria e rankings por frente e equipe ("Mostrar todos"). A produção mensal, a distribuição dos status e a tabela de valores mensais saíram da Visão geral; a planilha Mensal do Excel continua trazendo os valores por mês.
 - Cores fixas por indicador (paleta validada quanto a daltonismo); valores sempre em texto ao lado das barras; dica com os valores ao passar o mouse ou focar por teclado.
 - Filtros valem para cartões, gráficos, analítico e exportação; o foco do teclado é mantido ao filtrar.
 - Analítico com 50 linhas por página, detalhe expansível com os 19 campos e exportação de **todas** as linhas filtradas.

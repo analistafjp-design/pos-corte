@@ -10,8 +10,8 @@ description: Visão geral do projeto Pós-Corte Interior (analistafjp-design/pos
 - **O que é:** painel de **um único arquivo HTML**, sem servidor e sem rede,
   que lê `.xlsx` de uma pasta do OneDrive no navegador. Nenhum dado sai do
   computador do usuário.
-- **Abas:** Visão geral (indicadores, produção mensal em colunas com linha,
-  recortes, cidades, categorias, frentes e equipes), Bases de campo,
+- **Abas:** Visão geral (indicadores sem legendas, recortes, valores negociados
+  por mês, negociações e termos, cidades, categorias, frentes e equipes), Bases de campo,
   Analítico e Arquivos e regras.
 - **Código:** `src/` (`core.js`, `app.js`, `exportar.js`, `styles.css`,
   `template.html`, `frentes-padrao.js`); `node build.mjs` gera o HTML e

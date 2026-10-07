@@ -887,8 +887,6 @@
   /* Componentes de gráfico                                              */
   /* ------------------------------------------------------------------ */
 
-  const valorInd = (s, k) => s[k];
-
   function legenda(itens) {
     return h('ul', { class: 'legend' }, itens.map((i) => h('li', null, h('span', { class: 'sw', style: { '--c': i.cor } }), i.t)));
   }
@@ -899,13 +897,7 @@
     return h('div', { class: 'note warn', text: '⚠ ' + IND[k].curto + ' não pôde ser calculado em ' + nomes.length + ' ' + plural(nomes.length, 'arquivo', 'arquivos') + ' (coluna ausente): ' + nomes.join(', ') + '. Esses arquivos contam 0.' });
   }
 
-  function periodoTexto() {
-    if (!vm.min) return 'sem datas no filtro';
-    return PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max);
-  }
-
   const fmtPctVal = (v) => (v == null ? '—' : (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%');
-  const fmtDec = (v) => (v == null ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 
   function renderKpis() {
     const s = vm.sum;
@@ -916,7 +908,6 @@
       const conteudo = [
         h('span', { class: 'kpi-label' }, h('i', { class: 'kdot' }), h('span', { text: c.t }), c.ind ? h('span', { class: 'kpi-go', 'aria-hidden': 'true' }, icon('arrow', 14)) : null),
         h('span', { class: 'kpi-value num', text: c.v }),
-        c.sub.map((t) => h('span', { class: 'kpi-sub', text: t })),
         indisp && indisp.length ? h('span', { class: 'kpi-sub', text: '⚠ indisponível em ' + indisp.length + ' ' + plural(indisp.length, 'arquivo', 'arquivos') }) : null,
       ];
       const props = { class: 'kpi' + (c.ind ? '' : ' static'), style: { '--kc': c.cor }, dataset: { fk: 'kpi:' + c.k } };
@@ -925,20 +916,19 @@
         : h('div', Object.assign(props, { role: 'group', tabindex: 0, 'aria-label': c.t + ': ' + c.v + '. ' + c.tip, 'data-tip': c.t + '\n' + c.tip }), conteudo);
     };
     const resultado = [
-      { k: 'atividades', ind: 'atividades', t: 'Percorrido', v: fmtInt(s.percorrido), cor: COR.atividades, sub: ['Exec + Exoc', periodoTexto()] },
-      { k: 'exec', ind: 'exec', t: 'Total de Exec', v: fmtInt(s.exec), cor: COR.exec, sub: ['Finalizada', fmtPct(s.exec, s.percorrido) + ' do percorrido'] },
-      { k: 'exoc', ind: 'exoc', t: 'Total de Exoc', v: fmtInt(s.exoc), cor: COR.exoc, sub: ['Encerrada com Ocorrência', fmtPct(s.exoc, s.percorrido) + ' do percorrido'] },
+      { k: 'atividades', ind: 'atividades', t: 'Percorrido', v: fmtInt(s.percorrido), cor: COR.atividades },
+      { k: 'exec', ind: 'exec', t: 'Total de Exec', v: fmtInt(s.exec), cor: COR.exec },
+      { k: 'exoc', ind: 'exoc', t: 'Total de Exoc', v: fmtInt(s.exoc), cor: COR.exoc },
       {
         k: 'equipes', t: 'Equipes que trabalharam', v: fmtInt(s.equipes), cor: COR.atividades,
-        sub: [mesmoDia ? 'no dia ' + PC.isoToBR(vm.min) : fmtDec(s.equipesPorDia) + ' por dia · ' + fmtInt(s.dias) + ' ' + plural(s.dias, 'dia', 'dias') + ' com atividade'],
         tip: 'Equipes (Recurso) com ao menos uma atividade ' + (mesmoDia ? 'no dia' : 'no período') + ' filtrado.',
       },
     ];
     const qualidade = [
-      { k: 'termos', ind: 'termos', t: 'Termos aplicados', v: fmtInt(s.termos), cor: COR.termos, sub: ['Irregularidade identificada', '110013 Serviços: ' + fmtInt(s.t11) + ' · 310013 VCG: ' + fmtInt(s.t31)] },
-      { k: 'assertividade', dep: 'termos', t: 'Assertividade', v: fmtPctVal(s.assertividade), cor: COR.termos, sub: ['Termos ÷ Exec', fmtInt(s.termos) + ' ÷ ' + fmtInt(s.exec)], tip: 'Termos aplicados divididos pelo total de Exec.' },
-      { k: 'neg', ind: 'neg', t: 'Negociações', v: fmtInt(s.neg), cor: COR.neg, sub: ['Débito informado: ' + brl.format(s.debito)].concat(s.debitoNaoInformado ? [s.debitoNaoInformado + ' sem valor informado'] : []) },
-      { k: 'efetividade', dep: 'neg', t: 'Efetividade', v: fmtPctVal(s.efetividade), cor: COR.neg, sub: ['Negociações ÷ Exec', fmtInt(s.neg) + ' ÷ ' + fmtInt(s.exec)], tip: 'Negociações divididas pelo total de Exec.' },
+      { k: 'termos', ind: 'termos', t: 'Termos aplicados', v: fmtInt(s.termos), cor: COR.termos },
+      { k: 'assertividade', dep: 'termos', t: 'Assertividade', v: fmtPctVal(s.assertividade), cor: COR.termos, tip: 'Termos aplicados divididos pelo total de Exec.' },
+      { k: 'neg', ind: 'neg', t: 'Negociações', v: fmtInt(s.neg), cor: COR.neg },
+      { k: 'efetividade', dep: 'neg', t: 'Efetividade', v: fmtPctVal(s.efetividade), cor: COR.neg, tip: 'Negociações divididas pelo total de Exec.' },
     ];
     return h('div', { class: 'kpi-groups' },
       h('div', { class: 'grp-title', text: 'Resultado', 'aria-hidden': 'true' }),
@@ -957,75 +947,6 @@
     if (mesAtivo(mes)) { state.filters.from = ''; state.filters.to = ''; }
     else { state.filters.from = r.from; state.filters.to = r.to; }
     aplicarFiltros();
-  }
-
-  function renderMensal() {
-    const ind = state.chartInd;
-    const meses = vm.months;
-    const max = Math.max(1, ...meses.map((m) => valorInd(m.sum, ind)));
-    const empilhado = ind === 'atividades';
-    const temOutros = vm.sum.outros > 0;
-    const n = meses.length;
-    // gráfico de colunas com linha: colunas empilhadas (Exec/Exoc) ou simples e uma linha ligando os topos; os valores ficam sempre visíveis
-    const colunas = meses.map((m, i) => {
-      const s = m.sum;
-      const v = valorInd(s, ind);
-      const partes = empilhado
-        ? [{ n: 'Exec', v: s.exec, c: COR.exec }, { n: 'Exoc', v: s.exoc, c: COR.exoc }, { n: 'Outros status', v: s.outros, c: COR.outros }].filter((p) => p.v > 0)
-        : [];
-      const tipText = m.rotulo + '\n' + fmtInt(v) + ' ' + IND[ind].curto.toLowerCase() + (empilhado ? partes.map((p) => '\n' + p.n + ': ' + fmtInt(p.v)).join('') : '') + (ind !== 'atividades' ? '\n' + fmtInt(s.atividades) + ' atividades no mês' : '');
-      const alt = (v / max) * 100;
-      const pilha = v === 0 ? null : h('span', { class: 'cc-stack', style: { height: Math.max(alt, 0.8) + '%' } },
-        empilhado ? partes.map((p) => h('i', { style: { flex: p.v + ' 1 0px', '--c': p.c } })) : h('i', { style: { flex: '1 1 0px', '--c': COR[ind] } }));
-      const conteudo = [
-        h('span', { class: 'cc-plot' }, pilha),
-        h('span', { class: 'cc-label', text: m.rotulo }),
-      ];
-      const aria = m.rotulo + ': ' + fmtInt(v) + ' ' + IND[ind].curto + (m.mes ? '. Filtrar este mês.' : '');
-      const el = m.mes
-        ? h('button', { class: 'cc-col' + (mesAtivo(m.mes) ? ' is-active' : ''), type: 'button', dataset: { fk: 'mes:' + m.mes }, 'data-tip': tipText, 'aria-label': aria, 'aria-pressed': mesAtivo(m.mes) ? 'true' : 'false', onclick: () => filtrarMes(m.mes) }, conteudo)
-        : h('div', { class: 'cc-col', 'data-tip': tipText, tabindex: 0, 'aria-label': aria }, conteudo);
-      return { el, v, alt, x: ((i + 0.5) / n) * 100 };
-    });
-    const pontos = colunas.map((c) => c.x + ',' + (100 - c.alt)).join(' ');
-    const grafico = h('div', { class: 'colchart', style: { minWidth: Math.max(n * 58, 240) + 'px' } },
-      h('div', { class: 'cc-area' },
-        h('div', { class: 'cc-grid', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
-        h('div', { class: 'cc-cols', style: { '--n': n } }, colunas.map((c) => c.el)),
-        h('div', { class: 'cc-over', 'aria-hidden': 'true' },
-          (() => {
-            const svg = document.createElementNS(SVG_NS, 'svg');
-            svg.setAttribute('viewBox', '0 0 100 100');
-            svg.setAttribute('preserveAspectRatio', 'none');
-            const pl = document.createElementNS(SVG_NS, n > 1 ? 'polyline' : 'g');
-            if (n > 1) pl.setAttribute('points', pontos);
-            svg.append(pl);
-            return svg;
-          })(),
-          colunas.map((c) => h('span', { class: 'cc-pt', style: { left: c.x + '%', bottom: c.alt + '%' } }, h('b', { class: 'cc-val num', text: fmtInt(c.v) }))))));
-    return h('section', { class: 'card card-mensal', 'aria-labelledby': 'h-mensal' },
-      h('div', { class: 'card-head' },
-        h('div', null, h('h2', { id: 'h-mensal', text: 'Produção mensal — ' + IND[ind].rotulo }), h('p', { class: 'hint', text: 'Clique em um mês para filtrar. Valores por mês também na tabela abaixo.' }))),
-      empilhado ? legenda([{ cor: COR.exec, t: 'Exec' }, { cor: COR.exoc, t: 'Exoc' }].concat(temOutros ? [{ cor: COR.outros, t: 'Outros status' }] : [])) : null,
-      meses.length ? h('div', { class: 'cc-wrap' }, grafico) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
-      alertaIndisponivel(ind === 'atividades' ? 'exec' : ind)
-    );
-  }
-
-  function renderStatusDist() {
-    const total = vm.sum.atividades;
-    const max = Math.max(1, ...vm.status.map((x) => x.value));
-    const norm = PC.norm;
-    const cor = (st) => (norm(st) === 'finalizada' ? COR.exec : norm(st) === 'encerrada com ocorrencia' ? COR.exoc : COR.outros);
-    return h('section', { class: 'card card-status', 'aria-labelledby': 'h-status' },
-      h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-status', text: 'Distribuição dos status' }), h('p', { class: 'hint', text: 'Todos os status encontrados na base filtrada.' }))),
-      h('div', { class: 'rank-list' }, vm.status.map((x) =>
-        h('div', { class: 'rrow', 'data-tip': x.status + '\n' + fmtInt(x.value) + ' (' + fmtPct(x.value, total) + ')', tabindex: 0 },
-          h('span', { class: 'rl', text: x.status }),
-          h('span', { class: 'rv num' }, fmtInt(x.value), h('small', { text: fmtPct(x.value, total) })),
-          h('span', { class: 'track' }, h('span', { class: 'bar solid', style: { width: Math.max((x.value / max) * 100, 0.6) + '%', '--c': cor(x.status) } }))))),
-      vm.sum.outros > 0 ? h('p', { class: 'note warn', text: 'Há ' + fmtInt(vm.sum.outros) + ' atividades com status diferente de Finalizada e Encerrada com Ocorrência: Exec + Exoc não é igual ao total de atividades.' }) : null
-    );
   }
 
   function renderNegTermo() {
@@ -1054,20 +975,20 @@
     );
   }
 
-  function renderTabelaMensal() {
+  /** Valores negociados: débito informado nas negociações, mês a mês, em faixa de largura total. */
+  function renderValoresNegociados() {
     const s = vm.sum;
-    const cab = ['Mês', 'Percorrido', 'Exec', 'Exoc', 'Termos', 'Assertividade', 'Negociações', 'Efetividade', 'Sem Desdobro', 'Equipes', 'Débito informado (negociações)'];
-    const linha = (x) => [fmtInt(x.percorrido), fmtInt(x.exec), fmtInt(x.exoc), fmtInt(x.termos), fmtPctVal(x.assertividade), fmtInt(x.neg), fmtPctVal(x.efetividade), fmtInt(x.semDesdobro), fmtInt(x.equipes), brl.format(x.debito)];
-    return h('section', { class: 'card', 'aria-labelledby': 'h-tm' },
-      h('div', { class: 'card-head' }, h('div', null, h('h2', { id: 'h-tm', text: 'Valores mensais' }), h('p', { class: 'hint', text: 'Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec; Equipes = recursos que trabalharam no mês. Débito informado = soma de "Valor Total dos Débitos" das negociações (não é arrecadação nem valor pago).' }))),
-      h('div', { class: 'table-wrap' }, h('table', null,
-        h('thead', null, h('tr', null, cab.map((c, i) => h('th', { scope: 'col', class: i ? 'n' : '', text: c })))),
-        h('tbody', null, vm.months.map((m) => h('tr', null,
-          h('th', { scope: 'row', text: m.rotulo }),
-          linha(m.sum).map((v) => h('td', { class: 'n', text: v }))))),
-        h('tfoot', null, h('tr', null,
-          h('td', { text: 'Total' }),
-          linha(s).map((v) => h('td', { class: 'n', text: v }))))))
+    const item = (rotulo, valor, total) => h('div', { class: 'vn-item' + (total ? ' is-total' : ''), role: 'listitem' },
+      h('span', { class: 'vn-mes', text: rotulo }),
+      h('span', { class: 'vn-valor num', text: brl.format(valor) }));
+    return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
+      h('div', { class: 'card-head' }, h('div', null,
+        h('h2', { id: 'h-valores', text: 'Valores negociados' }),
+        h('p', { class: 'hint', text: 'Débito informado nas negociações, por mês: soma de "Valor Total dos Débitos". Não é arrecadação nem valor pago.' }))),
+      vm.months.length
+        ? h('div', { class: 'vn-grid', role: 'list', 'aria-label': 'Valores negociados por mês' }, vm.months.map((m) => item(m.rotulo, m.sum.debito)).concat(item('Total', s.debito, true)))
+        : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
+      s.debitoNaoInformado ? h('p', { class: 'note', dataset: { vn: 'sem-valor' }, text: fmtInt(s.debitoNaoInformado) + ' ' + plural(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).' }) : null
     );
   }
 
@@ -1183,11 +1104,10 @@
           h('h2', { id: 'h-recorte', text: 'Recortes realizados' }),
           h('p', { class: 'hint', text: 'Atividades com "Fez o corte novamente" = Sim, por tipo de corte (Onde Foi Feito O Corte?), no filtro atual. Total recorte ÷ Exec.' }))),
         cartaoRecorte(vm.sum)),
-      h('div', { class: 'grid-2' }, renderMensal(), renderStatusDist()),
+      renderValoresNegociados(),
       renderNegTermo(),
       renderCidades(),
       renderCategorias(),
-      renderTabelaMensal(),
       h('div', { class: 'grid-rank' },
         renderRank('Frente de serviço', 'frente', 'frente'),
         renderRank('Equipe (recurso)', 'recurso', 'equipe'))
@@ -1476,7 +1396,7 @@
       h('h3', { text: 'Status considerados' }),
       h('p', null, 'Atividades = só as com status ', h('strong', { text: 'Finalizada' }), ' (Exec) ou ', h('strong', { text: 'Encerrada com Ocorrência' }), ' (Exoc). Cancelada, Paralisada, Pendente, Iniciada, Em Rota etc. não contam. Se a versão mais nova de uma atividade tiver outro status, ela deixa de contar, mesmo que um arquivo antigo a traga como Finalizada.'),
       h('h3', { text: 'Exec e Exoc' }),
-      h('ul', null, li(h('strong', { text: 'Exec' }), ': Status da Atividade = ', h('code', { text: 'Finalizada' }), '.'), li(h('strong', { text: 'Exoc' }), ': Status da Atividade = ', h('code', { text: 'Encerrada com Ocorrência' }), '. Outros status aparecem na distribuição dos status.')),
+      h('ul', null, li(h('strong', { text: 'Exec' }), ': Status da Atividade = ', h('code', { text: 'Finalizada' }), '.'), li(h('strong', { text: 'Exoc' }), ': Status da Atividade = ', h('code', { text: 'Encerrada com Ocorrência' }), '.')),
       h('h3', { text: 'Negociações e Sem Desdobro' }),
       h('ul', null,
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
@@ -1656,8 +1576,7 @@
       h('div', { class: 'recorte-res' },
         h('span', { class: 'mini-label' }, h('i', { class: 'kdot', style: { '--kc': COR.exoc } }), 'Recortes realizados'),
         h('span', { class: 'mini-value num', dataset: { rk: 'total' }, text: fmtInt(r.recortes) }),
-        h('span', { class: 'mini-sub', dataset: { rk: 'pct' }, text: fmtPctVal(r.recorteSobreExec) + ' do Exec (Total recorte ÷ Exec)' }),
-        h('span', { class: 'mini-sub', text: '"Fez o corte novamente" = Sim' })),
+        h('span', { class: 'mini-sub', dataset: { rk: 'pct' }, text: fmtPctVal(r.recorteSobreExec) + ' do Exec (Total recorte ÷ Exec)' })),
       h('div', { class: 'recorte-tipos' },
         tipos.length
           ? tipos.map(([t, n]) => h('div', { class: 'rc-row', dataset: { tipo: t } },
