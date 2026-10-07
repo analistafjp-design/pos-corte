@@ -415,9 +415,7 @@
               setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo + ' — ' + p.phase + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / metas.length });
             };
             // o arquivo "Cadastro" (matrícula e total de economias) tem leitor próprio; os demais são as atividades
-            res = PC.ehCadastro(e.name)
-              ? await PC.readCadastro(file, { onProgress })
-              : await PC.readSpreadsheetFile(file, { path: e.path, aliases: state.aliases, onProgress });
+            res = await PC.readFileAuto(file, { path: e.path, aliases: state.aliases, onProgress });
             res.path = e.path;
             res.name = e.name;
             res.size = file.size;
@@ -1010,7 +1008,7 @@
         quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito total informado de todas as atividades do filtro (' + brl.format(s.debitoTotal) + ').', avisoDe(semNeg)),
         cad
           ? quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec), 'Total de economias (TOTAL_ECO do Cadastro) de ' + mats(s.economiasMatriculas, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + ') dividido pelo total de Exec (' + fmtInt(s.exec) + ').', avisoDe(semNeg.concat(semMat)))
-          : quadro('economias', 'Economias recuperadas', '—', '—', 'Coloque na pasta o arquivo "Cadastro" (matrícula e total de economias) para calcular.', '⚠ arquivo Cadastro não encontrado')),
+          : quadro('economias', 'Economias recuperadas', '—', '—', 'Coloque na pasta o arquivo Cadastro (colunas NUM_LIGACAO e TOTAL_ECO) para calcular.', '⚠ arquivo Cadastro não encontrado')),
       s.debitoNaoInformado ? nota('sem-valor', mats(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).') : null,
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
       cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): não entram nas economias recuperadas.') : null,
@@ -1336,7 +1334,7 @@
     const cad = state.cadastro;
     add('Cadastro (economias)', cad
       ? cad.name + ' — aba "' + cad.aba + '" · ' + fmtInt(cad.linhas) + ' linhas · ' + fmtInt(cad.distintas) + ' matrículas distintas · ' + fmtInt(cad.repetidas) + ' repetidas (' + fmtInt(cad.linhasRepetidas) + ' linhas) desconsideradas · ' + fmtInt(cad.usadas) + ' usadas' + (cad.semTotal ? ' · ' + fmtInt(cad.semTotal) + ' sem TOTAL_ECO' : '') + (state.cadastros > 1 ? ' · há ' + state.cadastros + ' arquivos Cadastro: vale o mais recente' : '')
-      : 'não encontrado (coloque na pasta um arquivo com "Cadastro" no nome, com as colunas NUM_LIGACAO e TOTAL_ECO)');
+      : 'não encontrado (coloque na pasta o arquivo Cadastro, com as colunas NUM_LIGACAO e TOTAL_ECO)');
     if (state.records.length) {
       let mn = '', mx = '';
       for (const r of state.records) if (r.data) { if (!mn || r.data < mn) mn = r.data; if (!mx || r.data > mx) mx = r.data; }

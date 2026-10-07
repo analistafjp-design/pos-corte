@@ -1811,9 +1811,48 @@
 
   const CAD_TOTAL = new Set(['total eco', 'total economias', 'total de economias', 'qtd economias', 'total economia']);
 
-  /** O arquivo é o cadastro de economias quando o nome (sem pasta) tem "cadastro", sem acento e em qualquer caixa. */
-  function ehCadastro(nome) {
-    return /cadastro/.test(norm(String(nome || '').replace(/^.*[\\/]/, '')));
+  /** Dica de que o arquivo é o cadastro de economias: "cadastro" no nome do arquivo ou de uma pasta do caminho (sem acento, qualquer caixa). */
+  function ehCadastro(caminho) {
+    return /cadastro/.test(norm(caminho));
+  }
+
+  const SEM_ATIVIDADES = new Set(['NO_BASE_SHEET', 'NO_HEADER', 'MISSING_COLUMNS', 'AMBIGUOUS_SHEET']);
+
+  /**
+   * Lê um .xlsx da pasta, seja a base de atividades, seja o Cadastro. O nome (ou a pasta) com "cadastro" é só uma dica:
+   * o que decide são as colunas. Com a dica, tenta o Cadastro e, se não tiver as colunas dele, a base de atividades;
+   * sem a dica, tenta a base de atividades e, se ela não reconhecer as colunas, tenta o Cadastro (arquivo que veio com
+   * outro nome, como "data (16).xlsx"). Se nenhum servir, vale o erro do leitor que a dica indicava.
+   * opts: { path, aliases, onProgress }
+   */
+  async function readFileAuto(file, opts) {
+    opts = opts || {};
+    const atividades = () => readSpreadsheetFile(file, opts);
+    const cadastro = () => readCadastro(file, { onProgress: opts.onProgress });
+    if (ehCadastro(opts.path || file.name)) {
+      let erroCad;
+      try {
+        return await cadastro();
+      } catch (e) {
+        if (!(e instanceof PcError) || e.code !== 'CAD_SEM_COLUNAS') throw e;
+        erroCad = e;
+      }
+      try {
+        return await atividades();
+      } catch (e) {
+        throw e instanceof PcError ? erroCad : e;
+      }
+    }
+    try {
+      return await atividades();
+    } catch (e) {
+      if (!(e instanceof PcError) || !SEM_ATIVIDADES.has(e.code)) throw e;
+      try {
+        return await cadastro();
+      } catch (_) {
+        throw e;
+      }
+    }
   }
 
   /**
@@ -1977,6 +2016,6 @@
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell, agrupar,
     dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
-    ehCadastro, readCadastro, applyCadastro,
+    ehCadastro, readCadastro, readFileAuto, applyCadastro,
   };
 });

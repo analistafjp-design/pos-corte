@@ -174,6 +174,23 @@ test('Cadastro: arquivo inválido é recusado com mensagem clara e não vira ati
   await page.context().close();
 });
 
+test('Cadastro: pasta "Cadastro" com o arquivo no nome original (data (16).xlsx) é lida como Cadastro, sem erro', async () => {
+  const page = await abrir();
+  await page.setInputFiles('#inp-folder', fx('pasta_cadastro'));
+  await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
+  assert.doesNotMatch(await statusTexto(page), /Importação parcial|Não importado/);
+  assert.match(await statusTitulo(page), /Base carregada: 19 atividades de 1 arquivo/);
+  assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o Cadastro não vira atividade');
+  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((e) => e.textContent)), ['3', '16,7%']);
+  // mesmo sem "cadastro" em nenhum nome do caminho, o arquivo é reconhecido pelas colunas
+  const xlsx = (nome, arq) => ({ name: nome, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: fs.readFileSync(arq) });
+  await page.setInputFiles('#inp-files', [xlsx('atividades.xlsx', PEQUENO), xlsx('data (16).xlsx', CADASTRO)]);
+  await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent) && !/Importação parcial/.test(document.querySelector('#status').textContent));
+  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((e) => e.textContent)), ['3', '16,7%']);
+  semErros(page);
+  await page.context().close();
+});
+
 test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
