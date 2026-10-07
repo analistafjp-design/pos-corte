@@ -113,7 +113,7 @@ A comparação de cabeçalhos ignora maiúsculas, acentos e pontuação.
 | Negociações Sem Desdobro | Negociação com `Serviço adicionais resposta` vazio, nulo ou só espaços. **Subconjunto** das negociações (não somar). |
 | Termos aplicados (irregularidade identificada) | `Serviço adicionais resposta` contém o código completo `110013` (Serviços) ou `310013` (VCG) em qualquer posição. |
 | Débito das negociações (valor negociado) | Soma de `Valor Total dos Débitos` das negociações no filtro. É o **débito informado**; não é arrecadação nem valor pago. O % mostrado ao lado é esse valor ÷ a soma de `Valor Total dos Débitos` de todas as atividades do filtro (débito total informado). |
-| Economias recuperadas | Matrículas **distintas** com negociação no filtro (mesma matrícula conta uma vez; zeros à esquerda e espaços ignorados; negociação sem matrícula não conta). O % é economias recuperadas ÷ total de Exec. Definição indicada pelo usuário; sem a coluna `Matrícula` o indicador aparece como indisponível. |
+| Economias recuperadas | Soma do `TOTAL_ECO` do arquivo **Cadastro** (cruzado pela matrícula, coluna `NUM_LIGACAO`) das matrículas **distintas** com negociação no filtro: cada matrícula conta uma vez (zeros à esquerda e espaços ignorados). Matrícula que aparece **mais de uma vez no Cadastro é desconsiderada**; a que não está no Cadastro (ou está sem `TOTAL_ECO`) não entra; negociação sem matrícula não conta. O % é economias recuperadas ÷ total de Exec. Definição indicada pelo usuário. Sem o arquivo Cadastro ou sem a coluna `Matrícula`, o indicador aparece como indisponível. |
 
 ### Status considerados
 
@@ -214,6 +214,7 @@ Exec + Exoc = 8.136 porque essa base só tem esses dois status; em outras bases 
 - `src/app.js`, `src/styles.css`, `src/template.html`: interface. Todo texto de dados entra por `textContent` (sem `innerHTML` com dados).
 - `build.mjs`: gera `Acompanhamento_Pos_Corte.html` (~155 KB).
 - O leitor resolve os caminhos internos pelos relacionamentos do próprio arquivo, lê `sharedStrings`, estilos (para identificar datas) e `workbookPr/date1904`; usa o resultado gravado das fórmulas.
+- **Cadastro de economias:** arquivo `.xlsx` com "cadastro" no nome (na pasta ou nas subpastas), aba `Export`, colunas `NUM_LIGACAO` (matrícula) e `TOTAL_ECO`. É lido à parte, só nessas duas colunas (nome, endereço etc. nem são lidos), e guarda apenas matrícula e total. Havendo mais de um, vale o mais recente. Matrícula que aparece mais de uma vez no arquivo é desconsiderada. A planilha real nunca entra no repositório.
 - Formatos: `.xlsx` válido, sem senha. **Não** lê `.xls`, `.xlsb`, arquivos com senha nem ZIP64, e não recalcula fórmulas. Mensagens próprias para cada caso e para arquivo vazio, truncado ou sem estrutura de planilha.
 - Desempenho medido: a amostra (12,8 MB; 96 MB de XML) carrega em ~2,6 s no Node e ~4 s no Chromium, com a interface respondendo. Cada arquivo lido retém cerca de 9 MB de memória (textos são copiados para não prender pedaços do XML).
 - Gravação: `IndexedDB` (`poscorte`), loja `arquivos` (resultado por arquivo, com chave = versão das regras + nomes alternativos + caminho + tamanho + data) e loja `kv` (acesso à última pasta). Entradas de arquivos que saíram da pasta são apagadas.

@@ -44,6 +44,10 @@ validações).
 - **Indicador sem coluna** aparece como **indisponível**, nunca como zero
   silencioso.
 - **Leia só as 19 colunas usadas** (a lista está no prompt).
+  - Exceção: o arquivo **Cadastro** (nome com "cadastro"), lido à parte só pelas
+    colunas `NUM_LIGACAO` e `TOTAL_ECO`, para as economias recuperadas. Ele não
+    é base de atividades, só guarda matrícula e total, e matrícula repetida nele
+    é desconsiderada.
 - **Bases de campo**: o cruzamento é pela Matrícula e só considera os
   serviços de pós-corte (110010/11/12, 210010/11/12 e 310010/11/12).
 

@@ -59,6 +59,7 @@ async function importar(page, arquivos, esperaKpis = true) {
 const statusTitulo = (page) => page.textContent('#status .st-title');
 const statusTexto = (page) => page.textContent('#status');
 const PEQUENO = fx('pequeno_xlsxwriter.xlsx');
+const CADASTRO = fx('Cadastro_pequeno.xlsx');
 const KPIS_PEQUENO = ['19', '18', '1', '5', '7'];
 
 /* ------------------------------------------------------------------ */
@@ -115,11 +116,22 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   assert.equal(esp.debito, 2535.06);
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06', pct(esp.debito / esp.debitoTotal)]);
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '64,4%']);
-  // as 5 negociações do fixture são do mesmo imóvel (matrícula 1001): 1 economia recuperada sobre 18 Exec
+  // economias recuperadas dependem do arquivo Cadastro: sem ele o indicador fica indisponível, nunca zero silencioso
   assert.equal(esp.neg, 5);
-  assert.deepEqual(await vn('economias'), [String(esp.economias), pct(esp.economias / esp.exec)]);
-  assert.deepEqual(await vn('economias'), ['1', '5,6%']);
-  assert.equal(await page.locator('.card-valores .kpi-sub').count(), 0, 'sem aviso de indisponível quando as colunas existem');
+  assert.deepEqual(await vn('economias'), ['—', '—']);
+  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /arquivo Cadastro não encontrado/);
+  assert.match(await page.textContent('#view-geral'), /Valor negociado/);
+  // com o Cadastro na pasta: as 5 negociações são do mesmo imóvel (matrícula 1001), que tem TOTAL_ECO = 3 no Cadastro (contagem independente)
+  await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
+  await page.waitForFunction(() => document.querySelector('[data-fk="kpi:atividades"] .kpi-value') && /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));
+  assert.equal(esp.cadastro.economias, 3);
+  assert.deepEqual(await vn('economias'), [String(esp.cadastro.economias), pct(esp.cadastro.economias / esp.exec)]);
+  assert.deepEqual(await vn('economias'), ['3', '16,7%']);
+  assert.equal(await page.locator('.card-valores [data-vn=economias] .kpi-sub').count(), 0, 'sem aviso quando o Cadastro está carregado');
+  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '64,4%'], 'valor negociado não muda com o Cadastro');
+  assert.match(await page.textContent('#status'), /1 repetida desconsiderada/);
+  assert.equal(await page.locator('.card-valores [data-vn=sem-cadastro], .card-valores [data-vn=cadastro-repetida]').count(), 0, 'a matrícula negociada está no Cadastro');
+  assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o Cadastro não vira atividade nem muda os cartões');
   // negociações e termos por mês continuam, com legenda
   assert.ok(await page.locator('.card-negtermo .legend').isVisible());
   // rankings conciliam com o total
@@ -135,10 +147,29 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
 
 test('valores negociados: arquivo sem a coluna Matrícula sinaliza economias recuperadas como indisponíveis', async () => {
   const page = await abrir();
-  await importar(page, fx('leve_titulo_linha4.xlsx'));
+  await importar(page, [fx('leve_titulo_linha4.xlsx'), CADASTRO]);
   assert.match(await page.textContent('.card-valores [data-vn=economias]'), /indisponível em 1 arquivo/);
   assert.doesNotMatch(await page.textContent('.card-valores [data-vn=valor]'), /indisponível/);
   assert.match(await page.textContent('.card-valores [data-vn=sem-matricula]'), /5 negociações sem matrícula/);
+  semErros(page);
+  await page.context().close();
+});
+
+test('Cadastro: arquivo inválido é recusado com mensagem clara e não vira atividade; nomes em "Arquivos e regras"', async () => {
+  const page = await abrir();
+  await importar(page, [PEQUENO, fx('Cadastro_sem_colunas.xlsx')]);
+  assert.deepEqual(await kpis(page), KPIS_PEQUENO);
+  assert.match(await statusTexto(page), /Importação parcial/);
+  assert.match(await statusTexto(page), /Cadastro_sem_colunas\.xlsx — O arquivo Cadastro precisa ter a coluna da matrícula \(NUM_LIGACAO\) e a do total de economias \(TOTAL_ECO\)/);
+  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /arquivo Cadastro não encontrado/);
+  // com um Cadastro válido, a leitura é descrita em "Arquivos e regras"
+  await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
+  await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));
+  await page.click('#nav-tabs button[data-view=base]');
+  const linha = await page.textContent('dl.kv >> text=Cadastro (economias) >> xpath=following-sibling::dd[1]');
+  assert.match(linha, /Cadastro_pequeno\.xlsx — aba "Export" · 7 linhas · 5 matrículas distintas · 1 repetidas \(2 linhas\) desconsideradas · 3 usadas · 1 sem TOTAL_ECO/);
+  // o Cadastro não é uma base de atividades: não entra na contagem de arquivos válidos
+  assert.match(await page.textContent('dl.kv >> text=Arquivos válidos >> xpath=following-sibling::dd[1]'), /^1 de 1$/);
   semErros(page);
   await page.context().close();
 });

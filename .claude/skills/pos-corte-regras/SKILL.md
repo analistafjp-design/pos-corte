@@ -34,7 +34,7 @@ Em dúvida, confira em `src/core.js` (`classify`, `summarize`, `agrupar`) e em
 | Sem Desdobro | Negociação com `Serviço adicionais resposta` vazio (subconjunto das negociações). **Os cards de Sem Desdobro foram retirados do painel a pedido do usuário**; não recrie cards. |
 | Débito informado | Soma de `Valor Total dos Débitos` das negociações. **Nunca chamar de "arrecadação"** |
 | Valor negociado (% do débito) | O valor é o débito informado acima; o % é valor negociado ÷ soma de `Valor Total dos Débitos` de **todas** as atividades do filtro (negociadas ou não). Fica no bloco "Valores negociados" da Visão geral |
-| Economias recuperadas | Matrículas **distintas** com negociação (chave normalizada: sem espaços e zeros à esquerda; negociação sem matrícula não conta). % = economias ÷ Exec. Sem a coluna `Matrícula` aparece como indisponível. Definição dada pelo usuário |
+| Economias recuperadas | Soma do `TOTAL_ECO` do arquivo **Cadastro** (colunas `NUM_LIGACAO` e `TOTAL_ECO`; nome do arquivo com "cadastro") das matrículas **distintas** com negociação (chave normalizada: sem espaços e zeros à esquerda). Matrícula **repetida no Cadastro é desconsiderada**; fora do Cadastro ou sem total não entra; negociação sem matrícula não conta. % = economias ÷ Exec. Sem o Cadastro (ou sem a coluna `Matrícula`) aparece como indisponível. Definição dada pelo usuário |
 | Equipes que trabalharam | Recursos distintos com atividade no dia ou período |
 | Recorte | `Fez o corte novamente` = Sim; o tipo vem de `Onde Foi Feito O Corte?` (Ramal, Cavalete Simples, Rede). % por tipo = tipo ÷ total de recortes; % geral = Total recorte ÷ Exec |
 | Categoria | Coluna `Categoria`; vazia = "(sem categoria)". Ordenar pelo maior percorrido |

@@ -65,12 +65,11 @@ function conferirEsperados(records, esp, { cidade = true, matricula = true } = {
   assert.ok(Math.abs(s.debitoTotal - esp.debitoTotal) < 0.005, `débito total informado ${s.debitoTotal} vs ${esp.debitoTotal}`);
   assert.ok(Math.abs(s.debitoPct - esp.debito / esp.debitoTotal) < 1e-9, 'valor negociado ÷ débito total informado');
   if (matricula) {
-    assert.equal(s.economias, esp.economias, 'economias recuperadas (matrículas distintas que negociaram)');
+    assert.equal(s.matriculasNeg, esp.matriculasNeg, 'matrículas distintas que negociaram');
     assert.equal(s.negSemMatricula, esp.negSemMatricula, 'negociações sem matrícula');
-    assert.ok(Math.abs(s.economiasSobreExec - esp.economias / esp.exec) < 1e-9, 'economias recuperadas ÷ Exec');
   } else {
-    // arquivo sem a coluna Matrícula: nenhuma economia identificável; todas as negociações ficam "sem matrícula"
-    assert.equal(s.economias, 0, 'sem a coluna Matrícula');
+    // arquivo sem a coluna Matrícula: nenhuma matrícula identificável; todas as negociações ficam "sem matrícula"
+    assert.equal(s.matriculasNeg, 0, 'sem a coluna Matrícula');
     assert.equal(s.negSemMatricula, esp.neg, 'sem a coluna Matrícula, toda negociação fica sem matrícula');
   }
   const meses = {};
@@ -112,31 +111,97 @@ test('negociação: somente "Sim" (espaços e caixa ignorados)', () => {
   assert.equal(PC.classify('Finalizada', 'Sim', '110013;').neg, true);
 });
 
-test('valor negociado e economias recuperadas: débito ÷ débito total informado; matrículas distintas que negociaram ÷ Exec', () => {
-  const r = (o) => Object.assign({ exec: true, exoc: false, neg: false, valor: null, matricula: '' }, o);
+test('valor negociado e economias recuperadas: débito ÷ débito total informado; TOTAL_ECO do Cadastro das matrículas distintas que negociaram', () => {
+  const r = (o) => Object.assign({ exec: true, exoc: false, neg: false, valor: null, matricula: '', eco: null, ecoMotivo: 'nao' }, o);
   const recs = [
-    r({ neg: true, valor: 100, matricula: '00123' }),
-    r({ neg: true, valor: 50.5, matricula: ' 123 ' }), // mesma matrícula (zeros e espaços): conta uma economia
-    r({ neg: true, valor: null, matricula: '456.0' }), // negociação sem valor informado
+    r({ neg: true, valor: 100, matricula: '00123', eco: 3, ecoMotivo: 'ok' }),
+    r({ neg: true, valor: 50.5, matricula: ' 123 ', eco: 3, ecoMotivo: 'ok' }), // mesma matrícula (zeros e espaços): conta uma vez
+    r({ neg: true, valor: null, matricula: '456.0', ecoMotivo: 'rep' }), // negociação sem valor informado; repetida no Cadastro
     r({ neg: true, valor: 10, matricula: '' }), // sem matrícula: fora das economias
-    r({ neg: false, valor: 200, matricula: '123' }), // sem negociação: entra só no débito total
+    r({ neg: true, valor: 5, matricula: '999', ecoMotivo: 'sem' }), // não achada no Cadastro
+    r({ neg: true, valor: 1, matricula: '77', eco: 12, ecoMotivo: 'ok' }),
+    r({ neg: false, valor: 200, matricula: '123', eco: 3, ecoMotivo: 'ok' }), // sem negociação: entra só no débito total
     r({ exec: false, exoc: true, neg: false, valor: null, matricula: '789' }),
   ];
   const s = PC.summarize(recs);
-  assert.equal(s.neg, 4);
-  assert.ok(Math.abs(s.debito - 160.5) < 1e-9, 'valor negociado');
-  assert.ok(Math.abs(s.debitoTotal - 360.5) < 1e-9, 'débito total informado de todas as atividades');
-  assert.ok(Math.abs(s.debitoPct - 160.5 / 360.5) < 1e-9);
+  assert.equal(s.neg, 6);
+  assert.ok(Math.abs(s.debito - 166.5) < 1e-9, 'valor negociado');
+  assert.ok(Math.abs(s.debitoTotal - 366.5) < 1e-9, 'débito total informado de todas as atividades');
+  assert.ok(Math.abs(s.debitoPct - 166.5 / 366.5) < 1e-9);
   assert.equal(s.debitoNaoInformado, 1);
-  assert.equal(s.economias, 2, '123 (duas vezes) e 456');
+  assert.equal(s.matriculasNeg, 4, '123 (duas vezes), 456, 999 e 77');
+  assert.equal(s.economias, 15, 'TOTAL_ECO de 123 (3, uma vez) + 77 (12)');
+  assert.equal(s.economiasMatriculas, 2);
+  assert.equal(s.economiasRepetidas, 1);
+  assert.equal(s.economiasSemCadastro, 1);
+  assert.equal(s.economiasSemArquivo, 0);
   assert.equal(s.negSemMatricula, 1);
-  assert.equal(s.exec, 5);
-  assert.ok(Math.abs(s.economiasSobreExec - 2 / 5) < 1e-9);
+  assert.equal(s.exec, 7);
+  assert.ok(Math.abs(s.economiasSobreExec - 15 / 7) < 1e-9);
   // sem débito informado e sem Exec: divisões protegidas
-  const vazio = PC.summarize([r({ exec: false, exoc: true, neg: true, matricula: '1' })]);
+  const vazio = PC.summarize([r({ exec: false, exoc: true, neg: true, matricula: '1', eco: 2, ecoMotivo: 'ok' })]);
   assert.equal(vazio.debitoPct, null);
   assert.equal(vazio.economiasSobreExec, null);
-  assert.equal(vazio.economias, 1);
+  assert.equal(vazio.economias, 2);
+  // sem Cadastro carregado nada é somado e isso fica explícito
+  const sem = PC.summarize([r({ neg: true, matricula: '1' }), r({ neg: true, matricula: '2' })]);
+  assert.equal(sem.economias, 0);
+  assert.equal(sem.economiasSemArquivo, 2);
+});
+
+test('Cadastro: reconhece o arquivo pelo nome (sem acento, qualquer caixa e em subpasta)', () => {
+  for (const n of ['Cadastro.xlsx', 'cadastro_2026.xlsx', 'CADASTRO DE ECONOMIAS.xlsx', 'Cadastro_pequeno.xlsx', 'pasta/sub/Cadastro.xlsx', 'Cadastró.xlsx']) assert.equal(PC.ehCadastro(n), true, n);
+  for (const n of ['Acompanhamento - Pós Corte.xlsx', 'pequeno_xlsxwriter.xlsx', 'Base_Campo_28_09_2026.xlsx', '', null]) assert.equal(PC.ehCadastro(n), false, String(n));
+  assert.equal(PC.ehCadastro('Cadastro/atividades.xlsx'), false, 'só o nome do arquivo conta, não o da pasta');
+});
+
+test('Cadastro: lê só matrícula e TOTAL_ECO; matrícula repetida no arquivo é desconsiderada', { skip: !fs.existsSync(fx('Cadastro_pequeno.xlsx')) && 'gere as planilhas' }, async () => {
+  const cad = await PC.readCadastro(arquivo(fx('Cadastro_pequeno.xlsx')), {});
+  const esp = json('pequeno_esperados.json').cadastro;
+  assert.equal(cad.tipo, 'cadastro');
+  assert.equal(cad.aba, 'Export');
+  assert.deepEqual([cad.colunaMatricula, cad.colunaTotal], ['NUM_LIGACAO', 'TOTAL_ECO']);
+  for (const k of ['linhas', 'semMatricula', 'distintas', 'repetidas', 'linhasRepetidas', 'semTotal', 'usadas']) assert.equal(cad[k], esp[k], k);
+  assert.equal(cad.unicas.reduce((a, [, t]) => a + t, 0), esp.somaUnicas);
+  assert.deepEqual(cad.unicas.map(([m]) => m).sort(), ['1001', '3003', '4'], '00004 normalizada; 2002 (repetida) e 5005 (sem total) ficam de fora');
+  assert.deepEqual(cad.repetidasLista, ['2002']);
+  // só matrícula e total são guardados: nada de nome, cidade etc.
+  assert.ok(cad.unicas.every((x) => x.length === 2 && typeof x[0] === 'string' && typeof x[1] === 'number'));
+  assert.ok(!JSON.stringify(cad).includes('Cliente sintético'), 'colunas de nome/endereço não são lidas');
+  // arquivo sem as colunas: mensagem clara
+  await assert.rejects(PC.readCadastro(arquivo(fx('Cadastro_sem_colunas.xlsx')), {}), (e) => {
+    assert.ok(e instanceof PC.PcError);
+    assert.equal(e.code, 'CAD_SEM_COLUNAS');
+    assert.match(e.message, /NUM_LIGACAO.*TOTAL_ECO/);
+    return true;
+  });
+});
+
+test('Cadastro: economias recuperadas = soma do TOTAL_ECO das matrículas distintas que negociaram (conferido com contagem independente)', { skip: !fs.existsSync(fx('Cadastro_grande.xlsx')) && 'gere as planilhas' }, async () => {
+  for (const [base, cadFx, espFx] of [['pequeno_xlsxwriter.xlsx', 'Cadastro_pequeno.xlsx', 'pequeno_esperados.json'], ['grande_sintetico.xlsx', 'Cadastro_grande.xlsx', 'grande_esperados.json']]) {
+    const res = await ler(fx(base));
+    const cad = await PC.readCadastro(arquivo(fx(cadFx)), {});
+    const esp = json(espFx);
+    const e = esp.cadastro;
+    for (const k of ['linhas', 'semMatricula', 'distintas', 'repetidas', 'linhasRepetidas', 'semTotal', 'usadas']) assert.equal(cad[k], e[k], base + ' ' + k);
+    assert.equal(cad.unicas.reduce((a, [, t]) => a + t, 0), e.somaUnicas, base + ' soma do TOTAL_ECO das únicas');
+    PC.applyCadastro(res.records, cad);
+    const s = PC.summarize(res.records);
+    assert.equal(s.matriculasNeg, esp.matriculasNeg, base + ' matrículas que negociaram');
+    assert.equal(s.economias, e.economias, base + ' economias recuperadas');
+    assert.equal(s.economiasMatriculas, e.matriculasUsadas, base + ' matrículas com economia');
+    assert.equal(s.economiasRepetidas, e.negRepetidas, base + ' negociadas repetidas no Cadastro');
+    assert.equal(s.economiasSemCadastro, e.negSemCadastro, base + ' negociadas fora do Cadastro');
+    assert.equal(s.economiasSemArquivo, 0);
+    assert.ok(Math.abs(s.economiasSobreExec - e.economias / esp.exec) < 1e-9, base + ' ÷ Exec');
+    // conciliação: toda matrícula que negociou está em exatamente uma das quatro situações
+    assert.equal(s.economiasMatriculas + s.economiasRepetidas + s.economiasSemCadastro, s.matriculasNeg);
+    // sem Cadastro carregado: nada é somado
+    PC.applyCadastro(res.records, null);
+    const sem = PC.summarize(res.records);
+    assert.equal(sem.economias, 0);
+    assert.equal(sem.economiasSemArquivo, esp.matriculasNeg);
+  }
 });
 
 test('sem desdobro: negociação com serviço adicional vazio/nulo/espaços', () => {
