@@ -1059,7 +1059,6 @@
       aviso ? h('span', { class: 'kpi-sub', text: aviso }) : null);
     const nota = (k, txt) => h('p', { class: 'note', dataset: { vn: k }, text: txt });
     const mats = (n, um, varios) => fmtInt(n) + ' ' + plural(n, um, varios);
-    const negRepetidas = s.neg - s.negSemMatricula - s.matriculasNeg; // negociações em matrícula que já negociou: contam uma economia só
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
@@ -1069,12 +1068,9 @@
         quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec),
           'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): ' + (avu ? 'do Serviço avulso em ' + fmtInt(s.economiasDoAvulso) + ', ' : '') + (cad ? 'do Cadastro em ' + fmtInt(s.economiasDoCadastro) + ', ' : '') + '1 economia (mínimo) em ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
           temFonte ? avisoDe(semNeg.concat(semMat)) : '⚠ sem Cadastro nem Serviço avulso: 1 economia por matrícula')),
-      s.debitoNaoInformado ? nota('sem-valor', mats(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).') : null,
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
-      negRepetidas > 0 ? nota('negociacoes-repetidas', mats(negRepetidas, 'negociação repetida', 'negociações repetidas') + ' na mesma matrícula ' + plural(negRepetidas, 'conta', 'contam') + ' uma economia só: ' + mats(s.neg, 'negociação', 'negociações') + ' em ' + mats(s.matriculasNeg, 'matrícula distinta', 'matrículas distintas') + '. Por isso as economias recuperadas podem ficar abaixo das negociações.') : null,
-      temFonte && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada ' + fora, 'matrículas negociadas ' + fora) + ' (ou sem total de economias): ' + plural(s.economiasSemCadastro, 'conta', 'contam') + ' 1 economia cada, o mínimo, até o total entrar no arquivo.') : null,
       temFonte && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
-        h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro' }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas ' + fora + ' (Excel)' }))) : null,
+        h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro', n: String(s.economiasSemCadastro) }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas ' + fora + ' (Excel)' }))) : null,
       temFonte && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no ' + nomeFontes + ': o total ' + plural(s.economiasRepetidas, 'dela foi desconsiderado e ela conta', 'delas foi desconsiderado e elas contam') + ' 1 economia ' + plural(s.economiasRepetidas, '', 'cada') + ' (o mínimo).') : null
     );
   }
