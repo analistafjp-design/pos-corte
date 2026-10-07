@@ -130,23 +130,34 @@ test('valor negociado e economias recuperadas: débito ÷ débito total informad
   assert.ok(Math.abs(s.debitoPct - 166.5 / 366.5) < 1e-9);
   assert.equal(s.debitoNaoInformado, 1);
   assert.equal(s.matriculasNeg, 4, '123 (duas vezes), 456, 999 e 77');
-  assert.equal(s.economias, 15, 'TOTAL_ECO de 123 (3, uma vez) + 77 (12)');
+  assert.equal(s.economias, 17, 'TOTAL_ECO de 123 (3, uma vez) + 77 (12) + 1 de 456 (repetida no Cadastro) + 1 de 999 (fora do Cadastro)');
   assert.equal(s.economiasMatriculas, 2);
+  assert.equal(s.economiasPeloMinimo, 2, 'as que contam o mínimo de 1');
   assert.equal(s.economiasRepetidas, 1);
   assert.equal(s.economiasSemCadastro, 1);
   assert.equal(s.economiasSemArquivo, 0);
   assert.equal(s.negSemMatricula, 1);
   assert.equal(s.exec, 7);
-  assert.ok(Math.abs(s.economiasSobreExec - 15 / 7) < 1e-9);
+  assert.ok(Math.abs(s.economiasSobreExec - 17 / 7) < 1e-9);
+  assert.ok(s.economias >= s.matriculasNeg, 'nunca menos de 1 economia por matrícula que negociou');
   // sem débito informado e sem Exec: divisões protegidas
   const vazio = PC.summarize([r({ exec: false, exoc: true, neg: true, matricula: '1', eco: 2, ecoMotivo: 'ok' })]);
   assert.equal(vazio.debitoPct, null);
   assert.equal(vazio.economiasSobreExec, null);
   assert.equal(vazio.economias, 2);
-  // sem Cadastro carregado nada é somado e isso fica explícito
+  // sem Cadastro carregado cada matrícula que negociou conta o mínimo de 1, e isso fica explícito
   const sem = PC.summarize([r({ neg: true, matricula: '1' }), r({ neg: true, matricula: '2' })]);
-  assert.equal(sem.economias, 0);
+  assert.equal(sem.economias, 2);
+  assert.equal(sem.economiasPeloMinimo, 2);
   assert.equal(sem.economiasSemArquivo, 2);
+  // caso relatado: 6 negociações de 6 matrículas, só 1 no Cadastro (com 1 economia): no mínimo 6 economias recuperadas
+  const seis = PC.summarize(['a1', 'a2', 'a3', 'a4', 'a5', 'a6'].map((m, i) => r({ neg: true, matricula: m, eco: i === 0 ? 1 : null, ecoMotivo: i === 0 ? 'ok' : i % 2 ? 'sem' : 'rep' })));
+  assert.equal(seis.neg, 6);
+  assert.equal(seis.economias, 6);
+  assert.equal(seis.economiasMatriculas, 1);
+  assert.equal(seis.economiasPeloMinimo, 5);
+  // TOTAL_ECO 0 no Cadastro não faz uma matrícula que negociou valer menos de 1
+  assert.equal(PC.summarize([r({ neg: true, matricula: '1', eco: 0, ecoMotivo: 'ok' })]).economias, 1);
 });
 
 test('Cadastro: a dica é "cadastro" no nome do arquivo ou de uma pasta (sem acento, qualquer caixa)', () => {
@@ -214,14 +225,17 @@ test('Cadastro: economias recuperadas = soma do TOTAL_ECO das matrículas distin
     assert.equal(s.economiasMatriculas, e.matriculasUsadas, base + ' matrículas com economia');
     assert.equal(s.economiasRepetidas, e.negRepetidas, base + ' negociadas repetidas no Cadastro');
     assert.equal(s.economiasSemCadastro, e.negSemCadastro, base + ' negociadas fora do Cadastro');
+    assert.equal(s.economiasPeloMinimo, e.peloMinimo, base + ' matrículas que contam o mínimo de 1');
     assert.equal(s.economiasSemArquivo, 0);
     assert.ok(Math.abs(s.economiasSobreExec - e.economias / esp.exec) < 1e-9, base + ' ÷ Exec');
-    // conciliação: toda matrícula que negociou está em exatamente uma das quatro situações
+    assert.ok(s.economias >= esp.matriculasNeg, base + ' nunca menos de 1 economia por matrícula que negociou');
+    // conciliação: toda matrícula que negociou está em exatamente uma das situações
     assert.equal(s.economiasMatriculas + s.economiasRepetidas + s.economiasSemCadastro, s.matriculasNeg);
-    // sem Cadastro carregado: nada é somado
+    assert.equal(s.economiasMatriculas + s.economiasPeloMinimo, s.matriculasNeg);
+    // sem Cadastro carregado: cada matrícula que negociou conta o mínimo de 1
     PC.applyCadastro(res.records, null);
     const sem = PC.summarize(res.records);
-    assert.equal(sem.economias, 0);
+    assert.equal(sem.economias, esp.matriculasNeg);
     assert.equal(sem.economiasSemArquivo, esp.matriculasNeg);
   }
 });

@@ -222,8 +222,10 @@ def esperados_cadastro(linhas, mats_neg, rows=None):
         "linhas": sum(cont.values()) + sem_matricula, "semMatricula": sem_matricula, "distintas": len(cont),
         "repetidas": sum(1 for n in cont.values() if n > 1), "linhasRepetidas": sum(n for n in cont.values() if n > 1),
         "semTotal": sum(1 for k, n in cont.items() if n == 1 and total[k] is None), "usadas": len(unicas), "somaUnicas": sum(unicas.values()),
-        "economias": sum(unicas[m] for m in mats_neg if m in unicas),
+        # cada matrícula que negociou é, no mínimo, 1 economia: o TOTAL_ECO do Cadastro (se único e com total) ou 1
+        "economias": sum(max(1, unicas[m]) if m in unicas else 1 for m in mats_neg),
         "matriculasUsadas": sum(1 for m in mats_neg if m in unicas),
+        "peloMinimo": sum(1 for m in mats_neg if m not in unicas),
         "negRepetidas": sum(1 for m in mats_neg if cont.get(m, 0) > 1),
         "negSemCadastro": sum(1 for m in mats_neg if m not in unicas and cont.get(m, 0) <= 1),
     }

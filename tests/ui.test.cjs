@@ -116,10 +116,12 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   assert.equal(esp.debito, 2535.06);
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06', pct(esp.debito / esp.debitoTotal)]);
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '64,4%']);
-  // economias recuperadas dependem do arquivo Cadastro: sem ele o indicador fica indisponível, nunca zero silencioso
+  // sem o arquivo Cadastro, cada matrícula que negociou conta o mínimo de 1 economia (as 5 negociações são da matrícula 1001) e o aviso diz isso
   assert.equal(esp.neg, 5);
-  assert.deepEqual(await vn('economias'), ['—', '—']);
-  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /arquivo Cadastro não encontrado/);
+  assert.equal(esp.matriculasNeg, 1);
+  assert.deepEqual(await vn('economias'), [String(esp.matriculasNeg), pct(esp.matriculasNeg / esp.exec)]);
+  assert.deepEqual(await vn('economias'), ['1', '5,6%']);
+  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /sem arquivo Cadastro: 1 economia por matrícula/);
   assert.match(await page.textContent('#view-geral'), /Valor negociado/);
   // com o Cadastro na pasta: as 5 negociações são do mesmo imóvel (matrícula 1001), que tem TOTAL_ECO = 3 no Cadastro (contagem independente)
   await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
@@ -161,7 +163,7 @@ test('Cadastro: arquivo inválido é recusado com mensagem clara e não vira ati
   assert.deepEqual(await kpis(page), KPIS_PEQUENO);
   assert.match(await statusTexto(page), /Importação parcial/);
   assert.match(await statusTexto(page), /Cadastro_sem_colunas\.xlsx — O arquivo Cadastro precisa ter a coluna da matrícula \(NUM_LIGACAO\) e a do total de economias \(TOTAL_ECO\)/);
-  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /arquivo Cadastro não encontrado/);
+  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /sem arquivo Cadastro: 1 economia por matrícula/);
   // com um Cadastro válido, a leitura é descrita em "Arquivos e regras"
   await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
   await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));

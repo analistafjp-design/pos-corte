@@ -1456,12 +1456,13 @@
    * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoTotal`
    * (soma do mesmo campo em todas as atividades do conjunto). Matrículas que negociaram = `matriculasNeg` (distintas;
    * negociação sem matrícula fica em `negSemMatricula`). Economias recuperadas = `economias`: soma do TOTAL_ECO do
-   * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez; as que não entram ficam em
-   * `economiasSemCadastro` (não achadas ou sem total), `economiasRepetidas` (repetidas no Cadastro) e
-   * `economiasSemArquivo` (sem Cadastro carregado). `economiasSobreExec` = economias ÷ Exec.
+   * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez. Matrícula que negociou é,
+   * no mínimo, 1 economia: sem total aproveitável no Cadastro ela conta 1 (`economiasPeloMinimo`), seja por não estar
+   * nele (`economiasSemCadastro`, também sem TOTAL_ECO), por estar repetida (`economiasRepetidas`, total desconsiderado)
+   * ou por não haver Cadastro carregado (`economiasSemArquivo`). `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
     const matriculasNeg = new Map();
     const equipes = new Set();
     const dias = new Set();
@@ -1505,8 +1506,10 @@
     s.efetividade = s.exec ? s.neg / s.exec : null;
     s.matriculasNeg = matriculasNeg.size;
     for (const r of matriculasNeg.values()) {
-      if (r.ecoMotivo === 'ok') { s.economias += r.eco; s.economiasMatriculas++; }
-      else if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
+      if (r.ecoMotivo === 'ok') { s.economias += Math.max(1, r.eco); s.economiasMatriculas++; continue; }
+      s.economias += 1; // sem total no Cadastro: no mínimo 1 economia por matrícula que negociou
+      s.economiasPeloMinimo++;
+      if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
       else if (r.ecoMotivo === 'sem') s.economiasSemCadastro++;
       else s.economiasSemArquivo++;
     }

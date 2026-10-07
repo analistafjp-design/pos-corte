@@ -1022,18 +1022,18 @@
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias (TOTAL_ECO do arquivo Cadastro) das matrículas que negociaram, cada matrícula uma vez; % sobre o Exec.' }))),
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias (TOTAL_ECO do arquivo Cadastro) das matrículas que negociaram, cada matrícula uma vez e no mínimo 1 por matrícula (quando o Cadastro não tem o total); % sobre o Exec.' }))),
       h('div', { class: 'vn-grid' },
         quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito total informado de todas as atividades do filtro (' + brl.format(s.debitoTotal) + ').', avisoDe(semNeg)),
-        cad
-          ? quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec), 'Total de economias (TOTAL_ECO do Cadastro) de ' + mats(s.economiasMatriculas, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + ') dividido pelo total de Exec (' + fmtInt(s.exec) + ').', avisoDe(semNeg.concat(semMat)))
-          : quadro('economias', 'Economias recuperadas', '—', '—', 'Coloque na pasta o arquivo Cadastro (colunas NUM_LIGACAO e TOTAL_ECO) para calcular.', '⚠ arquivo Cadastro não encontrado')),
+        quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec),
+          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): TOTAL_ECO do Cadastro em ' + fmtInt(s.economiasMatriculas) + ' e 1 economia (mínimo) nas outras ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
+          cad ? avisoDe(semNeg.concat(semMat)) : '⚠ sem arquivo Cadastro: 1 economia por matrícula')),
       s.debitoNaoInformado ? nota('sem-valor', mats(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).') : null,
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
-      cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): não entram nas economias recuperadas.') : null,
+      cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): ' + plural(s.economiasSemCadastro, 'conta', 'contam') + ' 1 economia cada, o mínimo, até o total entrar no Cadastro.') : null,
       cad && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
         h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro' }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas fora do Cadastro (Excel)' }))) : null,
-      cad && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no Cadastro e ' + plural(s.economiasRepetidas, 'foi desconsiderada', 'foram desconsideradas') + '.') : null
+      cad && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no Cadastro: o total ' + plural(s.economiasRepetidas, 'dela foi desconsiderado e ela conta', 'delas foi desconsiderado e elas contam') + ' 1 economia ' + plural(s.economiasRepetidas, '', 'cada') + ' (o mínimo).') : null
     );
   }
 
@@ -1451,7 +1451,7 @@
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
         li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
         li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações. O % é esse valor dividido pela soma do mesmo campo em todas as atividades do filtro (débito total informado). Negociação sem valor informado não entra na soma.'),
-        li(h('strong', { text: 'Economias recuperadas' }), ': soma do ', h('code', { text: 'TOTAL_ECO' }), ' do arquivo ', h('strong', { text: 'Cadastro' }), ' (cruzado pela matrícula, coluna ', h('code', { text: 'NUM_LIGACAO' }), ') das matrículas distintas com negociação; cada matrícula conta uma vez (zeros à esquerda e espaços são ignorados). Matrícula que aparece mais de uma vez no Cadastro é desconsiderada, e a que não está no Cadastro não entra. O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra. Sem o arquivo Cadastro na pasta, o indicador fica indisponível.')),
+        li(h('strong', { text: 'Economias recuperadas' }), ': soma do ', h('code', { text: 'TOTAL_ECO' }), ' do arquivo ', h('strong', { text: 'Cadastro' }), ' (cruzado pela matrícula, coluna ', h('code', { text: 'NUM_LIGACAO' }), ') das matrículas distintas com negociação; cada matrícula conta uma vez (zeros à esquerda e espaços são ignorados). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está no Cadastro (ou está sem TOTAL_ECO) e a que aparece mais de uma vez nele (total desconsiderado) contam 1 cada; sem o arquivo Cadastro na pasta, todas contam 1. O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,
         li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),

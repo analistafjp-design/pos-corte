@@ -358,13 +358,13 @@
         [{ v: 'Filtros aplicados', f: 'negrito' }, info.filtros || 'nenhum'],
         [],
         [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
-        ['Matrículas fora do Cadastro', intCel(lista.length), 'Matrículas distintas com negociação no filtro que não estão no Cadastro ou estão sem TOTAL_ECO; por isso não entram nas economias recuperadas (aba "Fora do Cadastro")'],
+        ['Matrículas fora do Cadastro', intCel(lista.length), 'Matrículas distintas com negociação no filtro que não estão no Cadastro ou estão sem TOTAL_ECO; contam 1 economia cada (o mínimo) nas economias recuperadas, até o total entrar no Cadastro (aba "Fora do Cadastro")'],
         ['Negociações dessas matrículas', intCel(negociacoes), 'Negociou O Débito? = Sim, nessas matrículas e no filtro'],
         ['Valor negociado dessas matrículas', { v: valor, f: 'brl' }, 'Soma de Valor Total dos Débitos dessas negociações (débito informado; não é arrecadação nem valor pago)'],
-        ['Matrículas repetidas no Cadastro', intCel(info.repetidasNoCadastro || 0), 'Negociadas e presentes mais de uma vez no Cadastro: foram desconsideradas e não estão na lista'],
+        ['Matrículas repetidas no Cadastro', intCel(info.repetidasNoCadastro || 0), 'Negociadas e presentes mais de uma vez no Cadastro: o total delas foi desconsiderado e contam 1 economia cada; não estão na lista'],
         ['Negociações sem matrícula', intCel(info.semMatricula || 0), 'Sem matrícula não dá para buscar no Cadastro; não estão na lista'],
         [],
-        [{ v: 'Como usar', f: 'negrito' }, 'Busque o TOTAL_ECO de cada matrícula da aba "Fora do Cadastro" (a última coluna é para anotar) e inclua no Cadastro. Na próxima leitura elas passam a entrar nas economias recuperadas.'],
+        [{ v: 'Como usar', f: 'negrito' }, 'Busque o TOTAL_ECO de cada matrícula da aba "Fora do Cadastro" (a última coluna é para anotar) e inclua no Cadastro. Na próxima leitura elas passam a entrar com o total real, em vez do mínimo de 1.'],
       ],
     };
     const aba = {
