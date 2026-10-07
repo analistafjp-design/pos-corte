@@ -1813,6 +1813,18 @@
   /* ------------------------------------------------------------------ */
 
   const CAD_TOTAL = new Set(['total eco', 'total economias', 'total de economias', 'qtd economias', 'total economia']);
+  const CAD_MES = new Set(['mes ano', 'ano mes', 'mes', 'competencia', 'referencia', 'mes referencia', 'mes de referencia']);
+
+  /** "10/2026", "10-2026", "2026-10" ou uma data (ISO) viram "2026-10"; texto que não é mês/ano vira "". */
+  function mesCadastro(v) {
+    const t = trimStr(v);
+    let m = /^(\d{1,2})[/.\-](\d{4})$/.exec(t);
+    if (m && +m[1] >= 1 && +m[1] <= 12) return m[2] + '-' + pad2(+m[1]);
+    m = /^(\d{4})[/.\-](\d{1,2})(?:[/.\-]\d{1,2})?(?:[ T].*)?$/.exec(t);
+    if (m && +m[2] >= 1 && +m[2] <= 12) return m[1] + '-' + pad2(+m[2]);
+    return '';
+  }
+  const ordMes = (ym) => (ym ? +ym.substring(0, 4) * 12 + +ym.substring(5, 7) - 1 : -1);
 
   /** Dica de que o arquivo é o cadastro de economias: "cadastro" no nome do arquivo ou de uma pasta do caminho (sem acento, qualquer caixa). */
   function ehCadastro(caminho) {
@@ -1859,10 +1871,13 @@
   }
 
   /**
-   * Lê o arquivo Cadastro: só as colunas da matrícula (NUM_LIGACAO) e do total de economias (TOTAL_ECO); as demais
-   * (nome, endereço etc.) não são lidas nem guardadas. Matrícula que aparece mais de uma vez no arquivo é desconsiderada.
-   * Devolve { tipo: 'cadastro', aba, linhas, distintas, repetidas, linhasRepetidas, semTotal, semMatricula, usadas,
-   * unicas: [[matrícula normalizada, total]], repetidasLista: [matrícula normalizada], truncado }.
+   * Lê o arquivo Cadastro: só as colunas da matrícula (NUM_LIGACAO), do total de economias (TOTAL_ECO) e, se houver, do
+   * mês (Mês/Ano); as demais (nome, endereço etc.) não são lidas nem guardadas. Com várias linhas da mesma matrícula
+   * **no mesmo mês** (ou no arquivo todo, se não houver coluna de mês) a matrícula é desconsiderada naquele mês; a mesma
+   * matrícula em meses diferentes é normal (um arquivo com todos os meses).
+   * Devolve { tipo: 'cadastro', aba, linhas, distintas (matrículas), repetidas e linhasRepetidas (matrícula/mês com mais
+   * de uma linha), semTotal, semMatricula, usadas (matrícula/mês único e com total), meses: ['2026-10'...],
+   * itens: [[matrícula normalizada, 'AAAA-MM' ou '', total ou null, nº de linhas]], truncado }.
    */
   async function readCadastro(file, opts) {
     opts = opts || {};
@@ -1884,10 +1899,10 @@
 
   async function lerAbaCadastro(wb, sheet, ctx, opts) {
     // 1ª passada: acha o cabeçalho (todas as colunas, só nas primeiras linhas)
-    let colMat = -1, colTot = -1, nomeMat = '', nomeTot = '', scanned = 0, candidato = null;
+    let colMat = -1, colTot = -1, colMes = -1, nomeMat = '', nomeTot = '', nomeMes = '', scanned = 0, candidato = null;
     await scanSheet(wb, sheet, ctx, (n, cols, vals) => {
       scanned++;
-      let m = -1, t = -1, nm = '', nt = '', preenchidas = 0;
+      let m = -1, t = -1, me = -1, nm = '', nt = '', nme = '', preenchidas = 0;
       const nomes = [];
       for (let j = 0; j < n; j++) {
         const txt = trimStr(vals[j]);
@@ -1897,22 +1912,25 @@
         const h = normHeader(txt);
         if (m < 0 && BASE_MATRICULA.has(h)) { m = cols[j]; nm = txt; }
         if (t < 0 && CAD_TOTAL.has(h)) { t = cols[j]; nt = txt; }
+        if (me < 0 && CAD_MES.has(h)) { me = cols[j]; nme = txt; }
       }
-      if (m >= 0 && t >= 0) { colMat = m; colTot = t; nomeMat = nm; nomeTot = nt; return true; }
+      if (m >= 0 && t >= 0) { colMat = m; colTot = t; colMes = me; nomeMat = nm; nomeTot = nt; nomeMes = nme; return true; }
       if (!candidato && preenchidas >= 2) candidato = nomes;
       if (scanned >= MAX_HEADER_SCAN_ROWS) return true;
     });
     if (colMat < 0) {
       throw new PcError('CAD_SEM_COLUNAS', 'O arquivo Cadastro precisa ter a coluna da matrícula (NUM_LIGACAO) e a do total de economias (TOTAL_ECO) na aba "' + sheet.name.trim() + '".' + (candidato ? ' Colunas encontradas: ' + candidato.slice(0, 12).join(', ') + '.' : ''));
     }
-    // 2ª passada: só as duas colunas; conta quantas vezes cada matrícula aparece
-    const cont = new Map();
+    // 2ª passada: só as colunas usadas; conta quantas linhas cada matrícula tem em cada mês
+    const grupos = new Map();
+    const matriculas = new Set();
     let linhas = 0, semMatricula = 0, truncado = false, visto = false;
     await scanSheet(wb, sheet, ctx, (n, cols, vals) => {
-      let vm = '', vt = '';
+      let vm = '', vt = '', vme = '';
       for (let j = 0; j < n; j++) {
         if (cols[j] === colMat) vm = vals[j];
         else if (cols[j] === colTot) vt = vals[j];
+        else if (cols[j] === colMes) vme = vals[j];
       }
       if (!visto) { // linhas acima do cabeçalho e o próprio cabeçalho
         if (BASE_MATRICULA.has(normHeader(vm)) && CAD_TOTAL.has(normHeader(vt))) visto = true;
@@ -1923,40 +1941,69 @@
       const mat = chaveNorm(vm);
       if (!mat) { semMatricula++; return; }
       linhas++;
+      matriculas.add(mat);
       const tt = trimStr(vt);
       const total = /^\d+(?:[.,]0+)?$/.test(tt) ? parseInt(tt, 10) : null;
-      const e = cont.get(mat);
-      if (e) e.n++;
-      else cont.set(mat, { n: 1, total });
-    }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo o Cadastro', fraction: f }); }, (c) => c === colMat || c === colTot);
-    const unicas = [], repetidasLista = [];
-    let linhasRepetidas = 0, semTotal = 0;
-    for (const [mat, e] of cont) {
-      if (e.n > 1) { repetidasLista.push(mat); linhasRepetidas += e.n; }
-      else if (e.total == null) semTotal++;
-      else unicas.push([mat, e.total]);
+      const mes = colMes >= 0 ? mesCadastro(vme) : '';
+      const k = mat + '|' + mes;
+      const g = grupos.get(k);
+      if (g) g.n++;
+      else grupos.set(k, { mat, mes, n: 1, total });
+    }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo o Cadastro', fraction: f }); }, (c) => c === colMat || c === colTot || c === colMes);
+    const itens = [];
+    const meses = new Set();
+    let repetidas = 0, linhasRepetidas = 0, semTotal = 0, usadas = 0;
+    for (const g of grupos.values()) {
+      itens.push([g.mat, g.mes, g.total, g.n]);
+      if (g.mes) meses.add(g.mes);
+      if (g.n > 1) { repetidas++; linhasRepetidas += g.n; }
+      else if (g.total == null) semTotal++;
+      else usadas++;
     }
     return {
-      tipo: 'cadastro', aba: sheet.name.trim(), colunaMatricula: nomeMat, colunaTotal: nomeTot,
-      linhas: linhas + semMatricula, semMatricula, distintas: cont.size, repetidas: repetidasLista.length, linhasRepetidas,
-      semTotal, usadas: unicas.length, unicas, repetidasLista, truncado, warnings: [],
+      tipo: 'cadastro', aba: sheet.name.trim(), colunaMatricula: nomeMat, colunaTotal: nomeTot, colunaMes: nomeMes,
+      linhas: linhas + semMatricula, semMatricula, distintas: matriculas.size, repetidas, linhasRepetidas,
+      semTotal, usadas, meses: [...meses].sort(), itens, truncado, warnings: [],
     };
   }
 
   /**
    * Anota em cada registro o total de economias da matrícula no Cadastro: r.eco (número ou null) e r.ecoMotivo:
-   * 'ok' (achada uma vez, com total), 'rep' (repetida no Cadastro: desconsiderada), 'sem' (não achada ou sem total)
-   * e 'nao' (nenhum Cadastro carregado). Sem `cad`, tudo fica 'nao'.
+   * 'ok' (achada uma vez no mês, com total), 'rep' (repetida no mesmo mês do Cadastro: desconsiderada), 'sem' (não
+   * achada ou sem total) e 'nao' (nenhum Cadastro carregado). Sem `cad`, tudo fica 'nao'.
+   * Com vários meses no Cadastro vale o do mês da atividade (r.mes); se a matrícula não tiver aquele mês, o mês mais
+   * próximo (empate: o mais antigo); sem data na atividade, o mais recente. Cadastro de um mês só vale para todos.
    */
   function applyCadastro(records, cad) {
-    const tot = cad ? new Map(cad.unicas) : null;
-    const rep = cad ? new Set(cad.repetidasLista) : null;
+    let indice = null;
+    if (cad) {
+      // resultado gravado por uma versão anterior (um período só): unicas e repetidasLista
+      const itens = cad.itens || [].concat((cad.unicas || []).map(([m, t]) => [m, '', t, 1]), (cad.repetidasLista || []).map((m) => [m, '', null, 2]));
+      indice = new Map();
+      for (const [mat, mes, total, n] of itens) {
+        let l = indice.get(mat);
+        if (!l) indice.set(mat, (l = []));
+        l.push({ mes, ord: ordMes(mes), total, n });
+      }
+    }
+    const escolhe = (lista, mes) => {
+      if (lista.length === 1) return lista[0];
+      const alvo = ordMes(mes);
+      let melhor = null, dist = Infinity;
+      for (const e of lista) {
+        const d = alvo >= 0 ? Math.abs(e.ord - alvo) : -e.ord;
+        if (d < dist || (d === dist && e.ord < melhor.ord)) { melhor = e; dist = d; }
+      }
+      return melhor;
+    };
     for (const r of records) {
-      const mat = cad ? chaveNorm(r.matricula) : '';
-      if (!cad) { r.eco = null; r.ecoMotivo = 'nao'; }
-      else if (mat && tot.has(mat)) { r.eco = tot.get(mat); r.ecoMotivo = 'ok'; }
-      else if (mat && rep.has(mat)) { r.eco = null; r.ecoMotivo = 'rep'; }
-      else { r.eco = null; r.ecoMotivo = 'sem'; }
+      if (!cad) { r.eco = null; r.ecoMotivo = 'nao'; continue; }
+      const lista = indice.get(chaveNorm(r.matricula));
+      const e = lista ? escolhe(lista, r.mes) : null;
+      if (!e) { r.eco = null; r.ecoMotivo = 'sem'; }
+      else if (e.n > 1) { r.eco = null; r.ecoMotivo = 'rep'; }
+      else if (e.total == null) { r.eco = null; r.ecoMotivo = 'sem'; }
+      else { r.eco = e.total; r.ecoMotivo = 'ok'; }
     }
   }
 

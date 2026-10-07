@@ -176,9 +176,27 @@ test('Cadastro: arquivo inválido é recusado com mensagem clara e não vira ati
   await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));
   await page.click('#nav-tabs button[data-view=base]');
   const linha = await page.textContent('dl.kv >> text=Cadastro (economias) >> xpath=following-sibling::dd[1]');
-  assert.match(linha, /Cadastro_pequeno\.xlsx — aba "Export" · 7 linhas · 5 matrículas distintas · 1 repetidas \(2 linhas\) desconsideradas · 3 usadas · 1 sem TOTAL_ECO/);
+  assert.match(linha, /Cadastro_pequeno\.xlsx — aba "Export" · 7 linhas · 5 matrículas distintas · mês out\/2026 · 1 repetidas \(2 linhas\) desconsideradas · 3 usadas · 1 sem TOTAL_ECO/);
   // o Cadastro não é uma base de atividades: não entra na contagem de arquivos válidos
   assert.match(await page.textContent('dl.kv >> text=Arquivos válidos >> xpath=following-sibling::dd[1]'), /^1 de 1$/);
+  semErros(page);
+  await page.context().close();
+});
+
+test('Cadastro com todos os meses (coluna Mês/Ano): vale o total do mês da negociação e a matrícula em meses diferentes não é "repetida"', async () => {
+  const page = await abrir();
+  await importar(page, [PEQUENO, fx('Cadastro_meses.xlsx')]);
+  await page.waitForFunction(() => /Cadastro de 3 meses/.test(document.querySelector('#status').textContent));
+  assert.match(await statusTexto(page), /Cadastro de 3 meses: 7 registros de matrícula por mês usados, 1 repetido no mesmo mês desconsiderado/);
+  // as 5 negociações são de julho/2026, matrícula 1001: vale o total de julho (3), não o de agosto/setembro (4); contagem independente em cadastro_meses_esperados.json
+  const e = JSON.parse(fs.readFileSync(fx('cadastro_meses_esperados.json'), 'utf8'));
+  const jul = e.consultas.find((c) => c.mat === '1001' && c.mes === '2026-07');
+  assert.deepEqual([jul.motivo, jul.eco], ['ok', 3]);
+  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((x) => x.textContent)), ['3', '16,7%']);
+  assert.equal(await page.locator('.card-valores [data-vn=cadastro-repetida], .card-valores [data-vn=sem-cadastro]').count(), 0, '1001 não é repetida só por aparecer em três meses');
+  await page.click('#nav-tabs button[data-view=base]');
+  const linha = await page.textContent('dl.kv >> text=Cadastro (economias) >> xpath=following-sibling::dd[1]');
+  assert.match(linha, /Cadastro_meses\.xlsx — aba "Export" · 11 linhas · 5 matrículas distintas · 3 meses \(jul\/2026 a set\/2026\) · 1 matrícula repetida no mesmo mês \(2 linhas\) desconsideradas · 7 usadas · 1 sem TOTAL_ECO/);
   semErros(page);
   await page.context().close();
 });

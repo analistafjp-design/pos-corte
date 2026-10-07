@@ -168,19 +168,77 @@ def matriculas_neg(rows):
     return ms
 
 
-CAD_CAB = ["NUM_LIGACAO", "NOM_CLIENTE", "CIDADE", "TIPO_FATURAMENTO", "QTD_ECO_RES", "QTD_ECO_COM", "QTD_ECO_IND", "QTD_ECO_PUB", "TOTAL_ECO", "SIT_LIG"]
+CAD_CAB = ["NUM_LIGACAO", "NOM_CLIENTE", "CIDADE", "TIPO_FATURAMENTO", "QTD_ECO_RES", "QTD_ECO_COM", "QTD_ECO_IND", "QTD_ECO_PUB", "TOTAL_ECO", "Mês/Ano", "SIT_LIG"]
 
 
-def escrever_cadastro(path, linhas, nome_aba="Export"):
-    """Cadastro de economias SINTÉTICO (aba Export, colunas parecidas com o export real). linhas: (matrícula, total ou None)."""
+def escrever_cadastro(path, linhas, nome_aba="Export", mes_padrao="10/2026"):
+    """Cadastro de economias SINTÉTICO (aba Export, colunas parecidas com o export real, inclusive Mês/Ano em texto "MM/AAAA").
+    linhas: (matrícula, total ou None) ou (matrícula, total ou None, "MM/AAAA"); sem o mês, vale mes_padrao (o export real traz um só mês)."""
     wb = Workbook()
     ws = wb.active
     ws.title = nome_aba
     ws.append(CAD_CAB)
-    for i, (mat, total) in enumerate(linhas):
+    for i, lin in enumerate(linhas):
+        mat, total = lin[0], lin[1]
+        mes = lin[2] if len(lin) > 2 else mes_padrao
         res = total if total is not None else None
-        ws.append([mat, f"Cliente sintético {i}", "Cidade Norte", "MEDIDO", res, 0 if total is not None else None, 0 if total is not None else None, 0 if total is not None else None, total, "ATIVA"])
+        ws.append([mat, f"Cliente sintético {i}", "Cidade Norte", "MEDIDO", res, 0 if total is not None else None, 0 if total is not None else None, 0 if total is not None else None, total, mes, "ATIVA"])
     wb.save(path)
+
+
+def consulta_cadastro(linhas, mat, mes):
+    """Cadastro com vários meses, contagem independente: (motivo, total) de uma matrícula num mês "AAAA-MM".
+    Vale o mês exato; sem ele, o mais próximo (empate: o mais antigo). Repetida no mesmo mês: "rep"; sem total ou ausente: "sem"."""
+    def ordem(ym):
+        a, m = ym.split("-")
+        return int(a) * 12 + int(m) - 1
+
+    grupos = {}
+    for m, tot, mes_l in linhas:
+        k = chave_mat(m)
+        if not k:
+            continue
+        ym = f"{mes_l[3:]}-{mes_l[:2]}"
+        g = grupos.setdefault((k, ym), {"n": 0, "total": tot})
+        g["n"] += 1
+    cand = [(ym, g) for (k, ym), g in grupos.items() if k == chave_mat(mat)]
+    if not cand:
+        return ("sem", None)
+    alvo = ordem(mes)
+    ym, g = min(cand, key=lambda c: (abs(ordem(c[0]) - alvo), ordem(c[0])))
+    if g["n"] > 1:
+        return ("rep", None)
+    if g["total"] is None:
+        return ("sem", None)
+    return ("ok", g["total"])
+
+
+def esperados_cadastro_meses(linhas):
+    """Estatísticas do Cadastro com vários meses (matrícula/mês é a unidade) e consultas esperadas."""
+    grupos = collections.Counter()
+    total = {}
+    sem_matricula = 0
+    for m, tot, mes_l in linhas:
+        k = chave_mat(m)
+        if not k:
+            sem_matricula += 1
+            continue
+        ym = f"{mes_l[3:]}-{mes_l[:2]}"
+        grupos[(k, ym)] += 1
+        total[(k, ym)] = tot
+    meses = sorted({ym for _, ym in grupos})
+    consultas = []
+    for m in ["1001", "2002", "3003", "00004", "5005", "9999"]:
+        for mes in ["2026-01", "2026-07", "2026-08", "2026-09", "2026-12"]:
+            motivo, tot = consulta_cadastro(linhas, m, mes)
+            consultas.append({"mat": m, "mes": mes, "motivo": motivo, "eco": tot})
+    return {
+        "linhas": sum(grupos.values()) + sem_matricula, "semMatricula": sem_matricula, "distintas": len({k for k, _ in grupos}),
+        "repetidas": sum(1 for n in grupos.values() if n > 1), "linhasRepetidas": sum(n for n in grupos.values() if n > 1),
+        "semTotal": sum(1 for g, n in grupos.items() if n == 1 and total[g] is None),
+        "usadas": sum(1 for g, n in grupos.items() if n == 1 and total[g] is not None),
+        "meses": meses, "consultas": consultas,
+    }
 
 
 def negociacoes_por_matricula(rows, mats):
@@ -585,6 +643,12 @@ def main():
     # "00004" tem zeros à esquerda; 5005 não tem TOTAL_ECO; a última linha não tem matrícula
     cad_pequeno = [(1001, 3), (2002, 4), (2002, 4), (3003, 1), ("00004", 2), (5005, None), (None, 9)]
     escrever_cadastro(out / "Cadastro_pequeno.xlsx", cad_pequeno)
+    # Cadastro com vários meses (um registro por matrícula e mês): o total vale do mês da negociação; repetida só no mesmo mês
+    cad_meses = [(1001, 3, "07/2026"), (1001, 4, "08/2026"), (1001, 4, "09/2026"), (2002, 4, "07/2026"), (2002, 4, "07/2026"),
+                 (2002, 5, "08/2026"), (3003, 2, "08/2026"), ("00004", 2, "07/2026"), (5005, None, "07/2026"), (5005, 6, "09/2026"),
+                 (None, 9, "07/2026")]
+    escrever_cadastro(out / "Cadastro_meses.xlsx", cad_meses)
+    (out / "cadastro_meses_esperados.json").write_text(json.dumps(esperados_cadastro_meses(cad_meses), ensure_ascii=False, indent=1))
     esp_p = esperados(rows)
     esp_p["cadastro"] = esperados_cadastro(cad_pequeno, matriculas_neg(rows), rows)
     (out / "pequeno_esperados.json").write_text(json.dumps(esp_p, ensure_ascii=False, indent=1))
