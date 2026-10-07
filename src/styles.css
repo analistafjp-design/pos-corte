@@ -158,6 +158,7 @@ button.kpi:hover .kpi-go { color: var(--brand-2); }
 .kpi-sub { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
 .grp-title { font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 2px 2px -4px; }
 
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .grid-rank { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .stack { display: grid; gap: 14px; }
 
@@ -270,6 +271,7 @@ tfoot td { font-weight: 700; background: #f7f8fa; }
 @media (min-width: 960px) {
   .filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .filters .field.wide { grid-column: auto; }
+  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 1280px) {
   .kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -318,6 +320,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
   .kpi-value { font-size: 24px; }
   .kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .grid-rank { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table-wrap { overflow: visible; max-height: none !important; }
   table { font-size: 10.5px; }
@@ -341,6 +344,8 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
   .mgroup .bar { height: 7px; }
   .mgroup .tracks { gap: 1px; }
   .bval { font-size: 11px; }
+  .mgroup .bval { font-size: 10.5px; line-height: 1.1; }
+  .mgroup .bval .sw { width: 7px; height: 7px; }
   .legend { margin-bottom: 4px; }
   .rrow { padding: 2px 6px; gap: 2px 8px; }
   .rrow .rl, .rrow .rv { font-size: 11px; }
@@ -395,6 +400,30 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 @media (max-width: 560px) {
   .tabs button { white-space: normal; text-align: center; flex: 1 1 auto; line-height: 1.2; padding: 7px 6px; font-size: 13px; }
 }
+
+/* ---------- Gráfico de colunas com linha (produção mensal) ---------- */
+.cc-wrap { overflow-x: auto; padding-bottom: 2px; }
+.colchart { min-width: 240px; }
+.cc-area { position: relative; height: 300px; }
+.cc-grid { position: absolute; left: 0; right: 0; top: 28px; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+.cc-grid i { display: block; height: 1px; background: var(--line); }
+.cc-cols { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }
+.cc-col { display: flex; flex-direction: column; background: transparent; border: 0; padding: 0; min-width: 0; border-radius: 8px; color: inherit; text-align: center; }
+button.cc-col { cursor: pointer; }
+.cc-col:hover { background: rgba(30, 79, 214, 0.06); }
+.cc-col.is-active { background: var(--brand-tint); }
+.cc-plot { flex: 1 1 auto; margin-top: 28px; display: flex; align-items: flex-end; justify-content: center; min-height: 0; }
+.cc-stack { width: min(60%, 46px); display: flex; flex-direction: column-reverse; border-radius: 6px 6px 0 0; overflow: hidden; }
+.cc-stack i { display: block; background: var(--c); min-height: 2px; margin-top: 1px; }
+.cc-stack i:last-child { margin-top: 0; }
+.cc-label { height: 30px; line-height: 30px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.cc-col.is-active .cc-label { font-weight: 700; color: var(--brand-2); }
+.cc-over { position: absolute; left: 0; right: 0; top: 28px; bottom: 30px; pointer-events: none; }
+.cc-over svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.cc-over polyline { fill: none; stroke: #334155; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.cc-pt { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #334155; transform: translate(-50%, 50%); }
+.cc-val { position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -4px); font-size: 12.5px; font-weight: 700; white-space: nowrap; color: var(--ink); background: rgba(255, 255, 255, 0.85); border-radius: 4px; padding: 0 3px; }
+@media print { .cc-area { height: 210px; } .cc-wrap { overflow: visible; } .colchart { min-width: 0 !important; } }
 
 /* ---------- Recortes da base ---------- */
 .recorte { display: grid; gap: 14px 24px; grid-template-columns: minmax(0, 1fr); background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }

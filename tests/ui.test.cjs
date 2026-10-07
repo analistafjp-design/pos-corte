@@ -96,9 +96,18 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   assert.match(await page.textContent('.card-recorte .rc-row[data-tipo="CAVALETE SIMPLES"]'), /Corte no Cavalete Simples.*20,0% · 1/);
   assert.match(await page.textContent('.card-recorte .rc-row[data-tipo="NÃO INFORMADO"]'), /Tipo não informado.*20,0% · 1/);
   assert.equal(await page.locator('[data-fk="kpi:semDesdobro"]').count(), 0, 'sem card de desdobro na visão geral');
-  // visuais e tabela mensal retirados da Visão geral
-  for (const id of ['h-mensal', 'h-status', 'h-tm']) assert.equal(await page.locator('#' + id).count(), 0, id + ' removido');
-  assert.equal(await page.locator('.colchart, .card-status, .card-mensal').count(), 0);
+  // distribuição dos status e tabela mensal seguem fora da Visão geral; a produção mensal voltou, ao lado de negociações e termos
+  for (const id of ['h-status', 'h-tm']) assert.equal(await page.locator('#' + id).count(), 0, id + ' removido');
+  assert.equal(await page.locator('.card-status').count(), 0);
+  assert.equal(await page.textContent('#h-mensal'), 'Produção mensal — Percorrido (Exec + Exoc)');
+  const porMes = JSON.parse(fs.readFileSync(fx('pequeno_esperados.json'), 'utf8')).porMes; // contagem independente (Python)
+  assert.deepEqual(await page.$$eval('section[aria-labelledby=h-mensal] .cc-val', (els) => els.map((e) => e.textContent)), Object.keys(porMes).sort().map((m) => String(porMes[m].atividades)));
+  assert.deepEqual(await page.$$eval('section[aria-labelledby=h-mensal] .cc-label', (els) => els.map((e) => e.textContent)), ['jul/2026', 'ago/2026', 'set/2026']);
+  assert.ok(await page.locator('section[aria-labelledby=h-mensal] .legend').isVisible(), 'legenda Exec/Exoc');
+  const lado = await page.$$eval('.card-mensal, .card-negtermo', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) }; }));
+  assert.equal(lado.length, 2);
+  assert.equal(lado[0].y, lado[1].y, 'produção mensal na mesma linha de negociações e termos');
+  assert.ok(lado[1].x > lado[0].x + lado[0].w - 2 && Math.abs(lado[0].w - lado[1].w) <= 2, 'lado a lado, metade da largura cada um');
   assert.equal(await page.locator('#view-geral .mini-sub', { hasText: '"Fez o corte novamente" = Sim' }).count(), 0, 'legenda do recorte removida');
   // valores negociados: logo abaixo de "Recortes realizados", em largura total, com valor negociado e economias recuperadas (só o número, sem % nem rótulos)
   const ordem = await page.$$eval('#view-geral > .stack > *', (els) => els.map((e) => e.className));
@@ -350,6 +359,10 @@ test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   const page = await abrir();
   await importar(page, PEQUENO);
   // clicar no mês filtra e clicar de novo limpa
+  await page.click('.cc-col[data-fk="mes:2026-07"]');
+  assert.deepEqual((await kpis(page))[0], '17');
+  await page.click('.cc-col[data-fk="mes:2026-07"]');
+  assert.equal((await kpis(page))[0], '19');
   await page.click('.mgroup[data-fk="mesnt:2026-07"]');
   assert.deepEqual((await kpis(page))[0], '17');
   assert.match(await page.textContent('#chips'), /Período: 01\/07\/2026 a 31\/07\/2026/);
@@ -385,6 +398,8 @@ test('filtros: mês, ranking, datas, seletores, chips e limpar', async () => {
   await page.click('#chips button.ghost');
   // seletor do indicador dos gráficos
   await page.selectOption('#f-ind', 'termos');
+  assert.match(await page.textContent('#h-mensal'), /Termos aplicados/);
+  assert.deepEqual(await page.$$eval('section[aria-labelledby=h-mensal] .cc-val', (els) => els.map((e) => e.textContent)), ['7', '0', '0']);
   assert.match(await page.textContent('section[aria-labelledby=h-frente] .hint'), /^Termos · 7 no filtro/);
   assert.match(await page.textContent('section[aria-labelledby=h-recurso] .hint'), /^Termos · 7 no filtro/);
   await page.selectOption('#f-ind', 'atividades');
@@ -946,6 +961,11 @@ test('exportar PDF: o botão abre a impressão da Visão geral e o layout de imp
   assert.equal(await page.locator('.card-recorte').isVisible(), false, 'Recortes realizados oculto na impressão');
   assert.ok(await page.locator('.card-valores').isVisible(), 'Valores negociados segue no PDF');
   assert.ok(await page.locator('.card-negtermo').isVisible());
+  // produção mensal ao lado de negociações e termos, ocupando a largura da folha
+  const lado = await page.$$eval('.card-mensal, .card-negtermo', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) }; }));
+  assert.equal(lado.length, 2);
+  assert.equal(lado[0].y, lado[1].y, 'mesma linha na impressão');
+  assert.ok(lado[1].x > lado[0].x + lado[0].w - 2, 'um ao lado do outro na impressão');
   await page.emulateMedia({ media: 'screen' });
   assert.ok(await page.locator('.card-recorte').isVisible(), 'na tela o bloco de Recortes realizados continua');
   await page.emulateMedia({ media: 'print' });
@@ -953,6 +973,28 @@ test('exportar PDF: o botão abre a impressão da Visão geral e o layout de imp
   assert.equal(pdf.subarray(0, 4).toString(), '%PDF');
   const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
   assert.ok(paginas >= 1 && paginas <= 4, 'páginas: ' + paginas);
+  semErros(page);
+  await page.context().close();
+});
+
+test('exportar PDF: produção mensal e negociações e termos ocupam o fim da primeira folha (base grande, 9 meses)', { timeout: 120000 }, async () => {
+  const page = await abrir();
+  await importar(page, [fx('grande_sintetico.xlsx'), fx('Cadastro_grande.xlsx')]);
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await page.emulateMedia({ media: 'print' });
+  const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true });
+  const arq = require('node:path').join(require('node:os').tmpdir(), 'pc-pdf-' + process.pid + '-' + Date.now() + '.pdf');
+  fs.writeFileSync(arq, pdf);
+  const txt = require('node:child_process').spawnSync('pdftotext', ['-layout', '-f', '1', '-l', '1', arq, '-'], { encoding: 'utf8' });
+  if (txt.status === 0) { // poppler disponível: confere o que cai na primeira folha
+    assert.match(txt.stdout, /Valores negociados/);
+    assert.match(txt.stdout, /Produção mensal/, 'produção mensal na primeira folha');
+    assert.match(txt.stdout, /Negociações e termos aplicados por mês/, 'negociações e termos na primeira folha');
+    assert.doesNotMatch(txt.stdout, /Resultados por cidade/);
+  }
+  const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+  assert.ok(paginas <= 3, 'páginas: ' + paginas + ' (antes de aproveitar a primeira folha eram 4)');
+  fs.unlinkSync(arq);
   semErros(page);
   await page.context().close();
 });

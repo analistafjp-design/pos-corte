@@ -166,6 +166,7 @@ button.kpi:hover .kpi-go { color: var(--brand-2); }
 .kpi-sub { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
 .grp-title { font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 2px 2px -4px; }
 
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .grid-rank { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .stack { display: grid; gap: 14px; }
 
@@ -278,6 +279,7 @@ tfoot td { font-weight: 700; background: #f7f8fa; }
 @media (min-width: 960px) {
   .filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .filters .field.wide { grid-column: auto; }
+  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 1280px) {
   .kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -326,6 +328,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
   .kpi-value { font-size: 24px; }
   .kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .grid-rank { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table-wrap { overflow: visible; max-height: none !important; }
   table { font-size: 10.5px; }
@@ -349,6 +352,8 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
   .mgroup .bar { height: 7px; }
   .mgroup .tracks { gap: 1px; }
   .bval { font-size: 11px; }
+  .mgroup .bval { font-size: 10.5px; line-height: 1.1; }
+  .mgroup .bval .sw { width: 7px; height: 7px; }
   .legend { margin-bottom: 4px; }
   .rrow { padding: 2px 6px; gap: 2px 8px; }
   .rrow .rl, .rrow .rv { font-size: 11px; }
@@ -403,6 +408,30 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 @media (max-width: 560px) {
   .tabs button { white-space: normal; text-align: center; flex: 1 1 auto; line-height: 1.2; padding: 7px 6px; font-size: 13px; }
 }
+
+/* ---------- Gráfico de colunas com linha (produção mensal) ---------- */
+.cc-wrap { overflow-x: auto; padding-bottom: 2px; }
+.colchart { min-width: 240px; }
+.cc-area { position: relative; height: 300px; }
+.cc-grid { position: absolute; left: 0; right: 0; top: 28px; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+.cc-grid i { display: block; height: 1px; background: var(--line); }
+.cc-cols { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }
+.cc-col { display: flex; flex-direction: column; background: transparent; border: 0; padding: 0; min-width: 0; border-radius: 8px; color: inherit; text-align: center; }
+button.cc-col { cursor: pointer; }
+.cc-col:hover { background: rgba(30, 79, 214, 0.06); }
+.cc-col.is-active { background: var(--brand-tint); }
+.cc-plot { flex: 1 1 auto; margin-top: 28px; display: flex; align-items: flex-end; justify-content: center; min-height: 0; }
+.cc-stack { width: min(60%, 46px); display: flex; flex-direction: column-reverse; border-radius: 6px 6px 0 0; overflow: hidden; }
+.cc-stack i { display: block; background: var(--c); min-height: 2px; margin-top: 1px; }
+.cc-stack i:last-child { margin-top: 0; }
+.cc-label { height: 30px; line-height: 30px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.cc-col.is-active .cc-label { font-weight: 700; color: var(--brand-2); }
+.cc-over { position: absolute; left: 0; right: 0; top: 28px; bottom: 30px; pointer-events: none; }
+.cc-over svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.cc-over polyline { fill: none; stroke: #334155; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.cc-pt { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #334155; transform: translate(-50%, 50%); }
+.cc-val { position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -4px); font-size: 12.5px; font-weight: 700; white-space: nowrap; color: var(--ink); background: rgba(255, 255, 255, 0.85); border-radius: 4px; padding: 0 3px; }
+@media print { .cc-area { height: 210px; } .cc-wrap { overflow: visible; } .colchart { min-width: 0 !important; } }
 
 /* ---------- Recortes da base ---------- */
 .recorte { display: grid; gap: 14px 24px; grid-template-columns: minmax(0, 1fr); background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
@@ -4282,6 +4311,8 @@ window.FRENTES_PADRAO = [
   /* Componentes de gráfico                                              */
   /* ------------------------------------------------------------------ */
 
+  const valorInd = (s, k) => s[k];
+
   function legenda(itens) {
     return h('ul', { class: 'legend' }, itens.map((i) => h('li', null, h('span', { class: 'sw', style: { '--c': i.cor } }), i.t)));
   }
@@ -4342,6 +4373,59 @@ window.FRENTES_PADRAO = [
     if (mesAtivo(mes)) { state.filters.from = ''; state.filters.to = ''; }
     else { state.filters.from = r.from; state.filters.to = r.to; }
     aplicarFiltros();
+  }
+
+  function renderMensal() {
+    const ind = state.chartInd;
+    const meses = vm.months;
+    const max = Math.max(1, ...meses.map((m) => valorInd(m.sum, ind)));
+    const empilhado = ind === 'atividades';
+    const temOutros = vm.sum.outros > 0;
+    const n = meses.length;
+    // gráfico de colunas com linha: colunas empilhadas (Exec/Exoc) ou simples e uma linha ligando os topos; os valores ficam sempre visíveis
+    const colunas = meses.map((m, i) => {
+      const s = m.sum;
+      const v = valorInd(s, ind);
+      const partes = empilhado
+        ? [{ n: 'Exec', v: s.exec, c: COR.exec }, { n: 'Exoc', v: s.exoc, c: COR.exoc }, { n: 'Outros status', v: s.outros, c: COR.outros }].filter((p) => p.v > 0)
+        : [];
+      const tipText = m.rotulo + '\n' + fmtInt(v) + ' ' + IND[ind].curto.toLowerCase() + (empilhado ? partes.map((p) => '\n' + p.n + ': ' + fmtInt(p.v)).join('') : '') + (ind !== 'atividades' ? '\n' + fmtInt(s.atividades) + ' atividades no mês' : '');
+      const alt = (v / max) * 100;
+      const pilha = v === 0 ? null : h('span', { class: 'cc-stack', style: { height: Math.max(alt, 0.8) + '%' } },
+        empilhado ? partes.map((p) => h('i', { style: { flex: p.v + ' 1 0px', '--c': p.c } })) : h('i', { style: { flex: '1 1 0px', '--c': COR[ind] } }));
+      const conteudo = [
+        h('span', { class: 'cc-plot' }, pilha),
+        h('span', { class: 'cc-label', text: m.rotulo }),
+      ];
+      const aria = m.rotulo + ': ' + fmtInt(v) + ' ' + IND[ind].curto + (m.mes ? '. Filtrar este mês.' : '');
+      const el = m.mes
+        ? h('button', { class: 'cc-col' + (mesAtivo(m.mes) ? ' is-active' : ''), type: 'button', dataset: { fk: 'mes:' + m.mes }, 'data-tip': tipText, 'aria-label': aria, 'aria-pressed': mesAtivo(m.mes) ? 'true' : 'false', onclick: () => filtrarMes(m.mes) }, conteudo)
+        : h('div', { class: 'cc-col', 'data-tip': tipText, tabindex: 0, 'aria-label': aria }, conteudo);
+      return { el, v, alt, x: ((i + 0.5) / n) * 100 };
+    });
+    const pontos = colunas.map((c) => c.x + ',' + (100 - c.alt)).join(' ');
+    const grafico = h('div', { class: 'colchart', style: { minWidth: Math.max(n * 58, 240) + 'px' } },
+      h('div', { class: 'cc-area' },
+        h('div', { class: 'cc-grid', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
+        h('div', { class: 'cc-cols', style: { '--n': n } }, colunas.map((c) => c.el)),
+        h('div', { class: 'cc-over', 'aria-hidden': 'true' },
+          (() => {
+            const svg = document.createElementNS(SVG_NS, 'svg');
+            svg.setAttribute('viewBox', '0 0 100 100');
+            svg.setAttribute('preserveAspectRatio', 'none');
+            const pl = document.createElementNS(SVG_NS, n > 1 ? 'polyline' : 'g');
+            if (n > 1) pl.setAttribute('points', pontos);
+            svg.append(pl);
+            return svg;
+          })(),
+          colunas.map((c) => h('span', { class: 'cc-pt', style: { left: c.x + '%', bottom: c.alt + '%' } }, h('b', { class: 'cc-val num', text: fmtInt(c.v) }))))));
+    return h('section', { class: 'card card-mensal', 'aria-labelledby': 'h-mensal' },
+      h('div', { class: 'card-head' },
+        h('div', null, h('h2', { id: 'h-mensal', text: 'Produção mensal — ' + IND[ind].rotulo }), h('p', { class: 'hint', text: 'Clique em um mês para filtrar.' }))),
+      empilhado ? legenda([{ cor: COR.exec, t: 'Exec' }, { cor: COR.exoc, t: 'Exoc' }].concat(temOutros ? [{ cor: COR.outros, t: 'Outros status' }] : [])) : null,
+      meses.length ? h('div', { class: 'cc-wrap' }, grafico) : h('p', { class: 'note', text: 'Nenhum registro no filtro atual.' }),
+      alertaIndisponivel(ind === 'atividades' ? 'exec' : ind)
+    );
   }
 
   function renderNegTermo() {
@@ -4540,7 +4624,7 @@ window.FRENTES_PADRAO = [
           h('p', { class: 'hint', text: 'Atividades com "Fez o corte novamente" = Sim, por tipo de corte (Onde Foi Feito O Corte?), no filtro atual. Total recorte ÷ Exec.' }))),
         cartaoRecorte(vm.sum)),
       renderValoresNegociados(),
-      renderNegTermo(),
+      h('div', { class: 'grid-2' }, renderMensal(), renderNegTermo()),
       renderCidades(),
       renderCategorias(),
       h('div', { class: 'grid-rank' },
