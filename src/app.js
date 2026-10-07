@@ -106,6 +106,8 @@
     records: [],
     files: [], // resultados da última leitura (válidos e com erro)
     consolidado: null,
+    cadastro: null, // resultado da leitura do arquivo "Cadastro" (matrícula -> total de economias)
+    cadastros: 0, // quantos arquivos "Cadastro" havia na pasta
     cobertura: {},
     frenteMap: new Map(),
     source: null, // { kind: 'folder'|'files', mode: 'handle'|'input', name, handle?, entries? }
@@ -385,6 +387,7 @@
       }
 
       const ok = [];
+      const cadastros = [];
       const novos = [];
       const leitura = { lidos: 0, salvos: 0, memoria: 0 };
       let ultimoProgresso = 0;
@@ -406,15 +409,15 @@
           m.origem = 'lido';
           if (!opts.auto) setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo, progress: 0 });
           try {
-            res = await PC.readSpreadsheetFile(file, {
-              path: e.path,
-              aliases: state.aliases,
-              onProgress: (p) => {
-                if (opts.auto || (p.fraction < 1 && Date.now() - ultimoProgresso < 120)) return;
-                ultimoProgresso = Date.now();
-                setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo + ' — ' + p.phase + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / metas.length });
-              },
-            });
+            const onProgress = (p) => {
+              if (opts.auto || (p.fraction < 1 && Date.now() - ultimoProgresso < 120)) return;
+              ultimoProgresso = Date.now();
+              setStatus({ kind: 'info', title: 'Lendo arquivos…', detail: prefixo + ' — ' + p.phase + ' (' + Math.round(p.fraction * 100) + '%)', progress: (i + p.fraction) / metas.length });
+            };
+            // o arquivo "Cadastro" (matrícula e total de economias) tem leitor próprio; os demais são as atividades
+            res = PC.ehCadastro(e.name)
+              ? await PC.readCadastro(file, { onProgress })
+              : await PC.readSpreadsheetFile(file, { path: e.path, aliases: state.aliases, onProgress });
             res.path = e.path;
             res.name = e.name;
             res.size = file.size;
@@ -429,7 +432,8 @@
           }
         }
         res.origem = m.origem;
-        ok.push(res);
+        if (res.tipo === 'cadastro') cadastros.push(res);
+        else ok.push(res);
       }
       for (const k of [...state.cache.keys()]) if (!chaves.includes(k)) state.cache.delete(k);
       if (ok.length) idb.arquivoLimpar(new Set(chaves)).catch(() => {});
@@ -458,6 +462,10 @@
       const ordemMod = PC.ordenarArquivos(ok);
       state.frenteMap = PC.mergeFrentes(state.frenteMap, ordemMod.map((r) => ({ nome: r.name, frentes: r.frentes })));
       PC.applyFrentes(cons.records, state.frenteMap);
+      cadastros.sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0)); // vale o mais recente
+      state.cadastro = cadastros[0] || null;
+      state.cadastros = cadastros.length;
+      PC.applyCadastro(cons.records, state.cadastro);
       state.records = cons.records;
       state.consolidado = cons;
       state.files = ok.map((r) => ({ ok: true, res: r })).concat(falhas.map((f) => ({ ok: false, path: f.path, motivo: f.motivo })));
@@ -475,6 +483,8 @@
       ignoradosFormato.forEach((p) => itens.push('Ignorado (formato não suportado, salve como .xlsx): ' + p));
       const indisp = Object.entries(state.cobertura.indisponiveis || {});
       indisp.forEach(([k, nomes]) => itens.push(IND[k].curto + ' não pôde ser calculado em: ' + nomes.join(', ')));
+      if (cadastros.length > 1) itens.push('Há ' + cadastros.length + ' arquivos "Cadastro": foi usado o mais recente (' + cadastros[0].name + ').');
+      if (state.cadastro && state.cadastro.truncado) itens.push('Cadastro com muitas linhas: só as primeiras 300.000 foram lidas.');
       if (cons.semChave) itens.push(fmtInt(cons.semChave) + ' ' + plural(cons.semChave, 'linha', 'linhas') + ' sem chave de deduplicação completa (ID da Atividade ausente e Protocolo/Matrícula/Código/Data/Recurso incompleto): não são unidas a linhas de outros arquivos; se houver arquivos acumulados sobrepostos, as contagens podem duplicar.');
       const nAvisos = ok.reduce((a, r) => a + r.warnings.length, 0);
       const parcial = falhas.length > 0;
@@ -489,6 +499,7 @@
           'Lidos do arquivo agora: ' + leitura.lidos + ' · reaproveitados (já lidos antes): ' + (leitura.salvos + leitura.memoria) + '. ' +
           (cons.anuladas ? fmtInt(cons.anuladas) + ' ' + plural(cons.anuladas, 'atividade fora de Finalizada/Encerrada com Ocorrência', 'atividades fora de Finalizada/Encerrada com Ocorrência') + ' não contam. ' : '') +
           (cons.duplicatas ? fmtInt(cons.duplicatas) + ' ' + plural(cons.duplicatas, 'duplicata removida', 'duplicatas removidas') + '. ' : '') +
+          (state.cadastro ? 'Cadastro: ' + fmtInt(state.cadastro.usadas) + ' ' + plural(state.cadastro.usadas, 'matrícula usada', 'matrículas usadas') + (state.cadastro.repetidas ? ', ' + fmtInt(state.cadastro.repetidas) + ' ' + plural(state.cadastro.repetidas, 'repetida desconsiderada', 'repetidas desconsideradas') : '') + '. ' : '') +
           (nAvisos ? nAvisos + ' ' + plural(nAvisos, 'aviso de leitura', 'avisos de leitura') + ' em "Base e regras". ' : ''),
         items: itens,
       });
@@ -976,9 +987,10 @@
     );
   }
 
-  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas, cada um em valor e %. */
+  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (via Cadastro), cada um em valor e %. */
   function renderValoresNegociados() {
     const s = vm.sum;
+    const cad = state.cadastro;
     const semNeg = (state.cobertura.indisponiveis || {}).neg || [];
     const semMat = (state.cobertura.semMatricula || []).filter((n) => !semNeg.includes(n));
     const avisoDe = (nomes) => (nomes.length ? '⚠ indisponível em ' + nomes.length + ' ' + plural(nomes.length, 'arquivo', 'arquivos') : null);
@@ -988,15 +1000,21 @@
         h('div', { class: 'vn-col' }, h('span', { class: 'vn-cab', text: 'Valor' }), h('span', { class: 'vn-valor num', dataset: { vn: 'v' }, text: valor })),
         h('div', { class: 'vn-col' }, h('span', { class: 'vn-cab', text: '%' }), h('span', { class: 'vn-valor num', dataset: { vn: 'pct' }, text: pct }))),
       aviso ? h('span', { class: 'kpi-sub', text: aviso }) : null);
+    const nota = (k, txt) => h('p', { class: 'note', dataset: { vn: k }, text: txt });
+    const mats = (n, um, varios) => fmtInt(n) + ' ' + plural(n, um, varios);
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = matrículas distintas que negociaram; % sobre o Exec.' }))),
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias (TOTAL_ECO do arquivo Cadastro) das matrículas que negociaram, cada matrícula uma vez; % sobre o Exec.' }))),
       h('div', { class: 'vn-grid' },
         quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito total informado de todas as atividades do filtro (' + brl.format(s.debitoTotal) + ').', avisoDe(semNeg)),
-        quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec), 'Matrículas distintas com negociação (' + fmtInt(s.economias) + ') divididas pelo total de Exec (' + fmtInt(s.exec) + ').', avisoDe(semNeg.concat(semMat)))),
-      s.debitoNaoInformado ? h('p', { class: 'note', dataset: { vn: 'sem-valor' }, text: fmtInt(s.debitoNaoInformado) + ' ' + plural(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).' }) : null,
-      s.negSemMatricula ? h('p', { class: 'note', dataset: { vn: 'sem-matricula' }, text: fmtInt(s.negSemMatricula) + ' ' + plural(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).' }) : null
+        cad
+          ? quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec), 'Total de economias (TOTAL_ECO do Cadastro) de ' + mats(s.economiasMatriculas, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + ') dividido pelo total de Exec (' + fmtInt(s.exec) + ').', avisoDe(semNeg.concat(semMat)))
+          : quadro('economias', 'Economias recuperadas', '—', '—', 'Coloque na pasta o arquivo "Cadastro" (matrícula e total de economias) para calcular.', '⚠ arquivo Cadastro não encontrado')),
+      s.debitoNaoInformado ? nota('sem-valor', mats(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).') : null,
+      s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
+      cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): não entram nas economias recuperadas.') : null,
+      cad && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no Cadastro e ' + plural(s.economiasRepetidas, 'foi desconsiderada', 'foram desconsideradas') + '.') : null
     );
   }
 
@@ -1315,6 +1333,10 @@
       add('Nesta leitura', state.leitura.lidos + ' lidos do arquivo · ' + (state.leitura.salvos + state.leitura.memoria) + ' reaproveitados');
     }
     if (c && c.semChave) add('Linhas sem chave completa', fmtInt(c.semChave) + ' (nunca são unidas a outras)');
+    const cad = state.cadastro;
+    add('Cadastro (economias)', cad
+      ? cad.name + ' — aba "' + cad.aba + '" · ' + fmtInt(cad.linhas) + ' linhas · ' + fmtInt(cad.distintas) + ' matrículas distintas · ' + fmtInt(cad.repetidas) + ' repetidas (' + fmtInt(cad.linhasRepetidas) + ' linhas) desconsideradas · ' + fmtInt(cad.usadas) + ' usadas' + (cad.semTotal ? ' · ' + fmtInt(cad.semTotal) + ' sem TOTAL_ECO' : '') + (state.cadastros > 1 ? ' · há ' + state.cadastros + ' arquivos Cadastro: vale o mais recente' : '')
+      : 'não encontrado (coloque na pasta um arquivo com "Cadastro" no nome, com as colunas NUM_LIGACAO e TOTAL_ECO)');
     if (state.records.length) {
       let mn = '', mx = '';
       for (const r of state.records) if (r.data) { if (!mn || r.data < mn) mn = r.data; if (!mx || r.data > mx) mx = r.data; }
@@ -1410,7 +1432,7 @@
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
         li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
         li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações. O % é esse valor dividido pela soma do mesmo campo em todas as atividades do filtro (débito total informado). Negociação sem valor informado não entra na soma.'),
-        li(h('strong', { text: 'Economias recuperadas' }), ': matrículas distintas com negociação (a mesma matrícula conta uma vez; zeros à esquerda e espaços são ignorados). O % é esse número dividido pelo total de Exec. Negociação sem matrícula não entra na contagem.')),
+        li(h('strong', { text: 'Economias recuperadas' }), ': soma do ', h('code', { text: 'TOTAL_ECO' }), ' do arquivo ', h('strong', { text: 'Cadastro' }), ' (cruzado pela matrícula, coluna ', h('code', { text: 'NUM_LIGACAO' }), ') das matrículas distintas com negociação; cada matrícula conta uma vez (zeros à esquerda e espaços são ignorados). Matrícula que aparece mais de uma vez no Cadastro é desconsiderada, e a que não está no Cadastro não entra. O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra. Sem o arquivo Cadastro na pasta, o indicador fica indisponível.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,
         li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),

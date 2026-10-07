@@ -1454,12 +1454,15 @@
    * Equipes = recursos distintos que trabalharam; equipeDias = pares (equipe, dia) com atividade;
    * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
    * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoTotal`
-   * (soma do mesmo campo em todas as atividades do conjunto). Economias recuperadas = `economias` (matrículas distintas
-   * que negociaram; negociação sem matrícula fica em `negSemMatricula`); `economiasSobreExec` = economias ÷ Exec.
+   * (soma do mesmo campo em todas as atividades do conjunto). Matrículas que negociaram = `matriculasNeg` (distintas;
+   * negociação sem matrícula fica em `negSemMatricula`). Economias recuperadas = `economias`: soma do TOTAL_ECO do
+   * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez; as que não entram ficam em
+   * `economiasSemCadastro` (não achadas ou sem total), `economiasRepetidas` (repetidas no Cadastro) e
+   * `economiasSemArquivo` (sem Cadastro carregado). `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0 };
-    const matriculasNeg = new Set();
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
+    const matriculasNeg = new Map();
     const equipes = new Set();
     const dias = new Set();
     const equipeDias = new Set();
@@ -1475,7 +1478,7 @@
         else s.debito += r.valor;
         if (r.semDesdobro) s.semDesdobro++;
         const mat = chaveNorm(r.matricula);
-        if (mat) matriculasNeg.add(mat);
+        if (mat) { if (!matriculasNeg.has(mat)) matriculasNeg.set(mat, r); }
         else s.negSemMatricula++;
       }
       if (r.termo) {
@@ -1500,7 +1503,13 @@
     s.equipeDias = equipeDias.size;
     s.assertividade = s.exec ? s.termos / s.exec : null;
     s.efetividade = s.exec ? s.neg / s.exec : null;
-    s.economias = matriculasNeg.size;
+    s.matriculasNeg = matriculasNeg.size;
+    for (const r of matriculasNeg.values()) {
+      if (r.ecoMotivo === 'ok') { s.economias += r.eco; s.economiasMatriculas++; }
+      else if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
+      else if (r.ecoMotivo === 'sem') s.economiasSemCadastro++;
+      else s.economiasSemArquivo++;
+    }
     s.economiasSobreExec = s.exec ? s.economias / s.exec : null;
     s.debitoPct = s.debitoTotal ? s.debito / s.debitoTotal : null;
     s.recorteSobreExec = s.exec ? s.recortes / s.exec : null;
@@ -1796,6 +1805,119 @@
     return { aba: sheet.name.trim(), colunas: cabecalho.nomes, linhas, colProtocolo, colMatricula, dataNome: dataDoNome(file.name, opts.ref), truncado, nomeProtocolo: colProtocolo >= 0 ? cabecalho.nomes[colProtocolo] : '', nomeMatricula: colMatricula >= 0 ? cabecalho.nomes[colMatricula] : '' };
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Cadastro de economias (arquivo "Cadastro")                          */
+  /* ------------------------------------------------------------------ */
+
+  const CAD_TOTAL = new Set(['total eco', 'total economias', 'total de economias', 'qtd economias', 'total economia']);
+
+  /** O arquivo é o cadastro de economias quando o nome (sem pasta) tem "cadastro", sem acento e em qualquer caixa. */
+  function ehCadastro(nome) {
+    return /cadastro/.test(norm(String(nome || '').replace(/^.*[\\/]/, '')));
+  }
+
+  /**
+   * Lê o arquivo Cadastro: só as colunas da matrícula (NUM_LIGACAO) e do total de economias (TOTAL_ECO); as demais
+   * (nome, endereço etc.) não são lidas nem guardadas. Matrícula que aparece mais de uma vez no arquivo é desconsiderada.
+   * Devolve { tipo: 'cadastro', aba, linhas, distintas, repetidas, linhasRepetidas, semTotal, semMatricula, usadas,
+   * unicas: [[matrícula normalizada, total]], repetidasLista: [matrícula normalizada], truncado }.
+   */
+  async function readCadastro(file, opts) {
+    opts = opts || {};
+    const wb = await openWorkbook(file);
+    const ctx = await wb.loadContext();
+    const visiveis = wb.sheets.filter((x) => x.state === 'visible');
+    const lista = visiveis.length ? visiveis : wb.sheets;
+    let primeiroErro = null;
+    for (const sheet of lista) {
+      try {
+        return await lerAbaCadastro(wb, sheet, ctx, opts);
+      } catch (e) {
+        if (!(e instanceof PcError) || e.code !== 'CAD_SEM_COLUNAS') throw e;
+        if (!primeiroErro) primeiroErro = e;
+      }
+    }
+    throw primeiroErro;
+  }
+
+  async function lerAbaCadastro(wb, sheet, ctx, opts) {
+    // 1ª passada: acha o cabeçalho (todas as colunas, só nas primeiras linhas)
+    let colMat = -1, colTot = -1, nomeMat = '', nomeTot = '', scanned = 0, candidato = null;
+    await scanSheet(wb, sheet, ctx, (n, cols, vals) => {
+      scanned++;
+      let m = -1, t = -1, nm = '', nt = '', preenchidas = 0;
+      const nomes = [];
+      for (let j = 0; j < n; j++) {
+        const txt = trimStr(vals[j]);
+        if (!txt) continue;
+        preenchidas++;
+        nomes.push(txt);
+        const h = normHeader(txt);
+        if (m < 0 && BASE_MATRICULA.has(h)) { m = cols[j]; nm = txt; }
+        if (t < 0 && CAD_TOTAL.has(h)) { t = cols[j]; nt = txt; }
+      }
+      if (m >= 0 && t >= 0) { colMat = m; colTot = t; nomeMat = nm; nomeTot = nt; return true; }
+      if (!candidato && preenchidas >= 2) candidato = nomes;
+      if (scanned >= MAX_HEADER_SCAN_ROWS) return true;
+    });
+    if (colMat < 0) {
+      throw new PcError('CAD_SEM_COLUNAS', 'O arquivo Cadastro precisa ter a coluna da matrícula (NUM_LIGACAO) e a do total de economias (TOTAL_ECO) na aba "' + sheet.name.trim() + '".' + (candidato ? ' Colunas encontradas: ' + candidato.slice(0, 12).join(', ') + '.' : ''));
+    }
+    // 2ª passada: só as duas colunas; conta quantas vezes cada matrícula aparece
+    const cont = new Map();
+    let linhas = 0, semMatricula = 0, truncado = false, visto = false;
+    await scanSheet(wb, sheet, ctx, (n, cols, vals) => {
+      let vm = '', vt = '';
+      for (let j = 0; j < n; j++) {
+        if (cols[j] === colMat) vm = vals[j];
+        else if (cols[j] === colTot) vt = vals[j];
+      }
+      if (!visto) { // linhas acima do cabeçalho e o próprio cabeçalho
+        if (BASE_MATRICULA.has(normHeader(vm)) && CAD_TOTAL.has(normHeader(vt))) visto = true;
+        return;
+      }
+      if (n === 0) return;
+      if (linhas + semMatricula >= MAX_LINHAS_BASE) { truncado = true; return true; }
+      const mat = chaveNorm(vm);
+      if (!mat) { semMatricula++; return; }
+      linhas++;
+      const tt = trimStr(vt);
+      const total = /^\d+(?:[.,]0+)?$/.test(tt) ? parseInt(tt, 10) : null;
+      const e = cont.get(mat);
+      if (e) e.n++;
+      else cont.set(mat, { n: 1, total });
+    }, (f) => { if (opts.onProgress) opts.onProgress({ phase: 'Lendo o Cadastro', fraction: f }); }, (c) => c === colMat || c === colTot);
+    const unicas = [], repetidasLista = [];
+    let linhasRepetidas = 0, semTotal = 0;
+    for (const [mat, e] of cont) {
+      if (e.n > 1) { repetidasLista.push(mat); linhasRepetidas += e.n; }
+      else if (e.total == null) semTotal++;
+      else unicas.push([mat, e.total]);
+    }
+    return {
+      tipo: 'cadastro', aba: sheet.name.trim(), colunaMatricula: nomeMat, colunaTotal: nomeTot,
+      linhas: linhas + semMatricula, semMatricula, distintas: cont.size, repetidas: repetidasLista.length, linhasRepetidas,
+      semTotal, usadas: unicas.length, unicas, repetidasLista, truncado, warnings: [],
+    };
+  }
+
+  /**
+   * Anota em cada registro o total de economias da matrícula no Cadastro: r.eco (número ou null) e r.ecoMotivo:
+   * 'ok' (achada uma vez, com total), 'rep' (repetida no Cadastro: desconsiderada), 'sem' (não achada ou sem total)
+   * e 'nao' (nenhum Cadastro carregado). Sem `cad`, tudo fica 'nao'.
+   */
+  function applyCadastro(records, cad) {
+    const tot = cad ? new Map(cad.unicas) : null;
+    const rep = cad ? new Set(cad.repetidasLista) : null;
+    for (const r of records) {
+      const mat = cad ? chaveNorm(r.matricula) : '';
+      if (!cad) { r.eco = null; r.ecoMotivo = 'nao'; }
+      else if (mat && tot.has(mat)) { r.eco = tot.get(mat); r.ecoMotivo = 'ok'; }
+      else if (mat && rep.has(mat)) { r.eco = null; r.ecoMotivo = 'rep'; }
+      else { r.eco = null; r.ecoMotivo = 'sem'; }
+    }
+  }
+
   /**
    * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pela Matrícula e
    * só com os serviços de pós-corte (110010-110012, 210010-210012, 310010-310012). Havendo data da base, conta
@@ -1855,5 +1977,6 @@
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell, agrupar,
     dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
+    ehCadastro, readCadastro, applyCadastro,
   };
 });

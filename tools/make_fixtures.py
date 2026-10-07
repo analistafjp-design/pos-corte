@@ -11,6 +11,7 @@ planilha real.
 Uso: python3 tools/make_fixtures.py <pasta_saida> [--small-only]
 Requer: xlsxwriter, openpyxl (pip install xlsxwriter openpyxl).
 """
+import collections
 import json
 import random
 import re
@@ -149,6 +150,63 @@ def nova_matriz(rng, n_rows, spec):
 TERMO_RE = re.compile(r"(?<![0-9])(110013|310013)(?![0-9])")
 
 
+def chave_mat(v):
+    """Matrícula normalizada: sem espaços, sem ".0" final, em caixa alta e sem zeros à esquerda quando só tem dígitos."""
+    t = re.sub(r"\s+", "", str(v if v is not None else "").strip()).upper()
+    t = re.sub(r"\.0+$", "", t)
+    return (t.lstrip("0") or "0") if t.isdigit() else t
+
+
+def matriculas_neg(rows):
+    """Matrículas distintas que negociaram (mesmo escopo de serviços e status dos esperados)."""
+    ms = set()
+    for r in rows:
+        if em_escopo(r) and r["Status da Atividade"] in STATUS_CONTADOS and (r["Negociou O Débito?"] or "").strip().lower() == "sim":
+            m = chave_mat(r["Matrícula"])
+            if m:
+                ms.add(m)
+    return ms
+
+
+CAD_CAB = ["NUM_LIGACAO", "NOM_CLIENTE", "CIDADE", "TIPO_FATURAMENTO", "QTD_ECO_RES", "QTD_ECO_COM", "QTD_ECO_IND", "QTD_ECO_PUB", "TOTAL_ECO", "SIT_LIG"]
+
+
+def escrever_cadastro(path, linhas, nome_aba="Export"):
+    """Cadastro de economias SINTÉTICO (aba Export, colunas parecidas com o export real). linhas: (matrícula, total ou None)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = nome_aba
+    ws.append(CAD_CAB)
+    for i, (mat, total) in enumerate(linhas):
+        res = total if total is not None else None
+        ws.append([mat, f"Cliente sintético {i}", "Cidade Norte", "MEDIDO", res, 0 if total is not None else None, 0 if total is not None else None, 0 if total is not None else None, total, "ATIVA"])
+    wb.save(path)
+
+
+def esperados_cadastro(linhas, mats_neg):
+    """Contagem independente do Cadastro: matrícula que aparece mais de uma vez no arquivo é desconsiderada."""
+    cont = collections.Counter()
+    total = {}
+    sem_matricula = 0
+    for mat, tot in linhas:
+        k = chave_mat(mat)
+        if not k:
+            sem_matricula += 1
+            continue
+        cont[k] += 1
+        total[k] = tot
+    unicas = {k: total[k] for k, n in cont.items() if n == 1 and total[k] is not None}
+    return {
+        "linhas": sum(cont.values()) + sem_matricula, "semMatricula": sem_matricula, "distintas": len(cont),
+        "repetidas": sum(1 for n in cont.values() if n > 1), "linhasRepetidas": sum(n for n in cont.values() if n > 1),
+        "semTotal": sum(1 for k, n in cont.items() if n == 1 and total[k] is None), "usadas": len(unicas), "somaUnicas": sum(unicas.values()),
+        "economias": sum(unicas[m] for m in mats_neg if m in unicas),
+        "matriculasUsadas": sum(1 for m in mats_neg if m in unicas),
+        "negRepetidas": sum(1 for m in mats_neg if cont.get(m, 0) > 1),
+        "negSemCadastro": sum(1 for m in mats_neg if m not in unicas and cont.get(m, 0) <= 1),
+    }
+
+
 def esperados(rows, frentes=FRENTES):
     """Cálculo independente (Python) dos indicadores, a partir das regras do projeto."""
     def frente_de(rec):
@@ -161,13 +219,8 @@ def esperados(rows, frentes=FRENTES):
 
     rows = [r for r in rows if em_escopo(r) and r["Status da Atividade"] in STATUS_CONTADOS]  # só serviços dos 9 códigos e status contados
     out = {"atividades": 0, "exec": 0, "exoc": 0, "neg": 0, "termos": 0, "semDesdobro": 0, "t11": 0, "t31": 0,
-           "debito": 0.0, "debitoTotal": 0.0, "economias": 0, "negSemMatricula": 0, "negETermo": 0, "porMes": {}, "porFrente": {}, "porCidade": {}, "porEquipe": {}}
-    mats_neg = set()  # economias recuperadas: matrículas distintas que negociaram
-
-    def chave_mat(v):
-        t = re.sub(r"\s+", "", str(v if v is not None else "").strip()).upper()
-        t = re.sub(r"\.0+$", "", t)
-        return (t.lstrip("0") or "0") if t.isdigit() else t
+           "debito": 0.0, "debitoTotal": 0.0, "matriculasNeg": 0, "negSemMatricula": 0, "negETermo": 0, "porMes": {}, "porFrente": {}, "porCidade": {}, "porEquipe": {}}
+    mats_neg = set()  # matrículas distintas que negociaram
 
     for r in rows:
         st = r["Status da Atividade"].strip().lower()
@@ -208,7 +261,7 @@ def esperados(rows, frentes=FRENTES):
         out["porEquipe"][r["Recurso"]] = out["porEquipe"].get(r["Recurso"], 0) + 1
     out["debito"] = round(out["debito"], 2)
     out["debitoTotal"] = round(out["debitoTotal"], 2)
-    out["economias"] = len(mats_neg)
+    out["matriculasNeg"] = len(mats_neg)
     # equipes que trabalharam, equipe-dias e produtividade (visitas por equipe por dia), calculados à parte do painel
     vistos = [r for r in rows]
     out["equipes"] = len({r["Recurso"].strip().lower() for r in vistos if r["Recurso"].strip()})
@@ -504,7 +557,15 @@ def main():
     escrever_xlsxwriter(out / "pequeno_datas_texto.xlsx", names, rows, rec, datas_como_texto=True)
     escrever_openpyxl(out / "pequeno_openpyxl.xlsx", names, rows, rec)
     escrever_xlsxwriter(out / "pequeno_sem_frente.xlsx", names, rows, rec, frentes=None)
-    (out / "pequeno_esperados.json").write_text(json.dumps(esperados(rows), ensure_ascii=False, indent=1))
+    # Cadastro de economias do pequeno: todas as negociações são da matrícula 1001 (3 economias); 2002 repete (desconsiderada);
+    # "00004" tem zeros à esquerda; 5005 não tem TOTAL_ECO; a última linha não tem matrícula
+    cad_pequeno = [(1001, 3), (2002, 4), (2002, 4), (3003, 1), ("00004", 2), (5005, None), (None, 9)]
+    escrever_cadastro(out / "Cadastro_pequeno.xlsx", cad_pequeno)
+    esp_p = esperados(rows)
+    esp_p["cadastro"] = esperados_cadastro(cad_pequeno, matriculas_neg(rows))
+    (out / "pequeno_esperados.json").write_text(json.dumps(esp_p, ensure_ascii=False, indent=1))
+    # arquivo "Cadastro" sem as colunas esperadas: deve ser recusado com mensagem clara
+    (out / "Cadastro_sem_colunas.xlsx").write_bytes((out / "pequeno_xlsxwriter.xlsx").read_bytes())
 
     # ---- arquivos com problemas ----
     escrever_xlsxwriter(out / "aba_outro_nome.xlsx", names, rows, {}, frentes=None, sheet_names={"base": "Dados"})
@@ -629,7 +690,24 @@ def main():
     rec = recortes(rows)
     escrever_xlsxwriter(out / "grande_sintetico.xlsx", names, rows, rec)
     escrever_xlsxwriter(out / "grande_sintetico_inline.xlsx", names, rows, rec, constant_memory=True)
-    (out / "grande_esperados.json").write_text(json.dumps(esperados(rows), ensure_ascii=False, indent=1))
+    # Cadastro do grande: das matrículas que negociaram, ~60% únicas com total, ~15% repetidas, ~10% sem total e ~15% ausentes
+    rng_c = random.Random(7)
+    negs = sorted(matriculas_neg(rows))
+    cad_grande = []
+    for m in negs:
+        x = rng_c.random()
+        if x < 0.60:
+            cad_grande.append((int(m), rng_c.choice([1, 1, 1, 2, 3, 12])))
+        elif x < 0.75:
+            cad_grande += [(int(m), 1), (int(m), 2)]
+        elif x < 0.85:
+            cad_grande.append((int(m), None))
+    cad_grande += [(rng_c.randrange(1000000, 1900000), rng_c.choice([1, 1, 2, 4])) for _ in range(500)]  # outras matrículas do cadastro
+    rng_c.shuffle(cad_grande)
+    escrever_cadastro(out / "Cadastro_grande.xlsx", cad_grande)
+    esp_g = esperados(rows)
+    esp_g["cadastro"] = esperados_cadastro(cad_grande, matriculas_neg(rows))
+    (out / "grande_esperados.json").write_text(json.dumps(esp_g, ensure_ascii=False, indent=1))
     print("ok", out)
 
 
