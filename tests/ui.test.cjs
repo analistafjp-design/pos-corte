@@ -116,10 +116,12 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   assert.equal(esp.debito, 2535.06);
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06', pct(esp.debito / esp.debitoTotal)]);
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '64,4%']);
-  // economias recuperadas dependem do arquivo Cadastro: sem ele o indicador fica indisponível, nunca zero silencioso
+  // sem o arquivo Cadastro, cada matrícula que negociou conta o mínimo de 1 economia (as 5 negociações são da matrícula 1001) e o aviso diz isso
   assert.equal(esp.neg, 5);
-  assert.deepEqual(await vn('economias'), ['—', '—']);
-  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /arquivo Cadastro não encontrado/);
+  assert.equal(esp.matriculasNeg, 1);
+  assert.deepEqual(await vn('economias'), [String(esp.matriculasNeg), pct(esp.matriculasNeg / esp.exec)]);
+  assert.deepEqual(await vn('economias'), ['1', '5,6%']);
+  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /sem arquivo Cadastro: 1 economia por matrícula/);
   assert.match(await page.textContent('#view-geral'), /Valor negociado/);
   // com o Cadastro na pasta: as 5 negociações são do mesmo imóvel (matrícula 1001), que tem TOTAL_ECO = 3 no Cadastro (contagem independente)
   await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
@@ -161,7 +163,7 @@ test('Cadastro: arquivo inválido é recusado com mensagem clara e não vira ati
   assert.deepEqual(await kpis(page), KPIS_PEQUENO);
   assert.match(await statusTexto(page), /Importação parcial/);
   assert.match(await statusTexto(page), /Cadastro_sem_colunas\.xlsx — O arquivo Cadastro precisa ter a coluna da matrícula \(NUM_LIGACAO\) e a do total de economias \(TOTAL_ECO\)/);
-  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /arquivo Cadastro não encontrado/);
+  assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /sem arquivo Cadastro: 1 economia por matrícula/);
   // com um Cadastro válido, a leitura é descrita em "Arquivos e regras"
   await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
   await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));
@@ -187,6 +189,67 @@ test('Cadastro: pasta "Cadastro" com o arquivo no nome original (data (16).xlsx)
   await page.setInputFiles('#inp-files', [xlsx('atividades.xlsx', PEQUENO), xlsx('data (16).xlsx', CADASTRO)]);
   await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent) && !/Importação parcial/.test(document.querySelector('#status').textContent));
   assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((e) => e.textContent)), ['3', '16,7%']);
+  semErros(page);
+  await page.context().close();
+});
+
+test('botão "Baixar matrículas fora do Cadastro": só aparece quando há matrícula fora; o Excel traz as mesmas matrículas da nota e respeita o filtro', { timeout: 120000 }, async () => {
+  const cp = require('node:child_process');
+  const py = cp.spawnSync('python3', ['-c', 'import openpyxl'], { encoding: 'utf8' });
+  const lerXlsx = (arq) => JSON.parse(cp.spawnSync('python3', ['-c', `
+import openpyxl, json, sys
+wb = openpyxl.load_workbook(sys.argv[1])
+ws = wb['Fora do Cadastro']
+linhas = [[c.value for c in row] for row in ws.iter_rows(min_row=2)]
+print(json.dumps({'abas': wb.sheetnames, 'mats': sorted(str(l[0]) for l in linhas), 'cidades': sorted({l[1] for l in linhas}), 'neg': sum(l[3] for l in linhas), 'valor': round(sum(l[4] for l in linhas), 2), 'resumo': wb['Resumo']['B5'].value}))`, arq], { encoding: 'utf8' }).stdout);
+  const page = await abrir();
+  // sem Cadastro: nada a baixar (o quadro já avisa que o arquivo não foi encontrado)
+  await importar(page, PEQUENO);
+  assert.equal(await page.locator('[data-act=baixar-fora-cadastro]').count(), 0, 'sem Cadastro não há botão');
+  // Cadastro que cobre as matrículas negociadas (pequeno): nada fora, sem botão
+  await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
+  await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));
+  assert.equal(await page.locator('[data-act=baixar-fora-cadastro]').count(), 0, 'nenhuma matrícula fora do Cadastro');
+  // base grande com o Cadastro que deixa matrículas de fora
+  await page.setInputFiles('#inp-files', [fx('grande_sintetico.xlsx'), fx('Cadastro_grande.xlsx')]);
+  await page.waitForFunction(() => /Cadastro: 651 matrículas usadas/.test(document.querySelector('#status').textContent), null, { timeout: 90000 });
+  const e = JSON.parse(fs.readFileSync(fx('grande_esperados.json'), 'utf8')).cadastro;
+  const nota = async () => Number((/^([\d.]+) matrículas? negociadas? fora do Cadastro/.exec(await page.textContent('.card-valores [data-vn=sem-cadastro]')) || [])[1].replace(/\./g, ''));
+  assert.equal(await nota(), e.negSemCadastro);
+  const btn = page.locator('[data-act=baixar-fora-cadastro]');
+  assert.equal(await btn.count(), 1);
+  assert.match(await btn.textContent(), /Baixar matrículas fora do Cadastro \(Excel\)/);
+  const baixa = async () => {
+    const [dl] = await Promise.all([page.waitForEvent('download'), btn.click()]);
+    assert.match(dl.suggestedFilename(), /^matriculas-fora-do-cadastro_\d{8}\.xlsx$/);
+    const arq = require('node:path').join(require('node:os').tmpdir(), 'pc-fora-' + process.pid + '-' + Date.now() + '.xlsx');
+    await dl.saveAs(arq);
+    assert.equal(fs.readFileSync(arq).subarray(0, 2).toString(), 'PK');
+    return arq;
+  };
+  const arq1 = await baixa();
+  if (py.status === 0) {
+    const x = lerXlsx(arq1);
+    assert.deepEqual(x.abas, ['Resumo', 'Fora do Cadastro']);
+    assert.deepEqual(x.mats, e.foraLista.slice().sort(), 'as mesmas matrículas da contagem independente');
+    assert.equal(x.neg, e.foraNegociacoes);
+    assert.ok(Math.abs(x.valor - e.foraValor) < 0.005);
+    assert.equal(x.resumo, 'nenhum');
+  }
+  fs.unlinkSync(arq1);
+  // com filtro de cidade o arquivo tem exatamente as matrículas da nota
+  await page.selectOption('#f-cidade', 'Cidade Norte');
+  await page.waitForFunction(() => document.querySelector('.card-valores [data-vn=sem-cadastro]'));
+  const n = await nota();
+  assert.ok(n > 0 && n < e.negSemCadastro, 'o filtro reduz a lista: ' + n);
+  const arq2 = await baixa();
+  if (py.status === 0) {
+    const x = lerXlsx(arq2);
+    assert.equal(x.mats.length, n, 'o Excel tem tantas matrículas quanto a nota do filtro');
+    assert.deepEqual(x.cidades, ['Cidade Norte']);
+    assert.match(x.resumo, /Cidade: Cidade Norte/);
+  }
+  fs.unlinkSync(arq2);
   semErros(page);
   await page.context().close();
 });

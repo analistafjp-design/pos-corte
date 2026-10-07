@@ -423,6 +423,7 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 .vn-par { display: flex; flex-wrap: wrap; gap: 4px 36px; }
 .vn-col { display: flex; flex-direction: column; min-width: 0; }
 .vn-cab { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.vn-acoes { margin-top: 10px; }
 .vn-valor { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; white-space: nowrap; }
 
 /* ---------- Pós-corte por categoria ---------- */
@@ -2158,12 +2159,13 @@ window.FRENTES_PADRAO = [
    * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoTotal`
    * (soma do mesmo campo em todas as atividades do conjunto). Matrículas que negociaram = `matriculasNeg` (distintas;
    * negociação sem matrícula fica em `negSemMatricula`). Economias recuperadas = `economias`: soma do TOTAL_ECO do
-   * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez; as que não entram ficam em
-   * `economiasSemCadastro` (não achadas ou sem total), `economiasRepetidas` (repetidas no Cadastro) e
-   * `economiasSemArquivo` (sem Cadastro carregado). `economiasSobreExec` = economias ÷ Exec.
+   * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez. Matrícula que negociou é,
+   * no mínimo, 1 economia: sem total aproveitável no Cadastro ela conta 1 (`economiasPeloMinimo`), seja por não estar
+   * nele (`economiasSemCadastro`, também sem TOTAL_ECO), por estar repetida (`economiasRepetidas`, total desconsiderado)
+   * ou por não haver Cadastro carregado (`economiasSemArquivo`). `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
     const matriculasNeg = new Map();
     const equipes = new Set();
     const dias = new Set();
@@ -2207,8 +2209,10 @@ window.FRENTES_PADRAO = [
     s.efetividade = s.exec ? s.neg / s.exec : null;
     s.matriculasNeg = matriculasNeg.size;
     for (const r of matriculasNeg.values()) {
-      if (r.ecoMotivo === 'ok') { s.economias += r.eco; s.economiasMatriculas++; }
-      else if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
+      if (r.ecoMotivo === 'ok') { s.economias += Math.max(1, r.eco); s.economiasMatriculas++; continue; }
+      s.economias += 1; // sem total no Cadastro: no mínimo 1 economia por matrícula que negociou
+      s.economiasPeloMinimo++;
+      if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
       else if (r.ecoMotivo === 'sem') s.economiasSemCadastro++;
       else s.economiasSemArquivo++;
     }
@@ -2660,6 +2664,35 @@ window.FRENTES_PADRAO = [
   }
 
   /**
+   * Matrículas que negociaram e ficam fora das economias recuperadas por não estarem no Cadastro (ou estarem sem
+   * TOTAL_ECO): uma linha por matrícula, com cidade, categoria, nº de negociações, valor negociado e a data da última
+   * negociação. Ordenadas por cidade e matrícula. Serve para o usuário completar o Cadastro; as repetidas no Cadastro
+   * e as negociações sem matrícula não entram.
+   */
+  function matriculasForaDoCadastro(records) {
+    const m = new Map();
+    for (const r of records) {
+      if (!r.neg || r.ecoMotivo !== 'sem') continue;
+      const chave = chaveNorm(r.matricula);
+      if (!chave) continue;
+      let g = m.get(chave);
+      if (!g) m.set(chave, (g = { chave, matricula: String(r.matricula).trim(), cidade: '', categoria: '', negociacoes: 0, valor: 0, ultima: '' }));
+      g.negociacoes++;
+      if (r.valor != null) g.valor += r.valor;
+      const d = r.data || '';
+      if (d > g.ultima) {
+        g.ultima = d;
+        if (r.cidade) g.cidade = r.cidade;
+        if (r.categoria) g.categoria = r.categoria;
+      } else {
+        if (!g.cidade) g.cidade = r.cidade || '';
+        if (!g.categoria) g.categoria = r.categoria || '';
+      }
+    }
+    return [...m.values()].sort((a, b) => a.cidade.localeCompare(b.cidade, 'pt-BR') || a.chave.length - b.chave.length || a.chave.localeCompare(b.chave));
+  }
+
+  /**
    * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pela Matrícula e
    * só com os serviços de pós-corte (110010-110012, 210010-210012, 310010-310012). Havendo data da base, conta
    * apenas atividade realizada a partir dela; sem data, qualquer data. De cada matrícula vale a atividade mais recente.
@@ -2718,7 +2751,7 @@ window.FRENTES_PADRAO = [
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell, agrupar,
     dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
-    ehCadastro, readCadastro, readFileAuto, applyCadastro,
+    ehCadastro, readCadastro, readFileAuto, applyCadastro, matriculasForaDoCadastro,
   };
 });
 
@@ -3063,7 +3096,51 @@ window.FRENTES_PADRAO = [
     };
     return [resumo, faltam];
   }
-  return { toXlsx, montarExport, montarExportBase, criarZip, crc32, isoParaSerial };
+  /**
+   * Excel das matrículas que negociaram e estão fora do Cadastro (para completar o Cadastro): resumo e a lista.
+   * `lista` vem de matriculasForaDoCadastro; `info`: { geradoEm, cadastro, periodo, filtros, repetidasNoCadastro, semMatricula }.
+   */
+  function montarExportForaCadastro(lista, info) {
+    info = info || {};
+    const dt = info.geradoEm instanceof Date ? info.geradoEm : new Date();
+    const dtTxt = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+    const negociacoes = lista.reduce((a, g) => a + g.negociacoes, 0);
+    const valor = lista.reduce((a, g) => a + g.valor, 0);
+    const resumo = {
+      nome: 'Resumo',
+      colunas: [38, 24, 90],
+      linhas: [
+        [{ v: 'Pós-Corte Interior — Matrículas negociadas fora do Cadastro', f: 'titulo' }],
+        [{ v: 'Gerado em', f: 'negrito' }, dtTxt],
+        [{ v: 'Cadastro usado', f: 'negrito' }, info.cadastro || '—'],
+        [{ v: 'Período dos dados', f: 'negrito' }, info.periodo || '—'],
+        [{ v: 'Filtros aplicados', f: 'negrito' }, info.filtros || 'nenhum'],
+        [],
+        [cab('Indicador'), cab('Valor'), cab('Como é calculado')],
+        ['Matrículas fora do Cadastro', intCel(lista.length), 'Matrículas distintas com negociação no filtro que não estão no Cadastro ou estão sem TOTAL_ECO; contam 1 economia cada (o mínimo) nas economias recuperadas, até o total entrar no Cadastro (aba "Fora do Cadastro")'],
+        ['Negociações dessas matrículas', intCel(negociacoes), 'Negociou O Débito? = Sim, nessas matrículas e no filtro'],
+        ['Valor negociado dessas matrículas', { v: valor, f: 'brl' }, 'Soma de Valor Total dos Débitos dessas negociações (débito informado; não é arrecadação nem valor pago)'],
+        ['Matrículas repetidas no Cadastro', intCel(info.repetidasNoCadastro || 0), 'Negociadas e presentes mais de uma vez no Cadastro: o total delas foi desconsiderado e contam 1 economia cada; não estão na lista'],
+        ['Negociações sem matrícula', intCel(info.semMatricula || 0), 'Sem matrícula não dá para buscar no Cadastro; não estão na lista'],
+        [],
+        [{ v: 'Como usar', f: 'negrito' }, 'Busque o TOTAL_ECO de cada matrícula da aba "Fora do Cadastro" (a última coluna é para anotar) e inclua no Cadastro. Na próxima leitura elas passam a entrar com o total real, em vez do mínimo de 1.'],
+      ],
+    };
+    const aba = {
+      nome: 'Fora do Cadastro',
+      colunas: [16, 28, 22, 13, 20, 18, 22],
+      cabecalho: 1,
+      linhas: [['Matrícula', 'Cidade', 'Categoria', 'Negociações', 'Valor negociado (R$)', 'Última negociação', 'TOTAL_ECO (a preencher)'].map(cab)].concat(
+        lista.map((g) => [
+          /^[1-9]\d{0,14}$/.test(g.matricula) ? Number(g.matricula) : g.matricula, // número como no Cadastro; com zeros à esquerda ou letras, texto
+          g.cidade, g.categoria, intCel(g.negociacoes), { v: g.valor, f: 'brl' },
+          g.ultima ? { v: isoParaSerial(g.ultima), f: 'data' } : '', null,
+        ])
+      ),
+    };
+    return [resumo, aba];
+  }
+  return { toXlsx, montarExport, montarExportBase, montarExportForaCadastro, criarZip, crc32, isoParaSerial };
 });
 
 </script>
@@ -4055,6 +4132,25 @@ window.FRENTES_PADRAO = [
     );
   }
 
+  /** Excel com as matrículas que negociaram e não estão no Cadastro (no filtro atual), para completar o Cadastro. */
+  async function baixarForaDoCadastro() {
+    try {
+      const lista = PC.matriculasForaDoCadastro(vm.filtered);
+      const sheets = window.PosCorteExport.montarExportForaCadastro(lista, {
+        geradoEm: new Date(),
+        cadastro: state.cadastro ? state.cadastro.name : '',
+        periodo: vm.min ? PC.isoToBR(vm.min) + ' a ' + PC.isoToBR(vm.max) : 'sem datas',
+        filtros: textoFiltros(),
+        repetidasNoCadastro: vm.sum.economiasRepetidas,
+        semMatricula: vm.sum.negSemMatricula,
+      });
+      const bytes = await window.PosCorteExport.toXlsx(sheets);
+      baixarBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'matriculas-fora-do-cadastro_' + ymdLocal(Date.now()).replace(/-/g, '') + '.xlsx');
+    } catch (err) {
+      setStatus({ kind: 'error', title: 'Não foi possível gerar o Excel', detail: (err && err.message) || String(err) });
+    }
+  }
+
   /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (via Cadastro), cada um em valor e %. */
   function renderValoresNegociados() {
     const s = vm.sum;
@@ -4073,16 +4169,18 @@ window.FRENTES_PADRAO = [
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias (TOTAL_ECO do arquivo Cadastro) das matrículas que negociaram, cada matrícula uma vez; % sobre o Exec.' }))),
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago); % sobre o débito total informado. Economias recuperadas = total de economias (TOTAL_ECO do arquivo Cadastro) das matrículas que negociaram, cada matrícula uma vez e no mínimo 1 por matrícula (quando o Cadastro não tem o total); % sobre o Exec.' }))),
       h('div', { class: 'vn-grid' },
         quadro('valor', 'Valor negociado', brl.format(s.debito), fmtPctVal(s.debitoPct), 'Débito informado nas negociações (' + brl.format(s.debito) + ') dividido pelo débito total informado de todas as atividades do filtro (' + brl.format(s.debitoTotal) + ').', avisoDe(semNeg)),
-        cad
-          ? quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec), 'Total de economias (TOTAL_ECO do Cadastro) de ' + mats(s.economiasMatriculas, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + ') dividido pelo total de Exec (' + fmtInt(s.exec) + ').', avisoDe(semNeg.concat(semMat)))
-          : quadro('economias', 'Economias recuperadas', '—', '—', 'Coloque na pasta o arquivo Cadastro (colunas NUM_LIGACAO e TOTAL_ECO) para calcular.', '⚠ arquivo Cadastro não encontrado')),
+        quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec),
+          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): TOTAL_ECO do Cadastro em ' + fmtInt(s.economiasMatriculas) + ' e 1 economia (mínimo) nas outras ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
+          cad ? avisoDe(semNeg.concat(semMat)) : '⚠ sem arquivo Cadastro: 1 economia por matrícula')),
       s.debitoNaoInformado ? nota('sem-valor', mats(s.debitoNaoInformado, 'negociação sem valor informado', 'negociações sem valor informado') + ' (não entra na soma).') : null,
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
-      cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): não entram nas economias recuperadas.') : null,
-      cad && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no Cadastro e ' + plural(s.economiasRepetidas, 'foi desconsiderada', 'foram desconsideradas') + '.') : null
+      cad && s.economiasSemCadastro ? nota('sem-cadastro', mats(s.economiasSemCadastro, 'matrícula negociada fora do Cadastro', 'matrículas negociadas fora do Cadastro') + ' (ou sem TOTAL_ECO): ' + plural(s.economiasSemCadastro, 'conta', 'contam') + ' 1 economia cada, o mínimo, até o total entrar no Cadastro.') : null,
+      cad && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
+        h('button', { class: 'btn small', type: 'button', dataset: { act: 'baixar-fora-cadastro' }, onclick: baixarForaDoCadastro }, icon('download', 16), h('span', { text: 'Baixar matrículas fora do Cadastro (Excel)' }))) : null,
+      cad && s.economiasRepetidas ? nota('cadastro-repetida', mats(s.economiasRepetidas, 'matrícula negociada aparece', 'matrículas negociadas aparecem') + ' mais de uma vez no Cadastro: o total ' + plural(s.economiasRepetidas, 'dela foi desconsiderado e ela conta', 'delas foi desconsiderado e elas contam') + ' 1 economia ' + plural(s.economiasRepetidas, '', 'cada') + ' (o mínimo).') : null
     );
   }
 
@@ -4500,7 +4598,7 @@ window.FRENTES_PADRAO = [
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
         li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
         li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações. O % é esse valor dividido pela soma do mesmo campo em todas as atividades do filtro (débito total informado). Negociação sem valor informado não entra na soma.'),
-        li(h('strong', { text: 'Economias recuperadas' }), ': soma do ', h('code', { text: 'TOTAL_ECO' }), ' do arquivo ', h('strong', { text: 'Cadastro' }), ' (cruzado pela matrícula, coluna ', h('code', { text: 'NUM_LIGACAO' }), ') das matrículas distintas com negociação; cada matrícula conta uma vez (zeros à esquerda e espaços são ignorados). Matrícula que aparece mais de uma vez no Cadastro é desconsiderada, e a que não está no Cadastro não entra. O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra. Sem o arquivo Cadastro na pasta, o indicador fica indisponível.')),
+        li(h('strong', { text: 'Economias recuperadas' }), ': soma do ', h('code', { text: 'TOTAL_ECO' }), ' do arquivo ', h('strong', { text: 'Cadastro' }), ' (cruzado pela matrícula, coluna ', h('code', { text: 'NUM_LIGACAO' }), ') das matrículas distintas com negociação; cada matrícula conta uma vez (zeros à esquerda e espaços são ignorados). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está no Cadastro (ou está sem TOTAL_ECO) e a que aparece mais de uma vez nele (total desconsiderado) contam 1 cada; sem o arquivo Cadastro na pasta, todas contam 1. O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,
         li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),

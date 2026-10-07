@@ -1456,12 +1456,13 @@
    * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações); `debitoPct` = debito ÷ `debitoTotal`
    * (soma do mesmo campo em todas as atividades do conjunto). Matrículas que negociaram = `matriculasNeg` (distintas;
    * negociação sem matrícula fica em `negSemMatricula`). Economias recuperadas = `economias`: soma do TOTAL_ECO do
-   * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez; as que não entram ficam em
-   * `economiasSemCadastro` (não achadas ou sem total), `economiasRepetidas` (repetidas no Cadastro) e
-   * `economiasSemArquivo` (sem Cadastro carregado). `economiasSobreExec` = economias ÷ Exec.
+   * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez. Matrícula que negociou é,
+   * no mínimo, 1 economia: sem total aproveitável no Cadastro ela conta 1 (`economiasPeloMinimo`), seja por não estar
+   * nele (`economiasSemCadastro`, também sem TOTAL_ECO), por estar repetida (`economiasRepetidas`, total desconsiderado)
+   * ou por não haver Cadastro carregado (`economiasSemArquivo`). `economiasSobreExec` = economias ÷ Exec.
    */
   function summarize(records) {
-    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
+    const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, debitoTotal: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
     const matriculasNeg = new Map();
     const equipes = new Set();
     const dias = new Set();
@@ -1505,8 +1506,10 @@
     s.efetividade = s.exec ? s.neg / s.exec : null;
     s.matriculasNeg = matriculasNeg.size;
     for (const r of matriculasNeg.values()) {
-      if (r.ecoMotivo === 'ok') { s.economias += r.eco; s.economiasMatriculas++; }
-      else if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
+      if (r.ecoMotivo === 'ok') { s.economias += Math.max(1, r.eco); s.economiasMatriculas++; continue; }
+      s.economias += 1; // sem total no Cadastro: no mínimo 1 economia por matrícula que negociou
+      s.economiasPeloMinimo++;
+      if (r.ecoMotivo === 'rep') s.economiasRepetidas++;
       else if (r.ecoMotivo === 'sem') s.economiasSemCadastro++;
       else s.economiasSemArquivo++;
     }
@@ -1958,6 +1961,35 @@
   }
 
   /**
+   * Matrículas que negociaram e ficam fora das economias recuperadas por não estarem no Cadastro (ou estarem sem
+   * TOTAL_ECO): uma linha por matrícula, com cidade, categoria, nº de negociações, valor negociado e a data da última
+   * negociação. Ordenadas por cidade e matrícula. Serve para o usuário completar o Cadastro; as repetidas no Cadastro
+   * e as negociações sem matrícula não entram.
+   */
+  function matriculasForaDoCadastro(records) {
+    const m = new Map();
+    for (const r of records) {
+      if (!r.neg || r.ecoMotivo !== 'sem') continue;
+      const chave = chaveNorm(r.matricula);
+      if (!chave) continue;
+      let g = m.get(chave);
+      if (!g) m.set(chave, (g = { chave, matricula: String(r.matricula).trim(), cidade: '', categoria: '', negociacoes: 0, valor: 0, ultima: '' }));
+      g.negociacoes++;
+      if (r.valor != null) g.valor += r.valor;
+      const d = r.data || '';
+      if (d > g.ultima) {
+        g.ultima = d;
+        if (r.cidade) g.cidade = r.cidade;
+        if (r.categoria) g.categoria = r.categoria;
+      } else {
+        if (!g.cidade) g.cidade = r.cidade || '';
+        if (!g.categoria) g.categoria = r.categoria || '';
+      }
+    }
+    return [...m.values()].sort((a, b) => a.cidade.localeCompare(b.cidade, 'pt-BR') || a.chave.length - b.chave.length || a.chave.localeCompare(b.chave));
+  }
+
+  /**
    * Cruza a base com o histórico de atividades realizadas (Exec/Exoc) da base principal, sempre pela Matrícula e
    * só com os serviços de pós-corte (110010-110012, 210010-210012, 310010-310012). Havendo data da base, conta
    * apenas atividade realizada a partir dela; sem data, qualquer data. De cada matrícula vale a atividade mais recente.
@@ -2016,6 +2048,6 @@
     filterRecords, summarize, monthlySeries, monthLabel, monthRange, ranking, distinct, statusBreakdown,
     toCsv, csvCell, agrupar,
     dataDoNome, chaveNorm, readBaseCampo, avaliarBase,
-    ehCadastro, readCadastro, readFileAuto, applyCadastro,
+    ehCadastro, readCadastro, readFileAuto, applyCadastro, matriculasForaDoCadastro,
   };
 });

@@ -183,7 +183,24 @@ def escrever_cadastro(path, linhas, nome_aba="Export"):
     wb.save(path)
 
 
-def esperados_cadastro(linhas, mats_neg):
+def negociacoes_por_matricula(rows, mats):
+    """Nº de negociações e valor informado (só negociações com valor) das matrículas pedidas, no escopo dos esperados."""
+    n = collections.Counter()
+    valor = collections.defaultdict(float)
+    for r in rows:
+        if em_escopo(r) and r["Status da Atividade"] in STATUS_CONTADOS and (r["Negociou O Débito?"] or "").strip().lower() == "sim":
+            m = chave_mat(r["Matrícula"])
+            if m in mats:
+                n[m] += 1
+                v = r["Valor Total dos Débitos"]
+                if isinstance(v, str):
+                    v = float(re.sub(r"[^\d,]", "", v).replace(",", ".") or 0)
+                if v is not None:
+                    valor[m] += v
+    return n, valor
+
+
+def esperados_cadastro(linhas, mats_neg, rows=None):
     """Contagem independente do Cadastro: matrícula que aparece mais de uma vez no arquivo é desconsiderada."""
     cont = collections.Counter()
     total = {}
@@ -196,12 +213,19 @@ def esperados_cadastro(linhas, mats_neg):
         cont[k] += 1
         total[k] = tot
     unicas = {k: total[k] for k, n in cont.items() if n == 1 and total[k] is not None}
-    return {
+    fora = sorted(m for m in mats_neg if m not in unicas and cont.get(m, 0) <= 1)
+    extra = {"foraLista": fora}
+    if rows is not None:
+        n_neg, v_neg = negociacoes_por_matricula(rows, set(fora))
+        extra.update({"foraNegociacoes": sum(n_neg.values()), "foraValor": round(sum(v_neg.values()), 2)})
+    return {**extra,
         "linhas": sum(cont.values()) + sem_matricula, "semMatricula": sem_matricula, "distintas": len(cont),
         "repetidas": sum(1 for n in cont.values() if n > 1), "linhasRepetidas": sum(n for n in cont.values() if n > 1),
         "semTotal": sum(1 for k, n in cont.items() if n == 1 and total[k] is None), "usadas": len(unicas), "somaUnicas": sum(unicas.values()),
-        "economias": sum(unicas[m] for m in mats_neg if m in unicas),
+        # cada matrícula que negociou é, no mínimo, 1 economia: o TOTAL_ECO do Cadastro (se único e com total) ou 1
+        "economias": sum(max(1, unicas[m]) if m in unicas else 1 for m in mats_neg),
         "matriculasUsadas": sum(1 for m in mats_neg if m in unicas),
+        "peloMinimo": sum(1 for m in mats_neg if m not in unicas),
         "negRepetidas": sum(1 for m in mats_neg if cont.get(m, 0) > 1),
         "negSemCadastro": sum(1 for m in mats_neg if m not in unicas and cont.get(m, 0) <= 1),
     }
@@ -562,7 +586,7 @@ def main():
     cad_pequeno = [(1001, 3), (2002, 4), (2002, 4), (3003, 1), ("00004", 2), (5005, None), (None, 9)]
     escrever_cadastro(out / "Cadastro_pequeno.xlsx", cad_pequeno)
     esp_p = esperados(rows)
-    esp_p["cadastro"] = esperados_cadastro(cad_pequeno, matriculas_neg(rows))
+    esp_p["cadastro"] = esperados_cadastro(cad_pequeno, matriculas_neg(rows), rows)
     (out / "pequeno_esperados.json").write_text(json.dumps(esp_p, ensure_ascii=False, indent=1))
     # arquivo "Cadastro" sem a coluna TOTAL_ECO (e que também não é base de atividades): recusado com mensagem clara
     wb_inv = Workbook()
@@ -715,7 +739,7 @@ def main():
     rng_c.shuffle(cad_grande)
     escrever_cadastro(out / "Cadastro_grande.xlsx", cad_grande)
     esp_g = esperados(rows)
-    esp_g["cadastro"] = esperados_cadastro(cad_grande, matriculas_neg(rows))
+    esp_g["cadastro"] = esperados_cadastro(cad_grande, matriculas_neg(rows), rows)
     (out / "grande_esperados.json").write_text(json.dumps(esp_g, ensure_ascii=False, indent=1))
     print("ok", out)
 
