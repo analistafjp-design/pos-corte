@@ -44,7 +44,8 @@ validações).
 - **Indicador sem coluna** aparece como **indisponível**, nunca como zero
   silencioso.
 - **Leia só as 19 colunas usadas** (a lista está no prompt).
-  - Exceção: o arquivo **Cadastro** (nome com "cadastro"), lido à parte só pelas
+  - Exceção: o arquivo **Cadastro** (colunas `NUM_LIGACAO` e `TOTAL_ECO`; "cadastro"
+    no nome do arquivo ou da pasta é só dica), lido à parte só pelas
     colunas `NUM_LIGACAO` e `TOTAL_ECO`, para as economias recuperadas. Ele não
     é base de atividades, só guarda matrícula e total, e matrícula repetida nele
     é desconsiderada.

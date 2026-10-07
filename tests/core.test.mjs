@@ -149,10 +149,32 @@ test('valor negociado e economias recuperadas: débito ÷ débito total informad
   assert.equal(sem.economiasSemArquivo, 2);
 });
 
-test('Cadastro: reconhece o arquivo pelo nome (sem acento, qualquer caixa e em subpasta)', () => {
-  for (const n of ['Cadastro.xlsx', 'cadastro_2026.xlsx', 'CADASTRO DE ECONOMIAS.xlsx', 'Cadastro_pequeno.xlsx', 'pasta/sub/Cadastro.xlsx', 'Cadastró.xlsx']) assert.equal(PC.ehCadastro(n), true, n);
-  for (const n of ['Acompanhamento - Pós Corte.xlsx', 'pequeno_xlsxwriter.xlsx', 'Base_Campo_28_09_2026.xlsx', '', null]) assert.equal(PC.ehCadastro(n), false, String(n));
-  assert.equal(PC.ehCadastro('Cadastro/atividades.xlsx'), false, 'só o nome do arquivo conta, não o da pasta');
+test('Cadastro: a dica é "cadastro" no nome do arquivo ou de uma pasta (sem acento, qualquer caixa)', () => {
+  for (const n of ['Cadastro.xlsx', 'cadastro_2026.xlsx', 'CADASTRO DE ECONOMIAS.xlsx', 'Cadastro_pequeno.xlsx', 'pasta/sub/Cadastro.xlsx', 'Cadastró.xlsx', 'Cadastro/data (16).xlsx', 'OneDrive/Cadastro de Economias/data.xlsx']) assert.equal(PC.ehCadastro(n), true, n);
+  for (const n of ['Acompanhamento - Pós Corte.xlsx', 'pequeno_xlsxwriter.xlsx', 'Base_Campo_28_09_2026.xlsx', 'data (16).xlsx', '', null]) assert.equal(PC.ehCadastro(n), false, String(n));
+});
+
+test('Cadastro: o conteúdo decide, não o nome (pasta "Cadastro", arquivo com nome original ou base de atividades em pasta de nome parecido)', { skip: !fs.existsSync(fx('Cadastro_pequeno.xlsx')) && 'gere as planilhas' }, async () => {
+  const cadFile = arquivo(fx('Cadastro_pequeno.xlsx'));
+  // pasta chamada Cadastro e arquivo com o nome original do export: é o Cadastro
+  assert.equal((await PC.readFileAuto(cadFile, { path: 'Cadastro/data (16).xlsx' })).tipo, 'cadastro');
+  // sem nenhuma dica no caminho: a base de atividades não reconhece as colunas e o arquivo é lido como Cadastro
+  assert.equal((await PC.readFileAuto(cadFile, { path: 'data (16).xlsx' })).tipo, 'cadastro');
+  // base de atividades de verdade, mesmo dentro de uma pasta com "cadastro" no nome: continua sendo atividades
+  const atv = await PC.readFileAuto(arquivo(fx('pequeno_xlsxwriter.xlsx')), { path: 'Cadastro 2026/atividades.xlsx' });
+  assert.equal(atv.tipo, undefined);
+  assert.equal(atv.records.length, 19);
+  // arquivo que não serve para nenhum dos dois: o erro é o do leitor indicado pela dica
+  await assert.rejects(PC.readFileAuto(arquivo(fx('Cadastro_sem_colunas.xlsx')), { path: 'Cadastro/data (17).xlsx' }), (e) => {
+    assert.equal(e.code, 'CAD_SEM_COLUNAS');
+    return true;
+  });
+  await assert.rejects(PC.readFileAuto(arquivo(fx('Cadastro_sem_colunas.xlsx')), { path: 'data (17).xlsx' }), (e) => {
+    assert.ok(['NO_BASE_SHEET', 'NO_HEADER'].includes(e.code), e.code);
+    return true;
+  });
+  // erros que não são "colunas diferentes" não são engolidos
+  await assert.rejects(PC.readFileAuto(arquivo(fx('texto_disfarçado.xlsx')), { path: 'Cadastro/x.xlsx' }), (e) => e instanceof PC.PcError && e.code === 'NOT_XLSX');
 });
 
 test('Cadastro: lê só matrícula e TOTAL_ECO; matrícula repetida no arquivo é desconsiderada', { skip: !fs.existsSync(fx('Cadastro_pequeno.xlsx')) && 'gere as planilhas' }, async () => {

@@ -564,8 +564,17 @@ def main():
     esp_p = esperados(rows)
     esp_p["cadastro"] = esperados_cadastro(cad_pequeno, matriculas_neg(rows))
     (out / "pequeno_esperados.json").write_text(json.dumps(esp_p, ensure_ascii=False, indent=1))
-    # arquivo "Cadastro" sem as colunas esperadas: deve ser recusado com mensagem clara
-    (out / "Cadastro_sem_colunas.xlsx").write_bytes((out / "pequeno_xlsxwriter.xlsx").read_bytes())
+    # arquivo "Cadastro" sem a coluna TOTAL_ECO (e que também não é base de atividades): recusado com mensagem clara
+    wb_inv = Workbook()
+    wb_inv.active.title = "Export"
+    wb_inv.active.append(["NUM_LIGACAO", "NOM_CLIENTE", "CIDADE"])
+    wb_inv.active.append([1001, "Cliente sintético", "Cidade Norte"])
+    wb_inv.save(out / "Cadastro_sem_colunas.xlsx")
+    # pasta como no OneDrive do usuário: o nome "Cadastro" está na PASTA e o arquivo mantém o nome original do export
+    pc = out / "pasta_cadastro"
+    (pc / "Cadastro").mkdir(parents=True, exist_ok=True)
+    (pc / "atividades.xlsx").write_bytes((out / "pequeno_xlsxwriter.xlsx").read_bytes())
+    (pc / "Cadastro" / "data (16).xlsx").write_bytes((out / "Cadastro_pequeno.xlsx").read_bytes())
 
     # ---- arquivos com problemas ----
     escrever_xlsxwriter(out / "aba_outro_nome.xlsx", names, rows, {}, frentes=None, sheet_names={"base": "Dados"})
