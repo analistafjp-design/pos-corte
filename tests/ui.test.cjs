@@ -99,19 +99,27 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   for (const id of ['h-mensal', 'h-status', 'h-tm']) assert.equal(await page.locator('#' + id).count(), 0, id + ' removido');
   assert.equal(await page.locator('.colchart, .card-status, .card-mensal').count(), 0);
   assert.equal(await page.locator('#view-geral .mini-sub', { hasText: '"Fez o corte novamente" = Sim' }).count(), 0, 'legenda do recorte removida');
-  // valores negociados: logo abaixo de "Recortes realizados", em largura total, só com o débito informado por mês
+  // valores negociados: logo abaixo de "Recortes realizados", em largura total, com valor negociado e economias recuperadas (valor e %)
   const ordem = await page.$$eval('#view-geral > .stack > *', (els) => els.map((e) => e.className));
   const iRec = ordem.findIndex((c) => /card-recorte/.test(c));
   assert.ok(/card-valores/.test(ordem[iRec + 1]), 'valores negociados logo após os recortes: ' + ordem.join(' | '));
   const larg = await page.$$eval('.card-recorte, .card-valores', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
   assert.equal(larg[0], larg[1], 'mesma largura do bloco de recortes (tela inteira)');
-  const vn = await page.$$eval('.card-valores .vn-item', (els) => els.map((e) => [e.querySelector('.vn-mes').textContent, e.querySelector('.vn-valor').textContent.replace(/\s/g, ' ')]));
-  // as 5 negociações do fixture são todas de julho (pequeno_esperados.json: porMes); ago e set sem negociação
-  const esp = JSON.parse(fs.readFileSync(fx('pequeno_esperados.json'), 'utf8'));
-  assert.equal(esp.porMes['2026-07'].neg, esp.neg);
-  assert.deepEqual(vn, [['jul/2026', 'R$ 2.535,06'], ['ago/2026', 'R$ 0,00'], ['set/2026', 'R$ 0,00'], ['Total', 'R$ 2.535,06']]);
-  assert.equal(esp.debito, 2535.06);
+  // sem a faixa por mês (repetitiva): só os dois quadros
+  assert.deepEqual(await page.$$eval('.card-valores .vn-item .vn-mes', (els) => els.map((e) => e.textContent)), ['Valor negociado', 'Economias recuperadas']);
   assert.equal(await page.locator('.card-valores table').count(), 0, 'sem a tabela de indicadores mensais');
+  const vn = (k) => page.$$eval(`.card-valores [data-vn=${k}] .vn-valor`, (els) => els.map((e) => e.textContent.replace(/\s/g, ' ')));
+  // valores esperados vêm da contagem independente do gerador de fixtures (pequeno_esperados.json)
+  const esp = JSON.parse(fs.readFileSync(fx('pequeno_esperados.json'), 'utf8'));
+  const pct = (v) => (v * 100).toFixed(1).replace('.', ',') + '%';
+  assert.equal(esp.debito, 2535.06);
+  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', pct(esp.debito / esp.debitoTotal)]);
+  assert.deepEqual(await vn('valor'), ['R$ 2.535,06', '64,4%']);
+  // as 5 negociações do fixture são do mesmo imóvel (matrícula 1001): 1 economia recuperada sobre 18 Exec
+  assert.equal(esp.neg, 5);
+  assert.deepEqual(await vn('economias'), [String(esp.economias), pct(esp.economias / esp.exec)]);
+  assert.deepEqual(await vn('economias'), ['1', '5,6%']);
+  assert.equal(await page.locator('.card-valores .kpi-sub').count(), 0, 'sem aviso de indisponível quando as colunas existem');
   // negociações e termos por mês continuam, com legenda
   assert.ok(await page.locator('.card-negtermo .legend').isVisible());
   // rankings conciliam com o total
@@ -121,6 +129,16 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   }
   // nada de HTML injetado a partir dos dados
   assert.equal(await page.evaluate(() => window.__xss), undefined);
+  semErros(page);
+  await page.context().close();
+});
+
+test('valores negociados: arquivo sem a coluna Matrícula sinaliza economias recuperadas como indisponíveis', async () => {
+  const page = await abrir();
+  await importar(page, fx('leve_titulo_linha4.xlsx'));
+  assert.match(await page.textContent('.card-valores [data-vn=economias]'), /indisponível em 1 arquivo/);
+  assert.doesNotMatch(await page.textContent('.card-valores [data-vn=valor]'), /indisponível/);
+  assert.match(await page.textContent('.card-valores [data-vn=sem-matricula]'), /5 negociações sem matrícula/);
   semErros(page);
   await page.context().close();
 });

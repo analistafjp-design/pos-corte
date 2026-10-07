@@ -161,7 +161,14 @@ def esperados(rows, frentes=FRENTES):
 
     rows = [r for r in rows if em_escopo(r) and r["Status da Atividade"] in STATUS_CONTADOS]  # só serviços dos 9 códigos e status contados
     out = {"atividades": 0, "exec": 0, "exoc": 0, "neg": 0, "termos": 0, "semDesdobro": 0, "t11": 0, "t31": 0,
-           "debito": 0.0, "negETermo": 0, "porMes": {}, "porFrente": {}, "porCidade": {}, "porEquipe": {}}
+           "debito": 0.0, "debitoTotal": 0.0, "economias": 0, "negSemMatricula": 0, "negETermo": 0, "porMes": {}, "porFrente": {}, "porCidade": {}, "porEquipe": {}}
+    mats_neg = set()  # economias recuperadas: matrículas distintas que negociaram
+
+    def chave_mat(v):
+        t = re.sub(r"\s+", "", str(v if v is not None else "").strip()).upper()
+        t = re.sub(r"\.0+$", "", t)
+        return (t.lstrip("0") or "0") if t.isdigit() else t
+
     for r in rows:
         st = r["Status da Atividade"].strip().lower()
         sa = r["Serviço adicionais resposta"] or ""
@@ -182,8 +189,16 @@ def esperados(rows, frentes=FRENTES):
         v = r["Valor Total dos Débitos"]
         if isinstance(v, str):  # "R$ 1.000,50" -> 1000.50
             v = float(re.sub(r"[^\d,]", "", v).replace(",", ".") or 0)
+        if v is not None:
+            out["debitoTotal"] += v  # débito informado de todas as atividades (negociadas ou não)
         if neg and v is not None:
             out["debito"] += v
+        if neg:
+            m = chave_mat(r["Matrícula"])
+            if m:
+                mats_neg.add(m)
+            else:
+                out["negSemMatricula"] += 1
         m = out["porMes"].setdefault(mes, {"atividades": 0, "neg": 0, "termos": 0})
         m["atividades"] += 1
         m["neg"] += neg
@@ -192,6 +207,8 @@ def esperados(rows, frentes=FRENTES):
         out["porCidade"][r["Cidade"]] = out["porCidade"].get(r["Cidade"], 0) + 1
         out["porEquipe"][r["Recurso"]] = out["porEquipe"].get(r["Recurso"], 0) + 1
     out["debito"] = round(out["debito"], 2)
+    out["debitoTotal"] = round(out["debitoTotal"], 2)
+    out["economias"] = len(mats_neg)
     # equipes que trabalharam, equipe-dias e produtividade (visitas por equipe por dia), calculados à parte do painel
     vistos = [r for r in rows]
     out["equipes"] = len({r["Recurso"].strip().lower() for r in vistos if r["Recurso"].strip()})

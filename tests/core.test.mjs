@@ -50,7 +50,7 @@ const minusculas = (o) => {
   for (const [k, v] of Object.entries(o)) m[k.toLowerCase()] = (m[k.toLowerCase()] || 0) + v;
   return m;
 };
-function conferirEsperados(records, esp, { cidade = true } = {}) {
+function conferirEsperados(records, esp, { cidade = true, matricula = true } = {}) {
   const s = PC.summarize(records);
   assert.equal(s.atividades, esp.atividades, 'atividades');
   assert.equal(s.exec, esp.exec, 'exec');
@@ -62,6 +62,17 @@ function conferirEsperados(records, esp, { cidade = true } = {}) {
   assert.equal(s.t31, esp.t31, '310013');
   assert.equal(s.negETermo, esp.negETermo, 'negociação e termo na mesma atividade');
   assert.ok(Math.abs(s.debito - esp.debito) < 0.005, `débito ${s.debito} vs ${esp.debito}`);
+  assert.ok(Math.abs(s.debitoTotal - esp.debitoTotal) < 0.005, `débito total informado ${s.debitoTotal} vs ${esp.debitoTotal}`);
+  assert.ok(Math.abs(s.debitoPct - esp.debito / esp.debitoTotal) < 1e-9, 'valor negociado ÷ débito total informado');
+  if (matricula) {
+    assert.equal(s.economias, esp.economias, 'economias recuperadas (matrículas distintas que negociaram)');
+    assert.equal(s.negSemMatricula, esp.negSemMatricula, 'negociações sem matrícula');
+    assert.ok(Math.abs(s.economiasSobreExec - esp.economias / esp.exec) < 1e-9, 'economias recuperadas ÷ Exec');
+  } else {
+    // arquivo sem a coluna Matrícula: nenhuma economia identificável; todas as negociações ficam "sem matrícula"
+    assert.equal(s.economias, 0, 'sem a coluna Matrícula');
+    assert.equal(s.negSemMatricula, esp.neg, 'sem a coluna Matrícula, toda negociação fica sem matrícula');
+  }
   const meses = {};
   for (const m of PC.monthlySeries(records)) if (m.mes) meses[m.mes] = { atividades: m.sum.atividades, neg: m.sum.neg, termos: m.sum.termos };
   const espMeses = Object.fromEntries(Object.entries(esp.porMes).filter(([, v]) => v.atividades > 0));
@@ -99,6 +110,33 @@ test('negociação: somente "Sim" (espaços e caixa ignorados)', () => {
   for (const v of ['Sim', 'SIM', ' sim ', 'sIm', ' Sim ']) assert.equal(n(v), true, JSON.stringify(v));
   for (const v of ['NÃO', 'Nao', '', null, 'Sim, parcial', 'Simulado', 'S', '1', 'true']) assert.equal(n(v), false, JSON.stringify(v));
   assert.equal(PC.classify('Finalizada', 'Sim', '110013;').neg, true);
+});
+
+test('valor negociado e economias recuperadas: débito ÷ débito total informado; matrículas distintas que negociaram ÷ Exec', () => {
+  const r = (o) => Object.assign({ exec: true, exoc: false, neg: false, valor: null, matricula: '' }, o);
+  const recs = [
+    r({ neg: true, valor: 100, matricula: '00123' }),
+    r({ neg: true, valor: 50.5, matricula: ' 123 ' }), // mesma matrícula (zeros e espaços): conta uma economia
+    r({ neg: true, valor: null, matricula: '456.0' }), // negociação sem valor informado
+    r({ neg: true, valor: 10, matricula: '' }), // sem matrícula: fora das economias
+    r({ neg: false, valor: 200, matricula: '123' }), // sem negociação: entra só no débito total
+    r({ exec: false, exoc: true, neg: false, valor: null, matricula: '789' }),
+  ];
+  const s = PC.summarize(recs);
+  assert.equal(s.neg, 4);
+  assert.ok(Math.abs(s.debito - 160.5) < 1e-9, 'valor negociado');
+  assert.ok(Math.abs(s.debitoTotal - 360.5) < 1e-9, 'débito total informado de todas as atividades');
+  assert.ok(Math.abs(s.debitoPct - 160.5 / 360.5) < 1e-9);
+  assert.equal(s.debitoNaoInformado, 1);
+  assert.equal(s.economias, 2, '123 (duas vezes) e 456');
+  assert.equal(s.negSemMatricula, 1);
+  assert.equal(s.exec, 5);
+  assert.ok(Math.abs(s.economiasSobreExec - 2 / 5) < 1e-9);
+  // sem débito informado e sem Exec: divisões protegidas
+  const vazio = PC.summarize([r({ exec: false, exoc: true, neg: true, matricula: '1' })]);
+  assert.equal(vazio.debitoPct, null);
+  assert.equal(vazio.economiasSobreExec, null);
+  assert.equal(vazio.economias, 1);
 });
 
 test('sem desdobro: negociação com serviço adicional vazio/nulo/espaços', () => {
@@ -300,7 +338,8 @@ test('arquivo leve: outra aba, título antes do cabeçalho, poucas colunas, sem 
   const cons = PC.consolidate([{ ...res, path: 'leve', lastModified: 1 }]);
   assert.equal(cons.semChave, 19, 'sem ID nem chave alternativa completa: nada é unido');
   comFrentes({ records: cons.records, frentes: (await ler(fx('pequeno_xlsxwriter.xlsx'))).frentes, name: 'x' });
-  conferirEsperados(cons.records, json('pequeno_esperados.json'));
+  conferirEsperados(cons.records, json('pequeno_esperados.json'), { matricula: false });
+  assert.equal(res.cobertura.semMatricula, true, 'sem a coluna Matrícula, as economias recuperadas ficam sinalizadas como indisponíveis');
 });
 
 test('arquivo leve: colunas com outros nomes exigem nome alternativo', async () => {
@@ -724,6 +763,7 @@ test('recorte: Fez o corte novamente = Sim e tipo por "Onde Foi Feito O Corte?"'
   assert.equal(s.exec, 18);
   assert.ok(Math.abs(s.recorteSobreExec - 5 / 18) < 1e-9);
   assert.equal(res.cobertura.semRecorte, false);
+  assert.equal(res.cobertura.semMatricula, false);
 });
 
 test('bases de campo: Excel com o resumo e as linhas que faltam', async () => {

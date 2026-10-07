@@ -408,12 +408,14 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 @media (min-width: 720px) { .recorte { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); } }
 @media (max-width: 480px) { .rc-row { grid-template-columns: minmax(0, 1fr) auto; } .rc-track { grid-column: 1 / -1; grid-row: 2; } }
 
-/* ---------- Valores negociados (débito informado por mês) ---------- */
-.vn-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
-.vn-item { background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.vn-item.is-total { background: var(--brand-tint); border-color: #c9d7f8; }
-.vn-mes { font-size: 12px; font-weight: 600; color: var(--muted); }
-.vn-valor { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; white-space: nowrap; }
+/* ---------- Valores negociados (valor negociado e economias recuperadas) ---------- */
+.vn-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.vn-item { background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.vn-mes { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.vn-par { display: flex; flex-wrap: wrap; gap: 4px 36px; }
+.vn-col { display: flex; flex-direction: column; min-width: 0; }
+.vn-cab { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.vn-valor { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; white-space: nowrap; }
 
 /* ---------- Pós-corte por categoria ---------- */
 .destaque { margin: 0 0 12px; padding: 10px 14px; background: var(--brand-tint); border: 1px solid #c9d7f8; border-radius: 10px; color: var(--ink); }
