@@ -100,7 +100,7 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   for (const id of ['h-mensal', 'h-status', 'h-tm']) assert.equal(await page.locator('#' + id).count(), 0, id + ' removido');
   assert.equal(await page.locator('.colchart, .card-status, .card-mensal').count(), 0);
   assert.equal(await page.locator('#view-geral .mini-sub', { hasText: '"Fez o corte novamente" = Sim' }).count(), 0, 'legenda do recorte removida');
-  // valores negociados: logo abaixo de "Recortes realizados", em largura total, com valor negociado (só o valor) e economias recuperadas (valor e %)
+  // valores negociados: logo abaixo de "Recortes realizados", em largura total, com valor negociado e economias recuperadas (só o número, sem % nem rótulos)
   const ordem = await page.$$eval('#view-geral > .stack > *', (els) => els.map((e) => e.className));
   const iRec = ordem.findIndex((c) => /card-recorte/.test(c));
   assert.ok(/card-valores/.test(ordem[iRec + 1]), 'valores negociados logo após os recortes: ' + ordem.join(' | '));
@@ -112,26 +112,27 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   const vn = (k) => page.$$eval(`.card-valores [data-vn=${k}] .vn-valor`, (els) => els.map((e) => e.textContent.replace(/\s/g, ' ')));
   // valores esperados vêm da contagem independente do gerador de fixtures (pequeno_esperados.json)
   const esp = JSON.parse(fs.readFileSync(fx('pequeno_esperados.json'), 'utf8'));
-  const pct = (v) => (v * 100).toFixed(1).replace('.', ',') + '%';
   assert.equal(esp.debito, 2535.06);
   // o valor negociado não tem percentual: só o valor (o % existe apenas nas economias recuperadas)
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06']);
   assert.equal(await page.locator('.card-valores [data-vn=valor] [data-vn=pct]').count(), 0, 'valor negociado sem %');
-  assert.equal(await page.locator('.card-valores [data-vn=economias] [data-vn=pct]').count(), 1, 'economias recuperadas seguem com %');
+  assert.equal(await page.locator('.card-valores [data-vn=economias] [data-vn=pct]').count(), 0, 'economias recuperadas também sem %');
+  assert.equal(await page.locator('.card-valores .vn-cab').count(), 0, 'sem os rótulos "Valor" e "%" sobre os números');
   assert.doesNotMatch(await page.getAttribute('.card-valores [data-vn=valor]', 'data-tip'), /%|dividido/);
+  assert.doesNotMatch(await page.getAttribute('.card-valores [data-vn=economias]', 'data-tip'), /%|dividido/);
   // sem o arquivo Cadastro, cada matrícula que negociou conta o mínimo de 1 economia (as 5 negociações são da matrícula 1001) e o aviso diz isso
   assert.equal(esp.neg, 5);
   assert.equal(esp.matriculasNeg, 1);
-  assert.deepEqual(await vn('economias'), [String(esp.matriculasNeg), pct(esp.matriculasNeg / esp.exec)]);
-  assert.deepEqual(await vn('economias'), ['1', '5,6%']);
+  assert.deepEqual(await vn('economias'), [String(esp.matriculasNeg)]);
+  assert.deepEqual(await vn('economias'), ['1']);
   assert.match(await page.textContent('.card-valores [data-vn=economias] .kpi-sub'), /sem Cadastro nem Serviço avulso: 1 economia por matrícula/);
   assert.match(await page.textContent('#view-geral'), /Valor negociado/);
   // com o Cadastro na pasta: as 5 negociações são do mesmo imóvel (matrícula 1001), que tem TOTAL_ECO = 3 no Cadastro (contagem independente)
   await page.setInputFiles('#inp-files', [PEQUENO, CADASTRO]);
   await page.waitForFunction(() => document.querySelector('[data-fk="kpi:atividades"] .kpi-value') && /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));
   assert.equal(esp.cadastro.economias, 3);
-  assert.deepEqual(await vn('economias'), [String(esp.cadastro.economias), pct(esp.cadastro.economias / esp.exec)]);
-  assert.deepEqual(await vn('economias'), ['3', '16,7%']);
+  assert.deepEqual(await vn('economias'), [String(esp.cadastro.economias)]);
+  assert.deepEqual(await vn('economias'), ['3']);
   assert.equal(await page.locator('.card-valores [data-vn=economias] .kpi-sub').count(), 0, 'sem aviso quando o Cadastro está carregado');
   assert.deepEqual(await vn('valor'), ['R$ 2.535,06'], 'valor negociado não muda com o Cadastro');
   assert.match(await page.textContent('#status'), /1 repetida desconsiderada/);
@@ -197,12 +198,12 @@ test('Serviço avulso (CSV): vale primeiro, o Cadastro completa o que faltar, e 
   assert.match(await statusTexto(page), /CSV ignorado \(não é o Serviço avulso: faltam N\. da Ligacao e Qtd\. Economia\): outro_relatorio\.csv/);
   assert.match(await statusTitulo(page), /Base carregada: 19 atividades de 1 arquivo/);
   assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o CSV não vira atividade');
-  assert.deepEqual(await economias(), ['4', '22,2%']);
+  assert.deepEqual(await economias(), ['4']);
   // CSV vazio (ou ainda sincronizando no OneDrive): aparece como erro, não é ignorado em silêncio
   await page.setInputFiles('#inp-files', [PEQUENO, AV07, fx('vazio.csv')]);
   await page.waitForFunction(() => /Importação parcial/.test(document.querySelector('#status').textContent));
   assert.match(await statusTexto(page), /Não importado: vazio\.csv — O arquivo está vazio\. Se ele está no OneDrive, espere terminar de sincronizar/);
-  assert.deepEqual(await economias(), ['4', '22,2%'], 'o resto continua valendo');
+  assert.deepEqual(await economias(), ['4'], 'o resto continua valendo');
   await page.setInputFiles('#inp-files', [PEQUENO, AV07, fx('outro_relatorio.csv')]);
   await page.waitForFunction(() => /CSV ignorado/.test(document.querySelector('#status').textContent) && !/Importação parcial/.test(document.querySelector('#status').textContent));
   assert.equal(await page.locator('.card-valores [data-vn=economias] .kpi-sub').count(), 0);
@@ -210,7 +211,7 @@ test('Serviço avulso (CSV): vale primeiro, o Cadastro completa o que faltar, e 
   // avulso + Cadastro: o avulso continua valendo (4); o Cadastro só entra onde o avulso não tem a matrícula
   await page.setInputFiles('#inp-files', [PEQUENO, AV07, CADASTRO]);
   await page.waitForFunction(() => /Serviço avulso: .*Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent));
-  assert.deepEqual(await economias(), ['4', '22,2%']);
+  assert.deepEqual(await economias(), ['4']);
   // "Arquivos e regras" descreve a leitura do avulso e do Cadastro
   await page.click('#nav-tabs button[data-view=base]');
   const linha = await page.textContent('dl.kv >> text=Serviço avulso (economias) >> xpath=following-sibling::dd[1]');
@@ -220,11 +221,11 @@ test('Serviço avulso (CSV): vale primeiro, o Cadastro completa o que faltar, e 
   await page.setInputFiles('#inp-files', [PEQUENO]);
   await page.waitForFunction(() => !/Serviço avulso|Cadastro:/.test(document.querySelector('#status .st-detail').textContent));
   await page.click('#nav-tabs button[data-view=geral]');
-  assert.deepEqual(await economias(), ['1', '5,6%']);
+  assert.deepEqual(await economias(), ['1']);
   // dois meses de avulso (UTF-8 com BOM e Windows-1252 sem cabeçalho de mês): o total do mês da negociação
   await page.setInputFiles('#inp-files', [PEQUENO, AV07, fx('Servico_avulso_08-2026.csv')]);
   await page.waitForFunction(() => /Serviço avulso de 2 meses/.test(document.querySelector('#status').textContent));
-  assert.deepEqual(await economias(), ['4', '22,2%'], 'as negociações são de julho: vale o total de julho (4), não o de agosto (5)');
+  assert.deepEqual(await economias(), ['4'], 'as negociações são de julho: vale o total de julho (4), não o de agosto (5)');
   semErros(page);
   await page.context().close();
 });
@@ -238,7 +239,7 @@ test('Cadastro com todos os meses (coluna Mês/Ano): vale o total do mês da neg
   const e = JSON.parse(fs.readFileSync(fx('cadastro_meses_esperados.json'), 'utf8'));
   const jul = e.consultas.find((c) => c.mat === '1001' && c.mes === '2026-07');
   assert.deepEqual([jul.motivo, jul.eco], ['ok', 3]);
-  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((x) => x.textContent)), ['3', '16,7%']);
+  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((x) => x.textContent)), ['3']);
   assert.equal(await page.locator('.card-valores [data-vn=cadastro-repetida], .card-valores [data-act=baixar-fora-cadastro]').count(), 0, '1001 não é repetida só por aparecer em três meses');
   await page.click('#nav-tabs button[data-view=base]');
   const linha = await page.textContent('dl.kv >> text=Cadastro (economias) >> xpath=following-sibling::dd[1]');
@@ -254,12 +255,12 @@ test('Cadastro: pasta "Cadastro" com o arquivo no nome original (data (16).xlsx)
   assert.doesNotMatch(await statusTexto(page), /Importação parcial|Não importado/);
   assert.match(await statusTitulo(page), /Base carregada: 19 atividades de 1 arquivo/);
   assert.deepEqual(await kpis(page), KPIS_PEQUENO, 'o Cadastro não vira atividade');
-  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((e) => e.textContent)), ['3', '16,7%']);
+  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((e) => e.textContent)), ['3']);
   // mesmo sem "cadastro" em nenhum nome do caminho, o arquivo é reconhecido pelas colunas
   const xlsx = (nome, arq) => ({ name: nome, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: fs.readFileSync(arq) });
   await page.setInputFiles('#inp-files', [xlsx('atividades.xlsx', PEQUENO), xlsx('data (16).xlsx', CADASTRO)]);
   await page.waitForFunction(() => /Cadastro: 3 matrículas usadas/.test(document.querySelector('#status').textContent) && !/Importação parcial/.test(document.querySelector('#status').textContent));
-  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((e) => e.textContent)), ['3', '16,7%']);
+  assert.deepEqual(await page.$$eval('.card-valores [data-vn=economias] .vn-valor', (els) => els.map((e) => e.textContent)), ['3']);
   semErros(page);
   await page.context().close();
 });

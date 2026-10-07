@@ -1040,7 +1040,7 @@
     }
   }
 
-  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (Serviço avulso e/ou Cadastro), cada um em valor e %. */
+  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (Serviço avulso e/ou Cadastro), cada um só com o número (sem rótulos nem percentual). */
   function renderValoresNegociados() {
     const s = vm.sum;
     const avu = state.avulso;
@@ -1051,22 +1051,20 @@
     const semNeg = (state.cobertura.indisponiveis || {}).neg || [];
     const semMat = (state.cobertura.semMatricula || []).filter((n) => !semNeg.includes(n));
     const avisoDe = (nomes) => (nomes.length ? '⚠ indisponível em ' + nomes.length + ' ' + plural(nomes.length, 'arquivo', 'arquivos') : null);
-    const quadro = (k, rotulo, valor, pct, tip, aviso) => h('div', { class: 'vn-item', role: 'group', tabindex: 0, style: { '--kc': COR.neg }, dataset: { vn: k }, 'aria-label': rotulo + ': ' + valor + (pct == null ? '' : ', ' + pct) + '. ' + tip, 'data-tip': rotulo + '\n' + tip },
+    const quadro = (k, rotulo, valor, tip, aviso) => h('div', { class: 'vn-item', role: 'group', tabindex: 0, style: { '--kc': COR.neg }, dataset: { vn: k }, 'aria-label': rotulo + ': ' + valor + '. ' + tip, 'data-tip': rotulo + '\n' + tip },
       h('span', { class: 'vn-mes' }, h('i', { class: 'kdot' }), rotulo),
-      h('div', { class: 'vn-par' },
-        h('div', { class: 'vn-col' }, h('span', { class: 'vn-cab', text: 'Valor' }), h('span', { class: 'vn-valor num', dataset: { vn: 'v' }, text: valor })),
-        pct == null ? null : h('div', { class: 'vn-col' }, h('span', { class: 'vn-cab', text: '%' }), h('span', { class: 'vn-valor num', dataset: { vn: 'pct' }, text: pct }))),
+      h('span', { class: 'vn-valor num', dataset: { vn: 'v' }, text: valor }),
       aviso ? h('span', { class: 'kpi-sub', text: aviso }) : null);
     const nota = (k, txt) => h('p', { class: 'note', dataset: { vn: k }, text: txt });
     const mats = (n, um, varios) => fmtInt(n) + ' ' + plural(n, um, varios);
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago). Economias recuperadas = total de economias das matrículas que negociaram (Serviço avulso do mês, ou Cadastro quando o avulso não tem a matrícula), cada matrícula uma vez e no mínimo 1 por matrícula; % sobre o Exec.' }))),
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago). Economias recuperadas = total de economias das matrículas que negociaram (Serviço avulso do mês, ou Cadastro quando o avulso não tem a matrícula), cada matrícula uma vez e no mínimo 1 por matrícula.' }))),
       h('div', { class: 'vn-grid' },
-        quadro('valor', 'Valor negociado', brl.format(s.debito), null, 'Soma do débito informado (Valor Total dos Débitos) nas negociações do filtro. Não é arrecadação nem valor pago.', avisoDe(semNeg)),
-        quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec),
-          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): ' + (avu ? 'do Serviço avulso em ' + fmtInt(s.economiasDoAvulso) + ', ' : '') + (cad ? 'do Cadastro em ' + fmtInt(s.economiasDoCadastro) + ', ' : '') + '1 economia (mínimo) em ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
+        quadro('valor', 'Valor negociado', brl.format(s.debito), 'Soma do débito informado (Valor Total dos Débitos) nas negociações do filtro. Não é arrecadação nem valor pago.', avisoDe(semNeg)),
+        quadro('economias', 'Economias recuperadas', fmtInt(s.economias),
+          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): ' + (avu ? 'do Serviço avulso em ' + fmtInt(s.economiasDoAvulso) + ', ' : '') + (cad ? 'do Cadastro em ' + fmtInt(s.economiasDoCadastro) + ', ' : '') + '1 economia (mínimo) em ' + fmtInt(s.economiasPeloMinimo) + '.',
           temFonte ? avisoDe(semNeg.concat(semMat)) : '⚠ sem Cadastro nem Serviço avulso: 1 economia por matrícula')),
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
       temFonte && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
@@ -1493,7 +1491,7 @@
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
         li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
         li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações, sem percentual. Negociação sem valor informado não entra na soma.'),
-        li(h('strong', { text: 'Economias recuperadas' }), ': total de economias das matrículas distintas com negociação (cruzamento pela matrícula; zeros à esquerda e espaços são ignorados), cada matrícula uma vez. A fonte é, nesta ordem: o ', h('strong', { text: 'Serviço avulso' }), ' (CSV do faturamento, um por mês; colunas ', h('code', { text: 'N. da Ligacao' }), ' e ', h('code', { text: 'Qtd. Economia ...' }), ', somadas) e, quando a matrícula não está nele, o ', h('strong', { text: 'Cadastro' }), ' (colunas ', h('code', { text: 'NUM_LIGACAO' }), ' e ', h('code', { text: 'TOTAL_ECO' }), '). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está em nenhum dos dois (ou está sem total) e a que aparece mais de uma vez no mesmo mês (total desconsiderado) contam 1 cada; sem esses arquivos na pasta, todas contam 1. Com vários meses, vale o total do mês da negociação (coluna Referencia de Leitura do avulso ou Mês/Ano do Cadastro; sem a coluna, o mês do nome do arquivo); a matrícula só é desconsiderada se repetir dentro do mesmo mês, e se ela não tiver aquele mês vale o mês mais próximo. Várias negociações na mesma matrícula contam uma vez só (por isso as economias podem ficar abaixo do número de negociações). O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
+        li(h('strong', { text: 'Economias recuperadas' }), ': total de economias das matrículas distintas com negociação (cruzamento pela matrícula; zeros à esquerda e espaços são ignorados), cada matrícula uma vez. A fonte é, nesta ordem: o ', h('strong', { text: 'Serviço avulso' }), ' (CSV do faturamento, um por mês; colunas ', h('code', { text: 'N. da Ligacao' }), ' e ', h('code', { text: 'Qtd. Economia ...' }), ', somadas) e, quando a matrícula não está nele, o ', h('strong', { text: 'Cadastro' }), ' (colunas ', h('code', { text: 'NUM_LIGACAO' }), ' e ', h('code', { text: 'TOTAL_ECO' }), '). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está em nenhum dos dois (ou está sem total) e a que aparece mais de uma vez no mesmo mês (total desconsiderado) contam 1 cada; sem esses arquivos na pasta, todas contam 1. Com vários meses, vale o total do mês da negociação (coluna Referencia de Leitura do avulso ou Mês/Ano do Cadastro; sem a coluna, o mês do nome do arquivo); a matrícula só é desconsiderada se repetir dentro do mesmo mês, e se ela não tiver aquele mês vale o mês mais próximo. Várias negociações na mesma matrícula contam uma vez só (por isso as economias podem ficar abaixo do número de negociações). Sem percentual. Negociação sem matrícula não entra.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,
         li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),

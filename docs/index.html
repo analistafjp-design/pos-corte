@@ -420,9 +420,6 @@ tr.is-active th, tr.is-active td { background: var(--brand-tint); }
 .vn-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
 .vn-item { background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .vn-mes { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
-.vn-par { display: flex; flex-wrap: wrap; gap: 4px 36px; }
-.vn-col { display: flex; flex-direction: column; min-width: 0; }
-.vn-cab { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .vn-acoes { margin-top: 10px; }
 .vn-valor { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; white-space: nowrap; }
 
@@ -2161,7 +2158,7 @@ window.FRENTES_PADRAO = [
    * arquivo Cadastro (anotado em r.eco por applyCadastro) dessas matrículas, cada uma uma vez. Matrícula que negociou é,
    * no mínimo, 1 economia: sem total aproveitável no Cadastro ela conta 1 (`economiasPeloMinimo`), seja por não estar
    * nele (`economiasSemCadastro`, também sem TOTAL_ECO), por estar repetida (`economiasRepetidas`, total desconsiderado)
-   * ou por não haver Cadastro carregado (`economiasSemArquivo`). `economiasSobreExec` = economias ÷ Exec.
+   * ou por não haver Cadastro carregado (`economiasSemArquivo`).
    */
   function summarize(records) {
     const s = { recortes: 0, recorteTipos: {}, atividades: 0, exec: 0, exoc: 0, outros: 0, neg: 0, semDesdobro: 0, termos: 0, t11: 0, t31: 0, negETermo: 0, debito: 0, debitoNaoInformado: 0, negSemMatricula: 0, economias: 0, economiasMatriculas: 0, economiasDoAvulso: 0, economiasDoCadastro: 0, economiasPeloMinimo: 0, economiasSemCadastro: 0, economiasRepetidas: 0, economiasSemArquivo: 0 };
@@ -2220,7 +2217,6 @@ window.FRENTES_PADRAO = [
       else if (r.ecoMotivo === 'sem') s.economiasSemCadastro++;
       else s.economiasSemArquivo++;
     }
-    s.economiasSobreExec = s.exec ? s.economias / s.exec : null;
     s.recorteSobreExec = s.exec ? s.recortes / s.exec : null;
     s.produtividade = s.equipeDias ? s.atividades / s.equipeDias : null;
     s.equipesPorDia = s.dias ? s.equipeDias / s.dias : null;
@@ -4398,7 +4394,7 @@ window.FRENTES_PADRAO = [
     }
   }
 
-  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (Serviço avulso e/ou Cadastro), cada um em valor e %. */
+  /** Valores negociados: valor negociado (débito informado das negociações) e economias recuperadas (Serviço avulso e/ou Cadastro), cada um só com o número (sem rótulos nem percentual). */
   function renderValoresNegociados() {
     const s = vm.sum;
     const avu = state.avulso;
@@ -4409,22 +4405,20 @@ window.FRENTES_PADRAO = [
     const semNeg = (state.cobertura.indisponiveis || {}).neg || [];
     const semMat = (state.cobertura.semMatricula || []).filter((n) => !semNeg.includes(n));
     const avisoDe = (nomes) => (nomes.length ? '⚠ indisponível em ' + nomes.length + ' ' + plural(nomes.length, 'arquivo', 'arquivos') : null);
-    const quadro = (k, rotulo, valor, pct, tip, aviso) => h('div', { class: 'vn-item', role: 'group', tabindex: 0, style: { '--kc': COR.neg }, dataset: { vn: k }, 'aria-label': rotulo + ': ' + valor + (pct == null ? '' : ', ' + pct) + '. ' + tip, 'data-tip': rotulo + '\n' + tip },
+    const quadro = (k, rotulo, valor, tip, aviso) => h('div', { class: 'vn-item', role: 'group', tabindex: 0, style: { '--kc': COR.neg }, dataset: { vn: k }, 'aria-label': rotulo + ': ' + valor + '. ' + tip, 'data-tip': rotulo + '\n' + tip },
       h('span', { class: 'vn-mes' }, h('i', { class: 'kdot' }), rotulo),
-      h('div', { class: 'vn-par' },
-        h('div', { class: 'vn-col' }, h('span', { class: 'vn-cab', text: 'Valor' }), h('span', { class: 'vn-valor num', dataset: { vn: 'v' }, text: valor })),
-        pct == null ? null : h('div', { class: 'vn-col' }, h('span', { class: 'vn-cab', text: '%' }), h('span', { class: 'vn-valor num', dataset: { vn: 'pct' }, text: pct }))),
+      h('span', { class: 'vn-valor num', dataset: { vn: 'v' }, text: valor }),
       aviso ? h('span', { class: 'kpi-sub', text: aviso }) : null);
     const nota = (k, txt) => h('p', { class: 'note', dataset: { vn: k }, text: txt });
     const mats = (n, um, varios) => fmtInt(n) + ' ' + plural(n, um, varios);
     return h('section', { class: 'card card-valores', 'aria-labelledby': 'h-valores' },
       h('div', { class: 'card-head' }, h('div', null,
         h('h2', { id: 'h-valores', text: 'Valores negociados' }),
-        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago). Economias recuperadas = total de economias das matrículas que negociaram (Serviço avulso do mês, ou Cadastro quando o avulso não tem a matrícula), cada matrícula uma vez e no mínimo 1 por matrícula; % sobre o Exec.' }))),
+        h('p', { class: 'hint', text: 'Valor negociado = débito informado nas negociações (não é arrecadação nem valor pago). Economias recuperadas = total de economias das matrículas que negociaram (Serviço avulso do mês, ou Cadastro quando o avulso não tem a matrícula), cada matrícula uma vez e no mínimo 1 por matrícula.' }))),
       h('div', { class: 'vn-grid' },
-        quadro('valor', 'Valor negociado', brl.format(s.debito), null, 'Soma do débito informado (Valor Total dos Débitos) nas negociações do filtro. Não é arrecadação nem valor pago.', avisoDe(semNeg)),
-        quadro('economias', 'Economias recuperadas', fmtInt(s.economias), fmtPctVal(s.economiasSobreExec),
-          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): ' + (avu ? 'do Serviço avulso em ' + fmtInt(s.economiasDoAvulso) + ', ' : '') + (cad ? 'do Cadastro em ' + fmtInt(s.economiasDoCadastro) + ', ' : '') + '1 economia (mínimo) em ' + fmtInt(s.economiasPeloMinimo) + ', dividido pelo total de Exec (' + fmtInt(s.exec) + ').',
+        quadro('valor', 'Valor negociado', brl.format(s.debito), 'Soma do débito informado (Valor Total dos Débitos) nas negociações do filtro. Não é arrecadação nem valor pago.', avisoDe(semNeg)),
+        quadro('economias', 'Economias recuperadas', fmtInt(s.economias),
+          'Total de economias de ' + mats(s.matriculasNeg, 'matrícula', 'matrículas') + ' com negociação (' + fmtInt(s.economias) + '): ' + (avu ? 'do Serviço avulso em ' + fmtInt(s.economiasDoAvulso) + ', ' : '') + (cad ? 'do Cadastro em ' + fmtInt(s.economiasDoCadastro) + ', ' : '') + '1 economia (mínimo) em ' + fmtInt(s.economiasPeloMinimo) + '.',
           temFonte ? avisoDe(semNeg.concat(semMat)) : '⚠ sem Cadastro nem Serviço avulso: 1 economia por matrícula')),
       s.negSemMatricula ? nota('sem-matricula', mats(s.negSemMatricula, 'negociação sem matrícula', 'negociações sem matrícula') + ' (não entra nas economias recuperadas).') : null,
       temFonte && s.economiasSemCadastro ? h('div', { class: 'vn-acoes' },
@@ -4851,7 +4845,7 @@ window.FRENTES_PADRAO = [
         li('Só há negociação quando ', h('code', { text: 'Negociou O Débito?' }), ' é ', h('strong', { text: 'Sim' }), ' (espaços nas pontas e maiúsculas/minúsculas são ignorados). Códigos, texto livre, valor do débito ou desdobro não criam negociação.'),
         li(h('strong', { text: 'Sem Desdobro' }), ': negociação com ', h('code', { text: 'Serviço adicionais resposta' }), ' vazio, nulo ou só com espaços. Continua contando como negociação: é um subconjunto, não um indicador a somar.'),
         li(h('strong', { text: 'Valor negociado' }), ': soma de ', h('code', { text: 'Valor Total dos Débitos' }), ' das negociações, sem percentual. Negociação sem valor informado não entra na soma.'),
-        li(h('strong', { text: 'Economias recuperadas' }), ': total de economias das matrículas distintas com negociação (cruzamento pela matrícula; zeros à esquerda e espaços são ignorados), cada matrícula uma vez. A fonte é, nesta ordem: o ', h('strong', { text: 'Serviço avulso' }), ' (CSV do faturamento, um por mês; colunas ', h('code', { text: 'N. da Ligacao' }), ' e ', h('code', { text: 'Qtd. Economia ...' }), ', somadas) e, quando a matrícula não está nele, o ', h('strong', { text: 'Cadastro' }), ' (colunas ', h('code', { text: 'NUM_LIGACAO' }), ' e ', h('code', { text: 'TOTAL_ECO' }), '). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está em nenhum dos dois (ou está sem total) e a que aparece mais de uma vez no mesmo mês (total desconsiderado) contam 1 cada; sem esses arquivos na pasta, todas contam 1. Com vários meses, vale o total do mês da negociação (coluna Referencia de Leitura do avulso ou Mês/Ano do Cadastro; sem a coluna, o mês do nome do arquivo); a matrícula só é desconsiderada se repetir dentro do mesmo mês, e se ela não tiver aquele mês vale o mês mais próximo. Várias negociações na mesma matrícula contam uma vez só (por isso as economias podem ficar abaixo do número de negociações). O % é esse total dividido pelo total de Exec. Negociação sem matrícula não entra.')),
+        li(h('strong', { text: 'Economias recuperadas' }), ': total de economias das matrículas distintas com negociação (cruzamento pela matrícula; zeros à esquerda e espaços são ignorados), cada matrícula uma vez. A fonte é, nesta ordem: o ', h('strong', { text: 'Serviço avulso' }), ' (CSV do faturamento, um por mês; colunas ', h('code', { text: 'N. da Ligacao' }), ' e ', h('code', { text: 'Qtd. Economia ...' }), ', somadas) e, quando a matrícula não está nele, o ', h('strong', { text: 'Cadastro' }), ' (colunas ', h('code', { text: 'NUM_LIGACAO' }), ' e ', h('code', { text: 'TOTAL_ECO' }), '). Toda matrícula que negociou é, no mínimo, 1 economia: a que não está em nenhum dos dois (ou está sem total) e a que aparece mais de uma vez no mesmo mês (total desconsiderado) contam 1 cada; sem esses arquivos na pasta, todas contam 1. Com vários meses, vale o total do mês da negociação (coluna Referencia de Leitura do avulso ou Mês/Ano do Cadastro; sem a coluna, o mês do nome do arquivo); a matrícula só é desconsiderada se repetir dentro do mesmo mês, e se ela não tiver aquele mês vale o mês mais próximo. Várias negociações na mesma matrícula contam uma vez só (por isso as economias podem ficar abaixo do número de negociações). Sem percentual. Negociação sem matrícula não entra.')),
       h('h3', { text: 'Irregularidade identificada — Termos aplicados' }),
       h('ul', null,
         li('Conta quando ', h('code', { text: 'Serviço adicionais resposta' }), ' contém o código completo ', h('code', { text: '110013' }), ' (termo do time de Serviços) ou ', h('code', { text: '310013' }), ' (termo do VCG), em qualquer posição do texto.'),
