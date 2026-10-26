@@ -410,22 +410,23 @@ def esperados(rows, frentes=FRENTES):
     ed = {(r["Recurso"].strip().lower(), r["Data"]) for r in vistos if r["Recurso"].strip()}
     out["equipeDias"] = len(ed)
     out["produtividade"] = out["atividades"] / len(ed) if ed else None
-    out["assertividade"] = out["termos"] / out["exec"] if out["exec"] else None
-    out["efetividade"] = out["neg"] / out["exec"] if out["exec"] else None
+    out["assertividade"] = out["exec"] / (out["exec"] + out["exoc"]) if (out["exec"] + out["exoc"]) else None  # Exec ÷ (Exec + Exoc)
+    out["efetividade"] = (out["termos"] + out["neg"]) / out["exec"] if out["exec"] else None  # (Termos + Negociações) ÷ Exec
     out["equipesPorDia"] = {}
     for rec, dia in ed:
         out["equipesPorDia"][dia.isoformat()] = out["equipesPorDia"].get(dia.isoformat(), 0) + 1
     cid = {}
     for r in vistos:
-        c = cid.setdefault(r["Cidade"].strip().lower(), {"percorrido": 0, "exec": 0, "termos": 0, "neg": 0, "ed": set()})
+        c = cid.setdefault(r["Cidade"].strip().lower(), {"percorrido": 0, "exec": 0, "exoc": 0, "termos": 0, "neg": 0, "ed": set()})
         c["percorrido"] += 1
         c["exec"] += r["Status da Atividade"].strip().lower() == "finalizada"
+        c["exoc"] += r["Status da Atividade"].strip().lower() == "encerrada com ocorrência"
         c["termos"] += bool(TERMO_RE.search(r["Serviço adicionais resposta"] or ""))
         c["neg"] += (r["Negociou O Débito?"] or "").strip().lower() == "sim"
         if r["Recurso"].strip():
             c["ed"].add((r["Recurso"].strip().lower(), r["Data"]))
     out["porCidadeProd"] = {k: {"percorrido": v["percorrido"], "equipeDias": len(v["ed"]), "produtividade": (v["percorrido"] / len(v["ed"])) if v["ed"] else None,
-                                "assertividade": (v["termos"] / v["exec"]) if v["exec"] else None, "efetividade": (v["neg"] / v["exec"]) if v["exec"] else None}
+                                "assertividade": (v["exec"] / (v["exec"] + v["exoc"])) if (v["exec"] + v["exoc"]) else None, "efetividade": ((v["termos"] + v["neg"]) / v["exec"]) if v["exec"] else None}
                            for k, v in cid.items()}
     return out
 
