@@ -114,7 +114,7 @@ Visual moderno e profissional, identidade AnalistaFJP; navegação Visão geral 
 
 ## Indicadores em evidência e exportação
 
-Cartões: **Percorrido = Exec + Exoc**, **Total de Exec** (Finalizada), **Total de Exoc** (Encerrada com Ocorrência), **Equipes que trabalharam** (recursos distintos no dia ou período), **Assertividade = Termos ÷ Exec**, **Efetividade = Negociações ÷ Exec**, além de Termos, Negociações e Sem Desdobro. Tabela **Produtividade por cidade** (Percorrido ÷ equipe-dias; definição a confirmar comigo). Botões **Exportar Excel** (`.xlsx` gerado no navegador por `src/exportar.js`, várias planilhas, textos nunca como fórmula) e **Exportar PDF** (impressão do navegador em A4 paisagem, ~3 páginas).
+Cartões: **Percorrido = Exec + Exoc**, **Total de Exec** (Finalizada), **Total de Exoc** (Encerrada com Ocorrência), **Equipes que trabalharam** (recursos distintos no dia ou período), **Assertividade = Exec ÷ (Exec + Exoc)**, **Efetividade = (Termos + Negociações) ÷ Exec**, além de Termos, Negociações e Sem Desdobro. Tabela **Produtividade por cidade** (Percorrido ÷ equipe-dias; definição a confirmar comigo). Botões **Exportar Excel** (`.xlsx` gerado no navegador por `src/exportar.js`, várias planilhas, textos nunca como fórmula) e **Exportar PDF** (impressão do navegador em A4 paisagem, ~3 páginas).
 
 ## Filtros e analítico
 

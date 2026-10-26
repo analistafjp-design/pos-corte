@@ -88,7 +88,7 @@ test('importar Excel: cartões, valores negociados e gráficos calculados a part
   // pós-corte por categoria: todos os 19 registros do fixture são da categoria Residencial
   assert.match(await page.textContent('[data-fk=cat-topo]'), /Categoria com mais pós-corte: Residencial — 19 \(100% do percorrido\)/);
   const cats = await page.$$eval('.card-categorias tbody tr', (trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent.trim())));
-  assert.deepEqual(cats, [['Residencial', '19', '100%', '18', '1', '7', '38,9%', '5', '27,8%']]);
+  assert.deepEqual(cats, [['Residencial', '19', '100%', '18', '1', '7', '94,7%', '5', '66,7%']]);
   // recortes da Visão geral: 5 recortes (3 ramal, 1 cavalete simples, 1 sem tipo) sobre 18 Exec
   assert.equal(await page.textContent('.card-recorte [data-rk=total]'), '5');
   assert.match(await page.textContent('.card-recorte [data-rk=pct]'), /27,8% do Exec \(Total recorte ÷ Exec\)/);
@@ -506,7 +506,8 @@ test('arquivos enxutos: outra aba, título antes do cabeçalho e colunas ausente
   await page.setInputFiles('#inp-files', fx('sem_coluna_servadic.xlsx'));
   await page.waitForFunction(() => /indisponível em 1 arquivo/.test(document.querySelector('.kpi-groups').textContent));
   assert.match(await kpiTexto(page, 'termos'), /indisponível em 1 arquivo/);
-  assert.match(await kpiTexto(page, 'assertividade'), /indisponível em 1 arquivo/);
+  assert.match(await kpiTexto(page, 'efetividade'), /indisponível em 1 arquivo/, 'a efetividade soma termos e negociações: sem a coluna de termos fica marcada');
+  assert.doesNotMatch(await kpiTexto(page, 'assertividade'), /indisponível/, 'a assertividade (Exec ÷ Exec + Exoc) não usa a coluna de termos');
   assert.doesNotMatch(await kpiTexto(page, 'neg'), /indisponível/);
   assert.match(await statusTexto(page), /Termos não pôde ser calculado em: sem_coluna_servadic\.xlsx/);
   await page.context().close();
@@ -863,8 +864,13 @@ test('cartões em destaque: percorrido, exec, exoc, equipes, assertividade e efe
   assert.equal(await t('exec'), 'Total de Exec18');
   assert.equal(await t('exoc'), 'Total de Exoc1');
   assert.equal(await t('equipes'), 'Equipes que trabalharam3');
-  assert.equal(await t('assertividade'), 'Assertividade38,9%');
-  assert.equal(await t('efetividade'), 'Efetividade27,8%');
+  // Assertividade = Exec ÷ (Exec + Exoc) = 18 ÷ 19; Efetividade = (Termos + Negociações) ÷ Exec = (7 + 5) ÷ 18 (contagem independente em pequeno_esperados.json)
+  const esp = JSON.parse(fs.readFileSync(fx('pequeno_esperados.json'), 'utf8'));
+  assert.deepEqual([esp.exec, esp.exoc, esp.termos, esp.neg], [18, 1, 7, 5]);
+  assert.equal(await t('assertividade'), 'Assertividade94,7%');
+  assert.equal(await t('efetividade'), 'Efetividade66,7%');
+  assert.match(await page.getAttribute('[data-fk="kpi:assertividade"]', 'data-tip'), /Exec dividido pelo percorrido \(Exec \+ Exoc\)/);
+  assert.match(await page.getAttribute('[data-fk="kpi:efetividade"]', 'data-tip'), /Termos aplicados mais negociações, divididos pelo total de Exec/);
   assert.match(await page.getAttribute('[data-fk="kpi:equipes"]', 'data-tip'), /no período filtrado/);
   // equipes de um único dia (3 equipes em 03/07/2026): o valor muda e a dica passa a falar do dia
   await page.fill('#f-from', '2026-07-03');
@@ -874,10 +880,12 @@ test('cartões em destaque: percorrido, exec, exoc, equipes, assertividade e efe
   await page.fill('#f-from', '2026-08-10');
   await page.fill('#f-to', '2026-08-10');
   assert.equal(await t('equipes'), 'Equipes que trabalharam1');
-  // sem Exec no filtro: divisão protegida
+  // 28/09/2026 tem 1 Exec, sem Exoc, termo nem negociação: assertividade 1 ÷ 1 = 100%; efetividade (0 + 0) ÷ 1 = 0%
+  // (sem Exec a efetividade fica protegida: coberto no teste do núcleo)
   await page.fill('#f-from', '2026-09-28');
   await page.fill('#f-to', '2026-09-28');
-  assert.match(await t('assertividade'), /Assertividade(0,0%|—)/);
+  assert.equal(await t('assertividade'), 'Assertividade100,0%');
+  assert.equal(await t('efetividade'), 'Efetividade0,0%');
   // cartões informativos não abrem o analítico; os de indicador abrem
   await page.click('#chips button.ghost');
   await page.click('[data-fk="kpi:equipes"]');
@@ -1076,7 +1084,9 @@ test('bases de campo: subir base, cruzamento por protocolo, recortes, pastas por
   assert.equal(await miniTxt(page, 'termos'), '0');
   assert.equal(await miniTxt(page, 'neg'), '0');
   assert.equal(await miniTxt(page, 'equipes'), '1');
-  assert.equal(await miniTxt(page, 'assertividade'), '0,0%');
+  // 1 Exec e nenhuma Exoc: Exec ÷ (Exec + Exoc) = 100%; (0 termos + 0 negociações) ÷ 1 Exec = 0%
+  assert.equal(await miniTxt(page, 'assertividade'), '100,0%');
+  assert.equal(await miniTxt(page, 'efetividade'), '0,0%');
   assert.match(await page.textContent('.basecard'), /25,0% percorrido/);
   const hoje = await page.evaluate(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear(); });
   assert.equal(await miniTxt(page, 'subiu'), hoje);

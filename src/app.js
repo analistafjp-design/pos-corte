@@ -947,7 +947,8 @@
     const mesmoDia = s.dias === 1;
     // `ind`: indicador aberto no Analítico ao clicar; sem `ind` o cartão é só informativo.
     const cartao = (c) => {
-      const indisp = (state.cobertura.indisponiveis || {})[c.ind || c.dep];
+      const chaves = [].concat(c.ind || c.dep || []);
+      const indisp = [...new Set(chaves.flatMap((k) => (state.cobertura.indisponiveis || {})[k] || []))];
       const conteudo = [
         h('span', { class: 'kpi-label' }, h('i', { class: 'kdot' }), h('span', { text: c.t }), c.ind ? h('span', { class: 'kpi-go', 'aria-hidden': 'true' }, icon('arrow', 14)) : null),
         h('span', { class: 'kpi-value num', text: c.v }),
@@ -969,9 +970,9 @@
     ];
     const qualidade = [
       { k: 'termos', ind: 'termos', t: 'Termos aplicados', v: fmtInt(s.termos), cor: COR.termos },
-      { k: 'assertividade', dep: 'termos', t: 'Assertividade', v: fmtPctVal(s.assertividade), cor: COR.termos, tip: 'Termos aplicados divididos pelo total de Exec.' },
+      { k: 'assertividade', t: 'Assertividade', v: fmtPctVal(s.assertividade), cor: COR.termos, tip: 'Exec dividido pelo percorrido (Exec + Exoc).' },
       { k: 'neg', ind: 'neg', t: 'Negociações', v: fmtInt(s.neg), cor: COR.neg },
-      { k: 'efetividade', dep: 'neg', t: 'Efetividade', v: fmtPctVal(s.efetividade), cor: COR.neg, tip: 'Negociações divididas pelo total de Exec.' },
+      { k: 'efetividade', dep: ['termos', 'neg'], t: 'Efetividade', v: fmtPctVal(s.efetividade), cor: COR.neg, tip: 'Termos aplicados mais negociações, divididos pelo total de Exec.' },
     ];
     return h('div', { class: 'kpi-groups' },
       h('div', { class: 'grp-title', text: 'Resultado', 'aria-hidden': 'true' }),
@@ -1764,9 +1765,9 @@
         miniKpi('exec', 'Total de Exec', fmtInt(r.exec), null, COR.exec),
         miniKpi('exoc', 'Total de Exoc', fmtInt(r.exoc), null, COR.exoc),
         miniKpi('termos', 'Termos aplicados', fmtInt(r.termos), null, COR.termos),
-        miniKpi('assertividade', 'Assertividade', fmtPctVal(r.assertividade), 'Termos ÷ Exec', COR.termos),
+        miniKpi('assertividade', 'Assertividade', fmtPctVal(r.assertividade), 'Exec ÷ (Exec + Exoc)', COR.termos),
         miniKpi('neg', 'Negociações', fmtInt(r.neg), null, COR.neg),
-        miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), 'Negociações ÷ Exec', COR.neg),
+        miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), '(Termos + Negociações) ÷ Exec', COR.neg),
         miniKpi('equipes', 'Total de equipes', fmtInt(r.equipes), null, COR.atividades)),
       cartaoRecorte(r),
       notas.length ? h('p', { class: 'note', text: notas.join(' ') }) : null);

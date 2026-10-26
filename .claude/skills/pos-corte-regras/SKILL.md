@@ -28,9 +28,9 @@ Em dúvida, confira em `src/core.js` (`classify`, `summarize`, `agrupar`) e em
 | Percorrido | Exec + Exoc |
 | Total de Exec / Exoc | Status Finalizada / Encerrada com Ocorrência |
 | Termos aplicados | `Serviço adicionais resposta` contém o código completo 110013 (Serviços) ou 310013 (VCG), sem dígito colado antes ou depois; uma atividade conta uma vez |
-| Assertividade | Termos ÷ Exec |
+| Assertividade | Exec ÷ (Exec + Exoc), ou seja, Exec sobre o percorrido (definição do usuário) |
 | Negociações | `Negociou O Débito?` = Sim |
-| Efetividade | Negociações ÷ Exec |
+| Efetividade | (Termos + Negociações) ÷ Exec: soma das quantidades, pode passar de 100% (definição do usuário) |
 | Sem Desdobro | Negociação com `Serviço adicionais resposta` vazio (subconjunto das negociações). **Os cards de Sem Desdobro foram retirados do painel a pedido do usuário**; não recrie cards. |
 | Débito informado | Soma de `Valor Total dos Débitos` das negociações. **Nunca chamar de "arrecadação"** |
 | Valor negociado | O valor é o débito informado acima, mostrado no bloco "Valores negociados" da Visão geral **sem percentual** (o usuário pediu para tirar o %) |

@@ -1450,7 +1450,8 @@
 
   /**
    * Indicadores de um conjunto de registros. Percorrido = Exec + Exoc (só esses status são carregados).
-   * Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec (null quando não há Exec).
+   * Assertividade = Exec ÷ (Exec + Exoc), null quando não há percorrido; Efetividade = (Termos + Negociações) ÷ Exec, null
+   * quando não há Exec (soma das quantidades: uma atividade com termo e negociação conta nas duas).
    * Equipes = recursos distintos que trabalharam; equipeDias = pares (equipe, dia) com atividade;
    * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
    * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações), sem percentual. Matrículas que negociaram = `matriculasNeg` (distintas;
@@ -1500,8 +1501,8 @@
     s.equipes = equipes.size;
     s.dias = dias.size;
     s.equipeDias = equipeDias.size;
-    s.assertividade = s.exec ? s.termos / s.exec : null;
-    s.efetividade = s.exec ? s.neg / s.exec : null;
+    s.assertividade = s.exec + s.exoc ? s.exec / (s.exec + s.exoc) : null;
+    s.efetividade = s.exec ? (s.termos + s.neg) / s.exec : null;
     s.matriculasNeg = matriculasNeg.size;
     for (const r of matriculasNeg.values()) {
       if (r.ecoMotivo === 'ok') {

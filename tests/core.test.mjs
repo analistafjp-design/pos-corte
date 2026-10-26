@@ -870,8 +870,8 @@ test('indicadores em destaque: percorrido, assertividade, efetividade, equipes e
   const perto = (a, b, m) => assert.ok(Math.abs(a - b) < 1e-9, `${m}: ${a} vs ${b}`);
   assert.equal(s.percorrido, s.exec + s.exoc, 'Percorrido = Exec + Exoc');
   assert.equal(s.percorrido, esp.atividades);
-  perto(s.assertividade, esp.assertividade, 'assertividade = termos / exec');
-  perto(s.efetividade, esp.efetividade, 'efetividade = negociações / exec');
+  perto(s.assertividade, esp.assertividade, 'assertividade = exec / (exec + exoc)');
+  perto(s.efetividade, esp.efetividade, 'efetividade = (termos + negociações) / exec');
   assert.equal(s.equipes, esp.equipes, 'equipes que trabalharam');
   assert.equal(s.dias, esp.dias);
   assert.equal(s.equipeDias, esp.equipeDias);
@@ -891,6 +891,22 @@ test('indicadores em destaque: percorrido, assertividade, efetividade, equipes e
     perto(g.assertividade, e.assertividade, 'assertividade da cidade');
     perto(g.efetividade, e.efetividade, 'efetividade da cidade');
   }
+  // fórmulas pedidas pelo usuário, com registros montados à mão: Assertividade = Exec ÷ (Exec + Exoc); Efetividade = (Termos + Negociações) ÷ Exec
+  const reg = (o) => Object.assign({ exec: true, exoc: false, neg: false, termo: false, t11: false, t31: false, semDesdobro: false, valor: null, recurso: 'R', data: '2026-07-01' }, o);
+  const f = PC.summarize([
+    reg({ termo: true, t11: true }),                 // Exec com termo
+    reg({ neg: true }),                              // Exec com negociação
+    reg({ termo: true, t31: true, neg: true }),      // Exec com termo E negociação: conta nas duas
+    reg({}),                                         // Exec sem nada
+    reg({ exec: false, exoc: true, termo: true, t11: true, neg: true }), // Exoc: entra só na assertividade (denominador); seu termo e sua negociação contam nas quantidades
+  ]);
+  assert.deepEqual([f.exec, f.exoc, f.termos, f.neg], [4, 1, 3, 3]);
+  perto(f.assertividade, 4 / 5, 'Exec ÷ (Exec + Exoc)');
+  perto(f.efetividade, (3 + 3) / 4, '(Termos + Negociações) ÷ Exec: pode passar de 100%');
+  // só Exoc: sem Exec a efetividade é nula, mas a assertividade existe (0%)
+  const soExoc = PC.summarize([reg({ exec: false, exoc: true, termo: true, t11: true })]);
+  assert.equal(soExoc.efetividade, null);
+  assert.equal(soExoc.assertividade, 0);
   // sem Exec não há divisão por zero
   const vazio = PC.summarize([]);
   assert.deepEqual([vazio.assertividade, vazio.efetividade, vazio.produtividade, vazio.equipes], [null, null, null, 0]);

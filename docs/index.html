@@ -2179,7 +2179,8 @@ window.FRENTES_PADRAO = [
 
   /**
    * Indicadores de um conjunto de registros. Percorrido = Exec + Exoc (só esses status são carregados).
-   * Assertividade = Termos ÷ Exec; Efetividade = Negociações ÷ Exec (null quando não há Exec).
+   * Assertividade = Exec ÷ (Exec + Exoc), null quando não há percorrido; Efetividade = (Termos + Negociações) ÷ Exec, null
+   * quando não há Exec (soma das quantidades: uma atividade com termo e negociação conta nas duas).
    * Equipes = recursos distintos que trabalharam; equipeDias = pares (equipe, dia) com atividade;
    * produtividade = percorrido ÷ equipeDias (visitas por equipe por dia trabalhado).
    * Valor negociado = `debito` (soma de Valor Total dos Débitos das negociações), sem percentual. Matrículas que negociaram = `matriculasNeg` (distintas;
@@ -2229,8 +2230,8 @@ window.FRENTES_PADRAO = [
     s.equipes = equipes.size;
     s.dias = dias.size;
     s.equipeDias = equipeDias.size;
-    s.assertividade = s.exec ? s.termos / s.exec : null;
-    s.efetividade = s.exec ? s.neg / s.exec : null;
+    s.assertividade = s.exec + s.exoc ? s.exec / (s.exec + s.exoc) : null;
+    s.efetividade = s.exec ? (s.termos + s.neg) / s.exec : null;
     s.matriculasNeg = matriculasNeg.size;
     for (const r of matriculasNeg.values()) {
       if (r.ecoMotivo === 'ok') {
@@ -3211,9 +3212,9 @@ window.FRENTES_PADRAO = [
         ['Total de Exec', intCel(s.exec), 'Status da Atividade = Finalizada'],
         ['Total de Exoc', intCel(s.exoc), 'Status da Atividade = Encerrada com Ocorrência'],
         ['Termos aplicados', intCel(s.termos), 'Serviço adicionais resposta contém o código 110013 (Serviços) ou 310013 (VCG)'],
-        ['Assertividade', pctCel(s.assertividade), 'Termos ÷ Exec'],
+        ['Assertividade', pctCel(s.assertividade), 'Exec ÷ (Exec + Exoc)'],
         ['Negociações', intCel(s.neg), 'Negociou O Débito? = Sim'],
-        ['Efetividade', pctCel(s.efetividade), 'Negociações ÷ Exec'],
+        ['Efetividade', pctCel(s.efetividade), '(Termos aplicados + Negociações) ÷ Exec'],
         ['Negociações Sem Desdobro', intCel(s.semDesdobro), 'Negociação com Serviço adicionais resposta vazio (subconjunto das negociações)'],
         ['Débito informado nas negociações', { v: s.debito, f: 'brl' }, 'Soma de Valor Total dos Débitos das negociações; não é arrecadação nem valor pago'],
         ['Equipes que trabalharam', intCel(s.equipes), 'Recursos distintos com ao menos uma atividade no período'],
@@ -3311,9 +3312,9 @@ window.FRENTES_PADRAO = [
         ['Total de Exec', intCel(r.exec), 'Status da Atividade = Finalizada'],
         ['Total de Exoc', intCel(r.exoc), 'Status da Atividade = Encerrada com Ocorrência'],
         ['Termos aplicados', intCel(r.termos), 'Serviço adicionais resposta contém o código 110013 (Serviços) ou 310013 (VCG)'],
-        ['Assertividade', pctCel(r.assertividade), 'Termos ÷ Exec'],
+        ['Assertividade', pctCel(r.assertividade), 'Exec ÷ (Exec + Exoc)'],
         ['Negociações', intCel(r.neg), 'Negociou O Débito? = Sim'],
-        ['Efetividade', pctCel(r.efetividade), 'Negociações ÷ Exec'],
+        ['Efetividade', pctCel(r.efetividade), '(Termos aplicados + Negociações) ÷ Exec'],
         ['Negociações Sem Desdobro', intCel(r.semDesdobro), 'Negociação com Serviço adicionais resposta vazio'],
         ['Equipes que trabalharam', intCel(r.equipes), 'Recursos distintos nas atividades desta base'],
         ['Recortes realizados', intCel(r.recortes), 'Fez o corte novamente = Sim'],
@@ -4330,7 +4331,8 @@ window.FRENTES_PADRAO = [
     const mesmoDia = s.dias === 1;
     // `ind`: indicador aberto no Analítico ao clicar; sem `ind` o cartão é só informativo.
     const cartao = (c) => {
-      const indisp = (state.cobertura.indisponiveis || {})[c.ind || c.dep];
+      const chaves = [].concat(c.ind || c.dep || []);
+      const indisp = [...new Set(chaves.flatMap((k) => (state.cobertura.indisponiveis || {})[k] || []))];
       const conteudo = [
         h('span', { class: 'kpi-label' }, h('i', { class: 'kdot' }), h('span', { text: c.t }), c.ind ? h('span', { class: 'kpi-go', 'aria-hidden': 'true' }, icon('arrow', 14)) : null),
         h('span', { class: 'kpi-value num', text: c.v }),
@@ -4352,9 +4354,9 @@ window.FRENTES_PADRAO = [
     ];
     const qualidade = [
       { k: 'termos', ind: 'termos', t: 'Termos aplicados', v: fmtInt(s.termos), cor: COR.termos },
-      { k: 'assertividade', dep: 'termos', t: 'Assertividade', v: fmtPctVal(s.assertividade), cor: COR.termos, tip: 'Termos aplicados divididos pelo total de Exec.' },
+      { k: 'assertividade', t: 'Assertividade', v: fmtPctVal(s.assertividade), cor: COR.termos, tip: 'Exec dividido pelo percorrido (Exec + Exoc).' },
       { k: 'neg', ind: 'neg', t: 'Negociações', v: fmtInt(s.neg), cor: COR.neg },
-      { k: 'efetividade', dep: 'neg', t: 'Efetividade', v: fmtPctVal(s.efetividade), cor: COR.neg, tip: 'Negociações divididas pelo total de Exec.' },
+      { k: 'efetividade', dep: ['termos', 'neg'], t: 'Efetividade', v: fmtPctVal(s.efetividade), cor: COR.neg, tip: 'Termos aplicados mais negociações, divididos pelo total de Exec.' },
     ];
     return h('div', { class: 'kpi-groups' },
       h('div', { class: 'grp-title', text: 'Resultado', 'aria-hidden': 'true' }),
@@ -5147,9 +5149,9 @@ window.FRENTES_PADRAO = [
         miniKpi('exec', 'Total de Exec', fmtInt(r.exec), null, COR.exec),
         miniKpi('exoc', 'Total de Exoc', fmtInt(r.exoc), null, COR.exoc),
         miniKpi('termos', 'Termos aplicados', fmtInt(r.termos), null, COR.termos),
-        miniKpi('assertividade', 'Assertividade', fmtPctVal(r.assertividade), 'Termos ÷ Exec', COR.termos),
+        miniKpi('assertividade', 'Assertividade', fmtPctVal(r.assertividade), 'Exec ÷ (Exec + Exoc)', COR.termos),
         miniKpi('neg', 'Negociações', fmtInt(r.neg), null, COR.neg),
-        miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), 'Negociações ÷ Exec', COR.neg),
+        miniKpi('efetividade', 'Efetividade', fmtPctVal(r.efetividade), '(Termos + Negociações) ÷ Exec', COR.neg),
         miniKpi('equipes', 'Total de equipes', fmtInt(r.equipes), null, COR.atividades)),
       cartaoRecorte(r),
       notas.length ? h('p', { class: 'note', text: notas.join(' ') }) : null);

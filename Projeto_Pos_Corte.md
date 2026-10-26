@@ -103,8 +103,8 @@ A comparação de cabeçalhos ignora maiúsculas, acentos e pontuação.
 | Indicador | Regra |
 |---|---|
 | Percorrido (= Atividades) | Exec + Exoc: registros da aba principal **dos serviços e status considerados** (abaixo), após deduplicação e filtros. |
-| Assertividade | Termos aplicados ÷ Exec. Sem Exec no filtro, mostra "—". |
-| Efetividade | Negociações ÷ Exec. Sem Exec no filtro, mostra "—". |
+| Assertividade | Exec ÷ (Exec + Exoc), ou seja, Exec sobre o percorrido. Sem percorrido no filtro, mostra "—". Definição indicada pelo usuário. |
+| Efetividade | (Termos aplicados + Negociações) ÷ Exec: soma das duas quantidades (uma atividade com termo e negociação conta nas duas), por isso pode passar de 100%. Sem Exec no filtro, mostra "—". Definição indicada pelo usuário. |
 | Equipes que trabalharam | Recursos distintos com ao menos uma atividade no dia ou no período filtrado. Também mostra a média de equipes por dia e os dias com atividade. |
 | Produtividade por cidade | Percorrido ÷ equipe-dias, isto é, visitas por equipe por dia trabalhado (uma equipe trabalhando um dia = 1 equipe-dia). É uma definição adotada por mim, a confirmar. |
 | Finalizadas — Exec | `Status da Atividade = Finalizada`. |
